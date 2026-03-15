@@ -405,6 +405,7 @@
             <div class="stat" style="color:#f1c40f"><span id="stat-gold">0</span> zl</div>
             <div class="stat">ATK <span id="stat-atk">5</span></div>
             <div class="stat">DEF <span id="stat-def">2</span></div>
+            <div class="stat" style="color:#2ecc71">AGI <span id="stat-agi">3</span></div>
             <div class="stat" style="color:#888;font-size:7px"><span id="stat-time">0:00</span></div>
             <div class="stat" style="color:#e74c3c;font-size:7px">&#9760;<span id="stat-deaths">0</span></div>
         </div>
@@ -445,11 +446,22 @@
                     <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#3498db">Zamknij [ESC]</button>
                 </div>
             </div>
+
+            <div id="worldmap-overlay" class="overlay">
+                <div class="overlay-box" style="border-color:#2ecc71;width:560px;max-width:95%">
+                    <h2 style="color:#2ecc71">Mapa Świata</h2>
+                    <div style="text-align:center">
+                        <canvas id="worldmap-canvas" width="500" height="380" style="image-rendering:pixelated;border:1px solid #333;background:#111;max-width:100%"></canvas>
+                    </div>
+                    <div id="worldmap-villages" style="margin-top:8px;max-height:80px;overflow-y:auto"></div>
+                    <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#2ecc71">Zamknij [ESC/N]</button>
+                </div>
+            </div>
         </div>
 
         <div id="message-log"></div>
         <div id="controls-hint">
-            [WASD] Ruch &nbsp; [SPACJA] Interakcja &nbsp; [E] Atak &nbsp; [I] Ekwipunek &nbsp; [K] Umiejetnosci &nbsp; [J] Questy &nbsp; [1-5] Skille &nbsp; [M] Muzyka &nbsp; [P] Zapis
+            [WASD] Ruch &nbsp; [SPACJA] Interakcja &nbsp; [E] Atak &nbsp; [I] Ekwipunek &nbsp; [K] Umiejetnosci &nbsp; [J] Questy &nbsp; [N] Mapa &nbsp; [1-5] Skille &nbsp; [M] Muzyka &nbsp; [P] Zapis
         </div>
     </div>
 

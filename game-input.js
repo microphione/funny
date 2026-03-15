@@ -37,6 +37,8 @@ const GameInput = {
         else if (e.code === 'KeyK') { GameUI.openSkillTree(); e.preventDefault(); }
         // Quests
         else if (e.code === 'KeyJ') { GameUI.openQuests(); e.preventDefault(); }
+        // World map
+        else if (e.code === 'KeyN') { GameUI.openWorldMap(); e.preventDefault(); }
         // Quick save
         else if (e.code === 'KeyP') { Game.save(); e.preventDefault(); }
         // Music toggle
@@ -88,20 +90,38 @@ const GameInput = {
         p.x = nx;
         p.y = ny;
 
+        // Track explored chunks (overworld only)
+        if (!World.activeDungeon) {
+            const ecx = Math.floor(nx / World.CHUNK_SIZE);
+            const ecy = Math.floor(ny / World.CHUNK_SIZE);
+            Game.exploredChunks.add(`${ecx},${ecy}`);
+        }
+
+        // Stealth step counter
+        if (Game.player.stealth && Game.player.stealthSteps > 0) {
+            Game.player.stealthSteps--;
+            if (Game.player.stealthSteps <= 0) {
+                Game.player.stealth = false;
+                Game.log('Niewidzialność się skończyła.', 'info');
+            }
+        }
+
         // After movement - end turn
         this.endPlayerTurn();
 
-        // Collect quest items
-        this.checkCollectQuest();
+        // Collect quest items (overworld only)
+        if (!World.activeDungeon) this.checkCollectQuest();
 
         // Music update
-        const biome = World.getBiome(nx, ny);
-        const inVillage = World.isVillageChunk(Math.floor(nx / World.CHUNK_SIZE), Math.floor(ny / World.CHUNK_SIZE));
-        const monstersNear = World.getMonstersNear(nx, ny, 3).length > 0;
-        Music.updateBiome(biome, inVillage, monstersNear);
+        if (!World.activeDungeon) {
+            const biome = World.getBiome(nx, ny);
+            const inVillage = World.isVillageChunk(Math.floor(nx / World.CHUNK_SIZE), Math.floor(ny / World.CHUNK_SIZE));
+            const monstersNear = World.getMonstersNear(nx, ny, 3).length > 0;
+            Music.updateBiome(biome, inVillage, monstersNear);
+        }
 
         // Cleanup far chunks periodically
-        if (Game.turnNumber % 20 === 0) World.cleanupChunks(nx, ny);
+        if (!World.activeDungeon && Game.turnNumber % 20 === 0) World.cleanupChunks(nx, ny);
     },
 
     performPlayerTurn(action) {
@@ -130,6 +150,8 @@ const GameInput = {
         const cls = CLASSES[Game.player.classId];
         Game.playerActionsLeft = cls.attacksPerTurn;
         GameRender.updateHUD();
+        // Periodic main quest check
+        if (Game.turnNumber % 10 === 0) Game.checkMainQuest();
     },
 
     interact() {
@@ -142,9 +164,42 @@ const GameInput = {
         const tile = World.getTile(tx, ty);
         const T = World.T;
 
+        // Cave entry - enter/navigate dungeon
+        if (tile === T.CAVE_ENTRY) {
+            if (World.activeDungeon) {
+                const d = World.activeDungeon;
+                if (tx === d.entryX && ty === d.entryY) {
+                    // Exit dungeon
+                    World.exitDungeon();
+                } else if (tx === d.exitX && ty === d.exitY) {
+                    // Next floor
+                    World.nextDungeonFloor();
+                }
+            } else {
+                // Enter dungeon from overworld
+                World.enterDungeon(tx, ty);
+            }
+            GameRender.updateHUD();
+            return;
+        }
+
         // Chest
         if (tile === T.CHEST) {
             const key = `${tx},${ty}`;
+            // Dungeon chests
+            if (World.activeDungeon) {
+                const dc = World.activeDungeon.chests && World.activeDungeon.chests[key];
+                if (!dc) { Game.log('Ta skrzynia jest już pusta.', 'info'); return; }
+                p.gold += dc.gold;
+                Game.log(`Skrzynia: +${dc.gold} złota!`, 'loot');
+                delete World.activeDungeon.chests[key];
+                if (Math.random() < 0.6) {
+                    const loot = generateLootForClass(p.classId, World.activeDungeon.difficulty + World.activeDungeon.floor);
+                    if (loot) { p.inventory.push(loot); Game.log(`Znaleziono: ${loot.name}!`, 'loot'); }
+                }
+                GameRender.updateHUD();
+                return;
+            }
             if (World.openedChests.has(key)) {
                 Game.log('Ta skrzynia jest już pusta.', 'info');
                 return;
@@ -216,18 +271,20 @@ const GameInput = {
                 // Accept quest
                 const q = { ...quest, progress: 0, completed: false, turned_in: false };
                 Game.quests.push(q);
+                if (q.type === 'collect') World.spawnQuestItems(q);
                 Game.log(`Nowy quest: ${q.title}`, 'info');
             }
             return;
         }
 
-        // Well - save point
+        // Well - save point + register for teleport
         if (tile === T.WELL) {
             const cx = Math.floor(tx / World.CHUNK_SIZE);
             const cy = Math.floor(ty / World.CHUNK_SIZE);
             const vk = World.getChunkKey(cx, cy);
             if (World.villages[vk]) {
                 Game.lastVillageWell = { x: tx, y: ty };
+                Game.usedWells.add(vk);
                 Game.log(`Punkt odrodzenia: ${World.villages[vk].name}`, 'info');
                 Game.save();
             }
@@ -277,9 +334,12 @@ const GameInput = {
     useSkillByIndex(idx) {
         const p = Game.player;
         const cls = CLASSES[p.classId];
-        const available = cls.skills.filter(s => p.unlockedSkills.includes(s.id));
-        if (idx >= available.length) return;
-        const skill = available[idx];
+        // Use active skill slots (3 slots max)
+        if (idx >= 3) return;
+        const skillId = p.activeSkills[idx];
+        if (!skillId) { Game.log('Brak umiejętności w tym slocie.', 'info'); return; }
+        const skill = cls.skills.find(s => s.id === skillId);
+        if (!skill) return;
 
         if (p.mp < skill.cost) {
             Game.log(`Za mało many na ${skill.name} (${skill.cost} MP)`, 'info');
@@ -328,19 +388,24 @@ const GameInput = {
 
     checkCollectQuest() {
         const p = Game.player;
-        Game.quests.forEach(q => {
-            if (q.type === 'collect' && !q.completed) {
-                const dist = Math.abs(p.x - q.targetX) + Math.abs(p.y - q.targetY);
-                if (dist < 5 && Math.random() < 0.2) {
-                    q.progress++;
-                    Game.log(`Zebrano ${q.itemName} (${q.progress}/${q.required})`, 'loot');
-                    if (q.progress >= q.required) {
-                        q.completed = true;
-                        Game.log(`Quest "${q.title}" ukończony! Wróć do zleceniodawcy.`, 'info');
+        const key = `${p.x},${p.y}`;
+        const qi = World.questItems[key];
+        if (qi) {
+            const q = Game.quests.find(q => q.id === qi.questId && !q.completed);
+            if (q) {
+                q.progress++;
+                delete World.questItems[key];
+                Game.log(`Zebrano ${qi.itemName} (${q.progress}/${q.required})`, 'loot');
+                if (q.progress >= q.required) {
+                    q.completed = true;
+                    Game.log(`Quest "${q.title}" ukończony! Wróć do zleceniodawcy.`, 'info');
+                    // Clean up remaining items for this quest
+                    for (const k in World.questItems) {
+                        if (World.questItems[k].questId === q.id) delete World.questItems[k];
                     }
                 }
             }
-        });
+        }
     },
 
     toggleMusic() {

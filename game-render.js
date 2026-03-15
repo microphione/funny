@@ -103,17 +103,78 @@ const GameRender = {
         const endX = startX + G.VIEW_W + 3;
         const endY = startY + G.VIEW_H + 3;
 
+        const T = World.T;
+        // Tiles that need a ground tile drawn underneath
+        const overlayTiles = new Set([T.TREE, T.SWAMP_TREE, T.CACTUS, T.CHEST, T.SIGN, T.WELL, T.STATUE,
+            T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC, T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC,
+            T.FENCE, T.INN, T.HOUSE, T.VILLAGE_HUT, T.ROCK]);
+
+        // First pass: ground tiles
         for (let wy = startY; wy < endY; wy++) {
             for (let wx = startX; wx < endX; wx++) {
                 const sx = Math.floor((wx - camX) * TILE);
                 const sy = Math.floor((wy - camY) * TILE);
                 const tile = World.getTile(wx, wy);
+
+                if (overlayTiles.has(tile)) {
+                    // Draw appropriate ground underneath
+                    const biome = World.activeDungeon ? 4 : World.getBiome(wx, wy);
+                    const v = ((wx * 7 + wy * 13) & 0x7fffffff) % 4;
+                    let groundSprite = 'grass_' + v;
+                    if (World.activeDungeon) groundSprite = 'cave_floor_' + (v % 3);
+                    else if (biome === 1) groundSprite = 'darkgrass_' + v;
+                    else if (biome === 2) groundSprite = 'swamp_' + v;
+                    else if (biome === 3) groundSprite = 'mountain_' + v;
+                    else if (biome === 4) groundSprite = 'desert_' + v;
+                    // Village tiles get stone floor
+                    const cx = Math.floor(wx / World.CHUNK_SIZE);
+                    const cy = Math.floor(wy / World.CHUNK_SIZE);
+                    if (World.villages[`${cx},${cy}`]) groundSprite = 'stone_floor';
+                    Sprites.draw(ctx, groundSprite, sx, sy);
+                }
+
                 const spriteKey = this.getTileSprite(tile, wx, wy, animFrame);
                 Sprites.draw(ctx, spriteKey, sx, sy);
 
                 // Opened chest check
-                if (tile === World.T.CHEST && World.openedChests.has(`${wx},${wy}`)) {
+                if (tile === T.CHEST && World.openedChests.has(`${wx},${wy}`)) {
                     Sprites.draw(ctx, 'chest_open', sx, sy);
+                }
+
+                // Quest item pickup sparkle
+                if (!World.activeDungeon && World.questItems[`${wx},${wy}`]) {
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 200 + wx + wy) * 0.3;
+                    ctx.beginPath();
+                    ctx.arc(sx + 16, sy + 16, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.arc(sx + 16, sy + 16, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+            }
+        }
+
+        // Second pass: draw tree canopy over player (trees in rows above player)
+        // Player can walk "behind" trees - draw upper portion over player
+        const playerScreenY = Math.floor((p.visualY - camY) * TILE);
+        for (let wy = startY; wy < endY; wy++) {
+            const tileScreenY = Math.floor((wy - camY) * TILE);
+            // Only redraw overlay tiles that are at same or lower row than player (player walks behind them)
+            if (tileScreenY > playerScreenY + TILE) continue;
+            for (let wx = startX; wx < endX; wx++) {
+                const tile = World.getTile(wx, wy);
+                if (tile === T.TREE || tile === T.SWAMP_TREE) {
+                    // Only redraw if player is directly below (within 1 tile)
+                    if (wy >= Math.floor(p.visualY) - 1 && wy <= Math.floor(p.visualY)) {
+                        const sx = Math.floor((wx - camX) * TILE);
+                        const sy = Math.floor((wy - camY) * TILE);
+                        ctx.globalAlpha = 0.7;
+                        Sprites.draw(ctx, this.getTileSprite(tile, wx, wy, animFrame), sx, sy);
+                        ctx.globalAlpha = 1;
+                    }
                 }
             }
         }
@@ -182,7 +243,14 @@ const GameRender = {
 
         // Location label
         const locLabel = document.getElementById('location-label');
-        if (locLabel) locLabel.textContent = World.getAreaName(p.x, p.y);
+        if (locLabel) {
+            if (World.activeDungeon) {
+                const d = World.activeDungeon;
+                locLabel.textContent = `${d.type.name} - Piętro ${d.floor}/${d.type.floors}`;
+            } else {
+                locLabel.textContent = World.getAreaName(p.x, p.y);
+            }
+        }
     },
 
     drawDirectionIndicator(ctx, px, py, dir) {
@@ -241,6 +309,38 @@ const GameRender = {
             }
         }
 
+        // Quest NPC markers (question marks on minimap)
+        Game.quests.forEach(q => {
+            if (q.turned_in) return;
+            // Show collect quest target area
+            if (q.type === 'collect' && !q.completed && q.targetX) {
+                const qdx = q.targetX - p.x;
+                const qdy = q.targetY - p.y;
+                if (Math.abs(qdx) <= hw && Math.abs(qdy) <= hh) {
+                    mctx.fillStyle = '#e67e22';
+                    mctx.fillRect((qdx + hw) * scale, (qdy + hh) * scale, scale, scale);
+                }
+            }
+        });
+        // Quest NPCs on minimap (green ? for completable, orange for active)
+        for (const key in World.questNpcs) {
+            const [nx, ny] = key.split(',').map(Number);
+            const qdx = nx - p.x, qdy = ny - p.y;
+            if (Math.abs(qdx) <= hw && Math.abs(qdy) <= hh) {
+                const quest = Game.quests.find(q => q.id === World.questNpcs[key].id);
+                if (quest && quest.completed && !quest.turned_in) {
+                    mctx.fillStyle = '#2ecc71'; // green - ready to turn in
+                } else if (quest && !quest.turned_in) {
+                    mctx.fillStyle = '#e67e22'; // orange - in progress
+                } else if (!quest) {
+                    mctx.fillStyle = '#f1c40f'; // yellow - available
+                } else {
+                    continue; // turned in, skip
+                }
+                mctx.fillRect((qdx + hw) * scale, (qdy + hh) * scale, scale, scale);
+            }
+        }
+
         // Player dot
         mctx.fillStyle = '#fff';
         mctx.fillRect(hw * scale, hh * scale, scale, scale);
@@ -263,6 +363,7 @@ const GameRender = {
         set('stat-gold', p.gold);
         set('stat-atk', s.atk);
         set('stat-def', s.def);
+        set('stat-agi', s.agi);
         set('stat-class', CLASSES[p.classId]?.name || '');
         set('stat-time', Game.getPlayTime());
         set('stat-deaths', Game.deathCount);

@@ -18,7 +18,7 @@ const World = {
         SWAMP_TREE: 28, CACTUS: 29, VILLAGE_HUT: 30,
         NPC_QUEST: 31, NPC_QUEST2: 32, NPC_SHOPKEEPER: 33,
         SHOP_FLOOR: 35, SHOP_WEAPON_NPC: 36, SHOP_ARMOR_NPC: 37,
-        SHOP_POTION_NPC: 38,
+        SHOP_POTION_NPC: 38, QUEST_ITEM: 39,
     },
 
     BIOME: { PLAINS: 0, FOREST: 1, SWAMP: 2, MOUNTAIN: 3, DESERT: 4 },
@@ -64,6 +64,7 @@ const World = {
         this.npcs = {};
         this.questNpcs = {};
         this.monsters = {};  // key: "x,y" -> monster object
+        this.questItems = {}; // key: "x,y" -> { questId, itemName }
     },
 
     rng(x, y, extra) {
@@ -179,7 +180,7 @@ const World = {
                 tiles[cidx] = T.CHEST;
                 const diff = this.getDifficulty(ox + chx, oy + chy);
                 this.chests[`${ox+chx},${oy+chy}`] = {
-                    gold: Math.floor(10 + diff * 15 * this.rng(cx, cy, 203)),
+                    gold: Math.floor(5 + diff * 8 * this.rng(cx, cy, 203)),
                 };
             }
         }
@@ -250,15 +251,17 @@ const World = {
     },
 
     getMonsterAt(wx, wy) {
+        if (this.activeDungeon) return this.getDungeonMonsterAt(wx, wy);
         const m = this.monsters[`${wx},${wy}`];
         return (m && m.alive) ? m : null;
     },
 
     moveMonster(m, nx, ny) {
+        if (this.activeDungeon) { this.moveDungeonMonster(m, nx, ny); return; }
         if (!m || !m.alive) return;
         const oldKey = `${m.x},${m.y}`;
         const newKey = `${nx},${ny}`;
-        if (this.monsters[newKey]) return; // occupied
+        if (this.monsters[newKey]) return;
         delete this.monsters[oldKey];
         m.x = nx;
         m.y = ny;
@@ -266,11 +269,13 @@ const World = {
     },
 
     removeMonster(m) {
+        if (this.activeDungeon) { this.removeDungeonMonster(m); return; }
         if (!m) return;
         delete this.monsters[`${m.x},${m.y}`];
     },
 
     getMonstersNear(px, py, range) {
+        if (this.activeDungeon) return this.getDungeonMonstersNear(px, py, range);
         const result = [];
         for (const key in this.monsters) {
             const m = this.monsters[key];
@@ -431,6 +436,24 @@ const World = {
         }
     },
 
+    spawnQuestItems(quest) {
+        if (quest.type !== 'collect' || !quest.targetX) return;
+        const count = quest.required;
+        for (let i = 0; i < count + 3; i++) { // spawn a few extra
+            const angle = (i / (count + 3)) * Math.PI * 2 + this.rng(quest.targetX, i, 600) * 0.5;
+            const dist = 2 + Math.floor(this.rng(quest.targetY, i, 601) * 6);
+            const qx = quest.targetX + Math.floor(Math.cos(angle) * dist);
+            const qy = quest.targetY + Math.floor(Math.sin(angle) * dist);
+            const key = `${qx},${qy}`;
+            if (!this.questItems[key] && !this.monsters[key]) {
+                const tile = this.getTile(qx, qy);
+                if (!this.isTileBlocked(tile) && tile !== this.T.WATER) {
+                    this.questItems[key] = { questId: quest.id, itemName: quest.itemName };
+                }
+            }
+        }
+    },
+
     getVillageName(cx, cy) {
         const pre = ['El','Ald','Kor','Myr','Dra','Val','Syl','Gor','Tar','Nol','Bel','Ith','Zar','Mor','Fen','Ash'];
         const suf = ['doria','heim','wald','grad','burg','ton','ria','lund','gar','mir','oth','ven','dal','sten','rok','vik'];
@@ -438,6 +461,7 @@ const World = {
     },
 
     getTile(wx, wy) {
+        if (this.activeDungeon) return this.getDungeonTile(wx, wy);
         const cx = Math.floor(wx / this.CHUNK_SIZE);
         const cy = Math.floor(wy / this.CHUNK_SIZE);
         const lx = ((wx % this.CHUNK_SIZE) + this.CHUNK_SIZE) % this.CHUNK_SIZE;
@@ -448,7 +472,6 @@ const World = {
     isWalkable(wx, wy) {
         const t = this.getTile(wx, wy);
         if (this.isTileBlocked(t)) return false;
-        // Also check for monsters
         if (this.getMonsterAt(wx, wy)) return false;
         return true;
     },
@@ -471,6 +494,237 @@ const World = {
             if (d < bestDist) { bestDist = d; best = v; }
         }
         return best;
+    },
+
+    // ========== DUNGEON SYSTEM ==========
+    DUNGEON_TYPES: [
+        { id: 'goblin_cave', name: 'Jaskinia Goblinów', monsters: ['goblin','spider'], boss: { name: 'Król Goblinów', sprite: 'goblin', hpMult: 8, atkMult: 3, defMult: 2, xpMult: 10, goldMult: 15 }, floors: 3, biome: 'cave' },
+        { id: 'undead_crypt', name: 'Krypta Nieumarłych', monsters: ['ghost','mummy'], boss: { name: 'Lich', sprite: 'ghost', hpMult: 10, atkMult: 4, defMult: 3, xpMult: 15, goldMult: 20 }, floors: 4, biome: 'crypt' },
+        { id: 'spider_nest', name: 'Gniazdo Pająków', monsters: ['spider','beetle'], boss: { name: 'Matka Pająków', sprite: 'spider', hpMult: 12, atkMult: 3, defMult: 2, xpMult: 12, goldMult: 18 }, floors: 3, biome: 'cave' },
+        { id: 'dragon_lair', name: 'Smocze Leże', monsters: ['dark_knight','golem'], boss: { name: 'Prastarzy Smok', sprite: 'griffin', hpMult: 15, atkMult: 5, defMult: 4, xpMult: 25, goldMult: 30 }, floors: 5, biome: 'fire' },
+        { id: 'shadow_realm', name: 'Kraina Cieni', monsters: ['ghost','djinn'], boss: { name: 'Władca Cieni', sprite: 'djinn', hpMult: 20, atkMult: 6, defMult: 5, xpMult: 30, goldMult: 40 }, floors: 5, biome: 'shadow' },
+    ],
+
+    activeDungeon: null, // { type, floor, tiles, monsters, exitX, exitY, size }
+    dungeonReturnPos: null, // { x, y } - where player was before entering
+
+    getDungeonType(wx, wy) {
+        const idx = Math.abs((wx * 13 + wy * 7 + this.worldSeed) % this.DUNGEON_TYPES.length);
+        return this.DUNGEON_TYPES[idx];
+    },
+
+    enterDungeon(wx, wy) {
+        const diff = this.getDifficulty(wx, wy);
+        const dtype = this.getDungeonType(wx, wy);
+        this.dungeonReturnPos = { x: Game.player.x, y: Game.player.y };
+        this.activeDungeon = {
+            type: dtype,
+            floor: 1,
+            difficulty: diff,
+            size: 25,
+        };
+        this.generateDungeonFloor();
+        Game.log(`Wchodzisz do: ${dtype.name} (Lv.${diff})`, 'info');
+    },
+
+    generateDungeonFloor() {
+        const d = this.activeDungeon;
+        if (!d) return;
+        const S = d.size;
+        const tiles = new Array(S * S).fill(this.T.CAVE_WALL);
+        const isBossFloor = d.floor >= d.type.floors;
+
+        // Simple room-based dungeon generation
+        const rooms = [];
+        const roomCount = 4 + d.floor;
+        for (let i = 0; i < roomCount; i++) {
+            const rw = 4 + Math.floor(this.rng(d.floor, i, 700) * 4);
+            const rh = 4 + Math.floor(this.rng(d.floor, i, 701) * 4);
+            const rx = 1 + Math.floor(this.rng(d.floor, i, 702) * (S - rw - 2));
+            const ry = 1 + Math.floor(this.rng(d.floor, i, 703) * (S - rh - 2));
+            rooms.push({ x: rx, y: ry, w: rw, h: rh, cx: rx + Math.floor(rw/2), cy: ry + Math.floor(rh/2) });
+            for (let y = ry; y < ry + rh; y++)
+                for (let x = rx; x < rx + rw; x++)
+                    tiles[y * S + x] = this.T.CAVE_FLOOR;
+        }
+
+        // Connect rooms with corridors
+        for (let i = 1; i < rooms.length; i++) {
+            const a = rooms[i-1], b = rooms[i];
+            let cx = a.cx, cy = a.cy;
+            while (cx !== b.cx) {
+                tiles[cy * S + cx] = this.T.CAVE_FLOOR;
+                cx += cx < b.cx ? 1 : -1;
+            }
+            while (cy !== b.cy) {
+                tiles[cy * S + cx] = this.T.CAVE_FLOOR;
+                cy += cy < b.cy ? 1 : -1;
+            }
+        }
+
+        // Place entrance in first room
+        const startRoom = rooms[0];
+        tiles[startRoom.cy * S + startRoom.cx] = this.T.CAVE_ENTRY;
+        d.entryX = startRoom.cx;
+        d.entryY = startRoom.cy;
+
+        // Place exit/boss in last room
+        const endRoom = rooms[rooms.length - 1];
+        if (isBossFloor) {
+            // Boss marker - just a floor tile, boss is a monster
+            tiles[endRoom.cy * S + endRoom.cx] = this.T.CAVE_FLOOR;
+        } else {
+            // Stairs down
+            tiles[endRoom.cy * S + endRoom.cx] = this.T.CAVE_ENTRY;
+            d.exitX = endRoom.cx;
+            d.exitY = endRoom.cy;
+        }
+
+        // Clear dungeon monsters
+        d.monsters = {};
+
+        // Spawn dungeon monsters
+        const monsterPool = d.type.monsters;
+        const monsterCount = 3 + d.floor * 2;
+        for (let i = 0; i < monsterCount; i++) {
+            const room = rooms[1 + Math.floor(this.rng(d.floor, i, 710) * (rooms.length - 2))];
+            if (!room) continue;
+            const mx = room.x + 1 + Math.floor(this.rng(d.floor, i, 711) * (room.w - 2));
+            const my = room.y + 1 + Math.floor(this.rng(d.floor, i, 712) * (room.h - 2));
+            const mKey = `${mx},${my}`;
+            if (d.monsters[mKey]) continue;
+            if (tiles[my * S + mx] !== this.T.CAVE_FLOOR) continue;
+
+            const spriteKey = monsterPool[Math.floor(this.rng(d.floor, i, 713) * monsterPool.length)];
+            const allMobs = Object.values(this.MONSTERS).flat();
+            const base = allMobs.find(m => m.sprite === spriteKey) || allMobs[0];
+            const scale = 1 + (d.difficulty - 1) * 0.5 + d.floor * 0.3;
+            const isElite = this.rng(d.floor, i, 714) < 0.12;
+            const eMult = isElite ? 2.5 : 1;
+
+            d.monsters[mKey] = {
+                id: mKey, name: (isElite ? '★ ' : '') + base.name,
+                baseName: base.name, sprite: base.sprite,
+                x: mx, y: my,
+                hp: Math.floor(base.hp * scale * eMult),
+                maxHp: Math.floor(base.hp * scale * eMult),
+                atk: Math.floor(base.atk * scale * eMult),
+                def: Math.floor(base.def * scale),
+                xp: Math.floor(base.xp * scale * eMult * 1.5),
+                gold: [Math.floor(base.gold[0] * scale * eMult), Math.floor(base.gold[1] * scale * eMult * 1.5)],
+                level: d.difficulty + d.floor,
+                isElite, biome: 'dungeon',
+                stunned: 0, poisoned: 0, frozen: 0, alive: true,
+            };
+        }
+
+        // Spawn boss on boss floor
+        if (isBossFloor) {
+            const boss = d.type.boss;
+            const allMobs = Object.values(this.MONSTERS).flat();
+            const base = allMobs.find(m => m.sprite === boss.sprite) || allMobs[0];
+            const scale = 1 + (d.difficulty - 1) * 0.5;
+            const bKey = `${endRoom.cx},${endRoom.cy}`;
+            d.monsters[bKey] = {
+                id: bKey, name: '⚔ ' + boss.name,
+                baseName: boss.name, sprite: boss.sprite,
+                x: endRoom.cx, y: endRoom.cy,
+                hp: Math.floor(base.hp * scale * boss.hpMult),
+                maxHp: Math.floor(base.hp * scale * boss.hpMult),
+                atk: Math.floor(base.atk * scale * boss.atkMult),
+                def: Math.floor(base.def * scale * boss.defMult),
+                xp: Math.floor(base.xp * scale * boss.xpMult),
+                gold: [Math.floor(base.gold[0] * scale * boss.goldMult), Math.floor(base.gold[1] * scale * boss.goldMult)],
+                level: d.difficulty + d.floor + 2,
+                isElite: false, isBoss: true, biome: 'dungeon',
+                stunned: 0, poisoned: 0, frozen: 0, alive: true,
+            };
+        }
+
+        // Place a chest in a random room
+        if (rooms.length > 2) {
+            const chestRoom = rooms[Math.floor(rooms.length / 2)];
+            tiles[chestRoom.cy * S + (chestRoom.cx + 1)] = this.T.CHEST;
+            const ckey = `${chestRoom.cx + 1},${chestRoom.cy}`;
+            d.chests = d.chests || {};
+            d.chests[ckey] = { gold: Math.floor(15 + d.difficulty * 12 + d.floor * 8) };
+        }
+
+        d.tiles = tiles;
+
+        // Position player at entrance
+        Game.player.x = d.entryX;
+        Game.player.y = d.entryY;
+        Game.player.visualX = d.entryX;
+        Game.player.visualY = d.entryY;
+    },
+
+    exitDungeon() {
+        if (!this.dungeonReturnPos) return;
+        const p = Game.player;
+        p.x = this.dungeonReturnPos.x;
+        p.y = this.dungeonReturnPos.y;
+        p.visualX = p.x;
+        p.visualY = p.y;
+        this.activeDungeon = null;
+        this.dungeonReturnPos = null;
+        Game.log('Opuszczasz dungeon.', 'info');
+    },
+
+    nextDungeonFloor() {
+        const d = this.activeDungeon;
+        if (!d) return;
+        d.floor++;
+        if (d.floor > d.type.floors) {
+            this.exitDungeon();
+            Game.log('Dungeon ukończony! Gratulacje!', 'loot');
+            return;
+        }
+        this.generateDungeonFloor();
+        Game.log(`Piętro ${d.floor}/${d.type.floors}`, 'info');
+    },
+
+    // Dungeon-aware tile/monster access
+    getDungeonTile(x, y) {
+        const d = this.activeDungeon;
+        if (!d || x < 0 || y < 0 || x >= d.size || y >= d.size) return this.T.CAVE_WALL;
+        return d.tiles[y * d.size + x];
+    },
+
+    getDungeonMonsterAt(x, y) {
+        const d = this.activeDungeon;
+        if (!d) return null;
+        const m = d.monsters[`${x},${y}`];
+        return (m && m.alive) ? m : null;
+    },
+
+    getDungeonMonstersNear(px, py, range) {
+        const d = this.activeDungeon;
+        if (!d) return [];
+        const result = [];
+        for (const key in d.monsters) {
+            const m = d.monsters[key];
+            if (!m.alive) continue;
+            if (Math.abs(m.x - px) <= range && Math.abs(m.y - py) <= range) result.push(m);
+        }
+        return result;
+    },
+
+    moveDungeonMonster(m, nx, ny) {
+        const d = this.activeDungeon;
+        if (!d || !m || !m.alive) return;
+        const oldKey = `${m.x},${m.y}`;
+        const newKey = `${nx},${ny}`;
+        if (d.monsters[newKey]) return;
+        delete d.monsters[oldKey];
+        m.x = nx; m.y = ny;
+        d.monsters[newKey] = m;
+    },
+
+    removeDungeonMonster(m) {
+        const d = this.activeDungeon;
+        if (!d || !m) return;
+        delete d.monsters[`${m.x},${m.y}`];
     },
 
     cleanupChunks(px, py) {

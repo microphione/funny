@@ -13,6 +13,10 @@ const Game = {
     lastVillageWell: null,
     quests: [],
     combatLog: [],
+    exploredChunks: new Set(), // tracks explored chunk keys for world map
+    usedWells: new Set(), // tracks wells used for teleporting
+    mainQuestStage: 0, // main story progression
+    dungeonBossesKilled: new Set(), // track which dungeon bosses defeated
 
     // Canvas
     canvas: null,
@@ -75,8 +79,11 @@ const Game = {
             skillPoints: 0,
             treeProgress: {}, // { nodeId: true }
             unlockedSkills: [],
+            skillLevels: {}, // { skillId: level } - upgradeable
+            activeSkills: [null, null, null], // 3 active skill slots
             buffs: [], // { id, turns }
             stealth: false,
+            stealthSteps: 0, // remaining stealth steps
         };
         // Give starting items
         const startWeapon = generateItemForClass(classId, 1, 'weapon');
@@ -143,17 +150,21 @@ const Game = {
         while (p.xp >= p.xpToNext) {
             p.xp -= p.xpToNext;
             p.level++;
-            p.skillPoints += 2;
-            p.xpToNext = Math.floor(30 * Math.pow(1.4, p.level - 1));
+            p.skillPoints += 1;
+            p.xpToNext = Math.floor(50 * Math.pow(1.6, p.level - 1));
             this.refreshStats();
             p.hp = p.maxHp;
             p.mp = p.maxMp;
-            this.log(`Poziom ${p.level}! +2 Punkty Umiejętności`, 'info');
+            this.log(`Poziom ${p.level}! +1 Punkt Umiejętności`, 'info');
             // Check new skills
             const cls = CLASSES[p.classId];
             cls.skills.forEach(sk => {
                 if (sk.level <= p.level && !p.unlockedSkills.includes(sk.id)) {
                     p.unlockedSkills.push(sk.id);
+                    p.skillLevels[sk.id] = 1;
+                    // Auto-assign to first empty active slot
+                    const emptySlot = p.activeSkills.indexOf(null);
+                    if (emptySlot !== -1) p.activeSkills[emptySlot] = sk.id;
                     this.log(`Nowa umiejętność: ${sk.name}!`, 'info');
                 }
             });
@@ -185,7 +196,7 @@ const Game = {
         const p = this.player;
         if (!p) return;
         const data = {
-            version: 'pq_save_v4',
+            version: 'pq_save_v5',
             classId: p.classId,
             x: p.x, y: p.y, dir: p.dir,
             level: p.level, xp: p.xp, xpToNext: p.xpToNext,
@@ -197,6 +208,8 @@ const Game = {
             skillPoints: p.skillPoints,
             treeProgress: p.treeProgress,
             unlockedSkills: p.unlockedSkills,
+            skillLevels: p.skillLevels,
+            activeSkills: p.activeSkills,
             quests: this.quests,
             gameTime: Math.floor((Date.now() - this.startTime) / 1000) + this.gameTime,
             deathCount: this.deathCount,
@@ -205,17 +218,21 @@ const Game = {
             openedChests: [...World.openedChests],
             lastVillageWell: this.lastVillageWell,
             musicMuted: Music.muted,
+            exploredChunks: [...this.exploredChunks],
+            usedWells: [...this.usedWells],
+            mainQuestStage: this.mainQuestStage,
+            dungeonBossesKilled: [...this.dungeonBossesKilled],
         };
-        localStorage.setItem('pq_save_v4', JSON.stringify(data));
+        localStorage.setItem('pq_save_v5', JSON.stringify(data));
         this.log('Gra zapisana!', 'info');
     },
 
     load() {
-        const raw = localStorage.getItem('pq_save_v4');
+        const raw = localStorage.getItem('pq_save_v5');
         if (!raw) return false;
         try {
             const d = JSON.parse(raw);
-            if (d.version !== 'pq_save_v4') return false;
+            if (d.version !== 'pq_save_v5') return false;
 
             this.createPlayer(d.classId);
             const p = this.player;
@@ -230,6 +247,8 @@ const Game = {
                 skillPoints: d.skillPoints || 0,
                 treeProgress: d.treeProgress || {},
                 unlockedSkills: d.unlockedSkills || [],
+                skillLevels: d.skillLevels || {},
+                activeSkills: d.activeSkills || [null, null, null],
                 visualX: d.x, visualY: d.y,
             });
             this.quests = d.quests || [];
@@ -242,6 +261,10 @@ const Game = {
             World.init(d.worldSeed);
             if (d.openedChests) World.openedChests = new Set(d.openedChests);
             if (d.musicMuted) Music.muted = true;
+            if (d.exploredChunks) this.exploredChunks = new Set(d.exploredChunks);
+            if (d.usedWells) this.usedWells = new Set(d.usedWells);
+            this.mainQuestStage = d.mainQuestStage || 0;
+            if (d.dungeonBossesKilled) this.dungeonBossesKilled = new Set(d.dungeonBossesKilled);
 
             this.refreshStats();
             return true;
@@ -280,6 +303,36 @@ const Game = {
         this.activeOverlay = null;
         GameUI.hideAllOverlays();
         this.log('Odrodzono w wiosce.', 'info');
+    },
+
+    // ========== MAIN QUEST ==========
+    MAIN_QUEST_STAGES: [
+        { id: 0, title: 'Początek Przygody', desc: 'Eksploruj świat i osiągnij poziom 3.', check: (g) => g.player.level >= 3 },
+        { id: 1, title: 'Pierwsza Wioska', desc: 'Odwiedź wioskę i użyj studni.', check: (g) => g.usedWells.size >= 1 },
+        { id: 2, title: 'Łowca Potworów', desc: 'Zabij 20 potworów.', check: (g) => g.killCount >= 20 },
+        { id: 3, title: 'Odkrywca', desc: 'Odkryj 3 różne wioski.', check: (g) => g.usedWells.size >= 3 },
+        { id: 4, title: 'Poszukiwacz Przygód', desc: 'Ukończ 3 questy.', check: (g) => g.quests.filter(q => q.turned_in).length >= 3 },
+        { id: 5, title: 'Wyprawa do Podziemi', desc: 'Pokonaj bossa w Jaskini Goblinów.', check: (g) => g.dungeonBossesKilled.has('goblin_cave') },
+        { id: 6, title: 'Pogromca Nieumarłych', desc: 'Pokonaj bossa w Krypcie Nieumarłych.', check: (g) => g.dungeonBossesKilled.has('undead_crypt') },
+        { id: 7, title: 'Pajączy Koszmar', desc: 'Pokonaj bossa w Gnieździe Pająków.', check: (g) => g.dungeonBossesKilled.has('spider_nest') },
+        { id: 8, title: 'Smocze Wyzwanie', desc: 'Pokonaj Prastarego Smoka.', check: (g) => g.dungeonBossesKilled.has('dragon_lair') },
+        { id: 9, title: 'Ostateczna Bitwa', desc: 'Pokonaj Władcę Cieni i uratuj świat!', check: (g) => g.dungeonBossesKilled.has('shadow_realm') },
+        { id: 10, title: 'Bohater Krainy!', desc: 'Pokonałeś wszystkie zagrożenia. Świat jest bezpieczny!', check: () => false },
+    ],
+
+    checkMainQuest() {
+        const stage = this.MAIN_QUEST_STAGES[this.mainQuestStage];
+        if (stage && stage.check(this)) {
+            this.mainQuestStage++;
+            const next = this.MAIN_QUEST_STAGES[this.mainQuestStage];
+            if (next) {
+                this.log(`[Główny Quest] ${stage.title} - Ukończono!`, 'loot');
+                this.log(`[Główny Quest] Nowy cel: ${next.title}`, 'info');
+                // Reward
+                this.player.gold += 50 + this.mainQuestStage * 30;
+                this.addXp(30 + this.mainQuestStage * 20);
+            }
+        }
     },
 
     closeAllOverlays() {

@@ -42,11 +42,16 @@ const CLASSES = {
         attacksPerTurn: 1,
         allowedItems: ['sword','axe','mace','helmet','armor','pants','boots','shield'],
         skills: [
-            { level: 1,  id: 'shield_bash', name: 'Uderzenie Tarczą', desc: 'Ogłusza wroga na 1 turę. Obrażenia 1.2x', cost: 8, type: 'melee' },
-            { level: 5,  id: 'power_strike', name: 'Potężne Uderzenie', desc: 'Obrażenia 2x ATK', cost: 12, type: 'melee' },
-            { level: 10, id: 'whirlwind', name: 'Wir Ostrza', desc: 'Uderza wszystkich wrogów dookoła', cost: 20, type: 'aoe' },
-            { level: 15, id: 'iron_skin', name: 'Żelazna Skóra', desc: '+50% DEF na 3 tury', cost: 15, type: 'buff' },
-            { level: 20, id: 'execute', name: 'Egzekucja', desc: '3x obrażenia jeśli wróg <30% HP', cost: 25, type: 'melee' },
+            { level: 1,  id: 'shield_bash', name: 'Uderzenie Tarczą', desc: 'Ogłusza wroga. Obrażenia 1.2x (+0.2x/lv)', cost: 8, type: 'melee', baseMult: 1.2, multPerLv: 0.2 },
+            { level: 2,  id: 'power_strike', name: 'Potężne Uderzenie', desc: 'Obrażenia 2x ATK (+0.3x/lv)', cost: 12, type: 'melee', baseMult: 2.0, multPerLv: 0.3 },
+            { level: 4,  id: 'iron_skin', name: 'Żelazna Skóra', desc: '+50% DEF na 3 tury (+1 tura/lv)', cost: 15, type: 'buff' },
+            { level: 6,  id: 'whirlwind', name: 'Wir Ostrza', desc: 'Uderza wszystkich dookoła 1.5x (+0.2x/lv)', cost: 20, type: 'aoe', baseMult: 1.5, multPerLv: 0.2 },
+            { level: 8,  id: 'taunt', name: 'Prowokacja', desc: 'Wszystkie potwory atakują ciebie (+1 tura/lv)', cost: 10, type: 'aoe' },
+            { level: 10, id: 'execute', name: 'Egzekucja', desc: '3x dmg jeśli wróg <30% HP (+0.5x/lv)', cost: 25, type: 'melee', baseMult: 3.0, multPerLv: 0.5 },
+            { level: 13, id: 'war_cry', name: 'Okrzyk Wojenny', desc: '+30% ATK na 3 tury (+5%/lv)', cost: 18, type: 'buff' },
+            { level: 16, id: 'shield_wall', name: 'Mur Tarcz', desc: 'Blokuje 80% dmg przez 2 tury (+1/lv)', cost: 22, type: 'buff' },
+            { level: 19, id: 'ground_slam', name: 'Trzęsienie', desc: 'Ogłusza i zadaje 2x w promieniu 2 (+0.3x/lv)', cost: 30, type: 'aoe', baseMult: 2.0, multPerLv: 0.3 },
+            { level: 22, id: 'last_stand', name: 'Ostatnia Szansa', desc: 'Nie możesz zginąć przez 3 tury (+1/lv)', cost: 35, type: 'buff' },
         ],
         tree: {
             defense: { name: 'Obrona', nodes: [
@@ -73,13 +78,18 @@ const CLASSES = {
         baseStats: { hp: 40, mp: 30, atk: 6, def: 2, agi: 5 },
         hpPerLevel: 5, mpPerLevel: 3, atkPerLevel: 1.5, defPerLevel: 1, agiPerLevel: 1,
         attacksPerTurn: 2,
-        allowedItems: ['dagger','sword','hood','cape','leggings','boots'],
+        allowedItems: ['dagger','sword','hood','cape','leggings','boots','offhand_dagger'],
         skills: [
-            { level: 1,  id: 'stealth', name: 'Niewidzialność', desc: 'Stajesz się niewidzialny. Następny atak 2.5x', cost: 10, type: 'buff' },
-            { level: 5,  id: 'backstab', name: 'Cios w Plecy', desc: '2x obrażenia', cost: 12, type: 'melee' },
-            { level: 10, id: 'poison_blade', name: 'Zatrute Ostrze', desc: 'Obrażenia + trucie 3 tury', cost: 15, type: 'melee' },
-            { level: 15, id: 'shadow_step', name: 'Krok Cienia', desc: 'Teleport za wroga + atak', cost: 18, type: 'melee' },
-            { level: 20, id: 'assassinate', name: 'Zamach', desc: '4x obrażenia jeśli niewidzialny', cost: 25, type: 'melee' },
+            { level: 1,  id: 'stealth', name: 'Niewidzialność', desc: 'Niewidzialny na 5 kratek (+2/lv)', cost: 10, type: 'buff' },
+            { level: 2,  id: 'backstab', name: 'Cios w Plecy', desc: '2x obrażenia (+0.3x/lv)', cost: 12, type: 'melee', baseMult: 2.0, multPerLv: 0.3 },
+            { level: 4,  id: 'poison_blade', name: 'Zatrute Ostrze', desc: 'Obrażenia + trucizna 3 tury (+1/lv)', cost: 15, type: 'melee', baseMult: 1.5, multPerLv: 0.2 },
+            { level: 6,  id: 'shadow_step', name: 'Krok Cienia', desc: 'Teleport za wroga + 2x atak (+0.3x/lv)', cost: 18, type: 'melee', baseMult: 2.0, multPerLv: 0.3 },
+            { level: 8,  id: 'smoke_bomb', name: 'Bomba Dymna', desc: 'Ogłusza wrogów dookoła na 2 tury (+1/lv)', cost: 14, type: 'aoe' },
+            { level: 10, id: 'assassinate', name: 'Zamach', desc: '4x dmg jeśli niewidzialny (+0.5x/lv)', cost: 25, type: 'melee', baseMult: 4.0, multPerLv: 0.5 },
+            { level: 13, id: 'blade_fury', name: 'Furia Ostrzy', desc: 'Atak 3x na losowych wrogów (+1 atak/lv)', cost: 20, type: 'aoe', baseMult: 1.0, multPerLv: 0.15 },
+            { level: 16, id: 'mark_death', name: 'Znak Śmierci', desc: 'Oznaczony wróg dostaje +50% dmg (+10%/lv)', cost: 16, type: 'melee' },
+            { level: 19, id: 'vanish', name: 'Zniknięcie', desc: 'Natychmiastowa niewidzialność + leczenie 20% HP (+5%/lv)', cost: 22, type: 'buff' },
+            { level: 22, id: 'death_blossom', name: 'Kwiat Śmierci', desc: 'Masowy atak 3x na wszystkich (+0.4x/lv)', cost: 35, type: 'aoe', baseMult: 3.0, multPerLv: 0.4 },
         ],
         tree: {
             agility: { name: 'Zwinność', nodes: [
@@ -109,11 +119,16 @@ const CLASSES = {
         attackRange: 3,
         allowedItems: ['wand','staff','hat','robe','pants','shoes','tome'],
         skills: [
-            { level: 1,  id: 'fireball', name: 'Kula Ognia', desc: 'Obszarowe 1.5x ATK w promieniu 1', cost: 12, type: 'ranged_aoe' },
-            { level: 5,  id: 'ice_bolt', name: 'Lodowy Pocisk', desc: '2x ATK + spowalnia', cost: 10, type: 'ranged' },
-            { level: 10, id: 'lightning', name: 'Błyskawica', desc: '2.5x ATK natychmiastowe', cost: 18, type: 'ranged' },
-            { level: 15, id: 'frost_nova', name: 'Mroźna Nova', desc: 'Zamraża wszystkich dookoła na 2 tury', cost: 22, type: 'aoe' },
-            { level: 20, id: 'meteor', name: 'Meteor', desc: '4x ATK obszarowe', cost: 35, type: 'ranged_aoe' },
+            { level: 1,  id: 'fireball', name: 'Kula Ognia', desc: 'Obszarowe 1.5x w promieniu 1 (+0.2x/lv)', cost: 12, type: 'ranged_aoe', baseMult: 1.5, multPerLv: 0.2 },
+            { level: 2,  id: 'ice_bolt', name: 'Lodowy Pocisk', desc: '2x ATK + zamrożenie (+0.3x/lv)', cost: 10, type: 'ranged', baseMult: 2.0, multPerLv: 0.3 },
+            { level: 4,  id: 'mana_shield', name: 'Tarcza Many', desc: 'Absorbuje dmg za MP przez 3 tury (+1/lv)', cost: 20, type: 'buff' },
+            { level: 6,  id: 'lightning', name: 'Błyskawica', desc: '2.5x ATK natychmiastowe (+0.4x/lv)', cost: 18, type: 'ranged', baseMult: 2.5, multPerLv: 0.4 },
+            { level: 8,  id: 'arcane_blast', name: 'Fala Arkany', desc: 'Odpycha i zadaje 1.5x (+0.2x/lv)', cost: 14, type: 'aoe', baseMult: 1.5, multPerLv: 0.2 },
+            { level: 10, id: 'frost_nova', name: 'Mroźna Nova', desc: 'Zamraża wszystkich na 2 tury (+1/lv)', cost: 22, type: 'aoe' },
+            { level: 13, id: 'chain_lightning', name: 'Łańcuch Błyskawic', desc: 'Uderza 3 wrogów po kolei 2x (+0.3x/lv)', cost: 24, type: 'ranged', baseMult: 2.0, multPerLv: 0.3 },
+            { level: 16, id: 'teleport', name: 'Teleportacja', desc: 'Teleportuj się 5 kratek (+1/lv) w kierunku', cost: 15, type: 'buff' },
+            { level: 19, id: 'meteor', name: 'Meteor', desc: '4x ATK obszarowe w promieniu 2 (+0.5x/lv)', cost: 35, type: 'ranged_aoe', baseMult: 4.0, multPerLv: 0.5 },
+            { level: 22, id: 'time_stop', name: 'Zatrzymanie Czasu', desc: 'Zamraża WSZYSTKO na 3 tury (+1/lv)', cost: 40, type: 'aoe' },
         ],
         tree: {
             power: { name: 'Moc', nodes: [
@@ -160,6 +175,7 @@ const ITEM_BASES = {
     // Offhand
     shield:  { slot: 'offhand', stat: 'def', base: 4, name: 'Tarcza',   classes: ['knight'] },
     tome:    { slot: 'offhand', stat: 'atk', base: 3, name: 'Grimuar',  classes: ['mage'] },
+    offhand_dagger: { slot: 'offhand', stat: 'atk', base: 2, name: 'Lewak',  classes: ['rogue'] },
 };
 
 const TIER_PREFIXES = {
@@ -196,7 +212,7 @@ function generateItem(itemType, level, forceTier, playerClass) {
         tier,
         level: reqLevel,
         classes: base.classes,
-        price: Math.floor(15 * mult * (1 + level * 0.5)),
+        price: Math.floor(25 * mult * (1 + level * 0.8)),
     };
     item[base.stat] = statVal;
     item.desc = `${base.stat.toUpperCase()} +${statVal} (Lv.${reqLevel})`;
@@ -225,15 +241,17 @@ function generateLootForClass(playerClass, level, luck) {
 function generatePotion(level) {
     const heal = 20 + level * 8;
     const r = Math.random();
-    if (r < 0.5) return { id: 'hp_potion', name: 'Mikstura HP', type: 'consumable', subtype: 'hp', heal, count: 1, price: 8 + level * 2, desc: `Leczy ${heal} HP` };
-    if (r < 0.75) return { id: 'big_hp_potion', name: 'Duża Mikstura HP', type: 'consumable', subtype: 'hp', heal: heal * 3, count: 1, price: 25 + level * 5, desc: `Leczy ${heal*3} HP` };
-    if (r < 0.9) return { id: 'mp_potion', name: 'Mikstura Many', type: 'consumable', subtype: 'mp', mana: 20 + level * 5, count: 1, price: 10 + level * 3, desc: `+${20+level*5} MP` };
-    return { id: 'big_mp_potion', name: 'Duża Mikstura Many', type: 'consumable', subtype: 'mp', mana: 50 + level * 10, count: 1, price: 30 + level * 6, desc: `+${50+level*10} MP` };
+    if (r < 0.5) return { id: 'hp_potion', name: 'Mikstura HP', type: 'consumable', subtype: 'hp', heal, count: 1, price: 15 + level * 4, desc: `Leczy ${heal} HP` };
+    if (r < 0.75) return { id: 'big_hp_potion', name: 'Duża Mikstura HP', type: 'consumable', subtype: 'hp', heal: heal * 3, count: 1, price: 50 + level * 10, desc: `Leczy ${heal*3} HP` };
+    if (r < 0.9) return { id: 'mp_potion', name: 'Mikstura Many', type: 'consumable', subtype: 'mp', mana: 20 + level * 5, count: 1, price: 20 + level * 5, desc: `+${20+level*5} MP` };
+    return { id: 'big_mp_potion', name: 'Duża Mikstura Many', type: 'consumable', subtype: 'mp', mana: 50 + level * 10, count: 1, price: 60 + level * 12, desc: `+${50+level*10} MP` };
 }
 
 function canEquip(item, playerClass, playerLevel) {
     if (!item || item.type !== 'equipment') return false;
     if (item.level > playerLevel) return false;
     if (item.classes && !item.classes.includes(playerClass)) return false;
+    // Rogue can't equip shields
+    if (playerClass === 'rogue' && item.itemType === 'shield') return false;
     return true;
 }
