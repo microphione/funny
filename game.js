@@ -134,16 +134,61 @@ const Game = {
         document.getElementById('controls-hint').style.display = this.isMobile ? 'none' : 'block';
         if (this.isMobile) {
             document.body.style.overflow = 'hidden';
+            this.setupFullscreen();
         }
+    },
+
+    setupFullscreen() {
+        const btn = document.getElementById('fullscreen-btn');
+        btn.style.display = 'flex';
+
+        btn.addEventListener('click', () => this.toggleFullscreen());
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.toggleFullscreen();
+        }, { passive: false });
+
+        document.addEventListener('fullscreenchange', () => this.onFullscreenChange());
+        document.addEventListener('webkitfullscreenchange', () => this.onFullscreenChange());
+    },
+
+    toggleFullscreen() {
+        const doc = document.documentElement;
+        const isFS = document.fullscreenElement || document.webkitFullscreenElement;
+        if (!isFS) {
+            const request = doc.requestFullscreen || doc.webkitRequestFullscreen;
+            if (request) request.call(doc);
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+        } else {
+            const exit = document.exitFullscreen || document.webkitExitFullscreen;
+            if (exit) exit.call(document);
+        }
+    },
+
+    onFullscreenChange() {
+        const isFS = document.fullscreenElement || document.webkitFullscreenElement;
+        const btn = document.getElementById('fullscreen-btn');
+        btn.textContent = isFS ? '✕' : '⛶';
+        btn.classList.toggle('is-fullscreen', !!isFS);
+        setTimeout(() => this.resizeCanvas(), 100);
     },
 
     resizeCanvas() {
         const container = document.getElementById('game-container');
+        const isFS = document.fullscreenElement || document.webkitFullscreenElement;
         if (this.isMobile) {
             const w = window.innerWidth;
-            const h = window.innerHeight - (this.isMobile ? 200 : 120);
-            container.style.width = w + 'px';
-            container.style.height = Math.min(h, w * 0.75) + 'px';
+            if (isFS) {
+                const h = window.innerHeight - 140;
+                container.style.width = w + 'px';
+                container.style.height = h + 'px';
+            } else {
+                const h = window.innerHeight - 200;
+                container.style.width = w + 'px';
+                container.style.height = Math.min(h, w * 0.75) + 'px';
+            }
         }
         // Internal resolution stays fixed
         this.canvas.width = this.canvasW;

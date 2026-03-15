@@ -381,6 +381,24 @@
         .mobile-btn.btn-inv { background: rgba(52,152,219,0.25); border-color: rgba(52,152,219,0.5); }
         .mobile-btn.btn-map { background: rgba(155,89,182,0.25); border-color: rgba(155,89,182,0.5); }
 
+        #fullscreen-btn {
+            position: fixed;
+            top: 6px; right: 6px;
+            width: 36px; height: 36px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            display: none;
+            justify-content: center; align-items: center;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 40;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s;
+        }
+        #fullscreen-btn:active { background: rgba(255,255,255,0.25); }
+        #fullscreen-btn.is-fullscreen { border-color: rgba(46,204,113,0.5); background: rgba(46,204,113,0.15); }
+
         /* Combat mobile buttons */
         #mobile-combat {
             display: none;
@@ -491,6 +509,8 @@
             [WASD / Strzałki] Ruch &nbsp; [SPACJA] Interakcja &nbsp; [I] Ekwipunek
         </div>
     </div>
+
+    <div id="fullscreen-btn" title="Pełny ekran">⛶</div>
 
     <!-- Mobile Controls -->
     <div id="mobile-controls">
