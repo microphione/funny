@@ -52,6 +52,7 @@ const GameRender = {
             case T.NPC_QUEST: return 'npc_quest';
             case T.NPC_QUEST2: return 'npc_quest2';
             case T.NPC_SHOPKEEPER: return 'npc_shopkeeper';
+            case T.HOUSE_DOOR: return 'door';
             default: return `grass_0`;
         }
     },
@@ -107,7 +108,7 @@ const GameRender = {
         // Tiles that need a ground tile drawn underneath
         const overlayTiles = new Set([T.TREE, T.SWAMP_TREE, T.CACTUS, T.CHEST, T.SIGN, T.WELL, T.STATUE,
             T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC, T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC,
-            T.FENCE, T.INN, T.HOUSE, T.VILLAGE_HUT, T.ROCK]);
+            T.FENCE, T.INN, T.HOUSE, T.VILLAGE_HUT, T.ROCK, T.HOUSE_DOOR]);
 
         // First pass: ground tiles
         for (let wy = startY; wy < endY; wy++) {
@@ -190,6 +191,23 @@ const GameRender = {
                         ctx.globalAlpha = 1;
                     }
                 }
+            }
+        }
+
+        // Draw city NPCs
+        if (!World.activeDungeon) {
+            for (const key in World.cityNpcs) {
+                const npc = World.cityNpcs[key];
+                const sx = Math.floor((npc.x - camX) * TILE);
+                const sy = Math.floor((npc.y - camY) * TILE);
+                if (sx < -TILE || sx > W + TILE || sy < -TILE || sy > H + TILE) continue;
+                Sprites.draw(ctx, npc.sprite, sx, sy);
+                // Name above NPC
+                ctx.fillStyle = '#3498db';
+                ctx.font = '6px "Press Start 2P"';
+                ctx.textAlign = 'center';
+                ctx.fillText(npc.name, sx + TILE / 2, sy - 3);
+                ctx.textAlign = 'left';
             }
         }
 
@@ -323,10 +341,14 @@ const GameRender = {
                 else if (tile === T.CAVE_ENTRY) color = '#333';
                 else if (tile === T.CHEST) color = '#f1c40f';
                 else if (tile === T.CACTUS) color = '#2ecc71';
+                else if (tile === T.HOUSE_DOOR) color = '#8B4513';
+                else if (tile === T.DOOR) color = '#c4a663';
 
                 // Monster dot
                 const mob = World.getMonsterAt(wx, wy);
                 if (mob) color = mob.isElite ? '#f1c40f' : '#e74c3c';
+                // City NPC dot
+                if (World.getCityNpcAt(wx, wy)) color = '#3498db';
 
                 mctx.fillStyle = color;
                 mctx.fillRect((dx + hw) * scale, (dy + hh) * scale, scale, scale);

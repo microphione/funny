@@ -136,11 +136,21 @@ const GameInput = {
             }
         }
 
-        // Check for ground loot at destination
+        // Check for ground loot at destination or surrounding
         const lootKey = `${nx},${ny}`;
         const groundLoot = World.groundLoot[lootKey];
         if (groundLoot && groundLoot.length > 0) {
             GameUI.showLootTooltip(groundLoot);
+        } else {
+            // Check if any loot nearby
+            let nearbyLoot = null;
+            const surr = [{dx:0,dy:-1},{dx:1,dy:0},{dx:0,dy:1},{dx:-1,dy:0},{dx:-1,dy:-1},{dx:1,dy:-1},{dx:1,dy:1},{dx:-1,dy:1}];
+            for (const s of surr) {
+                const sk = `${nx+s.dx},${ny+s.dy}`;
+                if (World.groundLoot[sk] && World.groundLoot[sk].length > 0) { nearbyLoot = World.groundLoot[sk]; break; }
+            }
+            if (nearbyLoot) GameUI.showLootTooltip(nearbyLoot);
+            else GameUI.hideLootTooltip();
         }
 
         // Collect quest items (overworld only)
@@ -184,27 +194,14 @@ const GameInput = {
         const p = Game.player;
         if (!p) return;
 
-        // First check: pick up ground loot at current position
-        const standKey = `${p.x},${p.y}`;
-        const standLoot = World.groundLoot[standKey];
-        if (standLoot && standLoot.length > 0) {
-            this.pickupGroundLoot(p.x, p.y);
-            return;
-        }
+        // Pickup flow: first under player, then surrounding tiles (one item at a time)
+        if (this.tryPickupOneItem()) return;
 
         // Check adjacent tile in facing direction
         const dirs = { up: {dx:0,dy:-1}, down: {dx:0,dy:1}, left: {dx:-1,dy:0}, right: {dx:1,dy:0} };
         const d = dirs[p.dir] || {dx:0,dy:1};
         const tx = p.x + d.dx;
         const ty = p.y + d.dy;
-
-        // Check ground loot at faced tile
-        const faceKey = `${tx},${ty}`;
-        const faceLoot = World.groundLoot[faceKey];
-        if (faceLoot && faceLoot.length > 0) {
-            this.pickupGroundLoot(tx, ty);
-            return;
-        }
 
         const tile = World.getTile(tx, ty);
         const T = World.T;
@@ -308,6 +305,38 @@ const GameInput = {
             return;
         }
 
+        // Buyable house door
+        if (tile === T.HOUSE_DOOR) {
+            const houseKey = `${tx},${ty}`;
+            const house = World.houses[houseKey];
+            if (house) {
+                if (house.owned || (p.ownedHouses && p.ownedHouses.includes(houseKey))) {
+                    Game.log(`${house.name} - Twój dom! Upuść przedmioty w środku.`, 'info');
+                } else {
+                    GameUI.showHouseBuyDialog(houseKey, house);
+                }
+            }
+            return;
+        }
+
+        // City NPC interaction
+        const cityNpc = World.getCityNpcAt(tx, ty);
+        if (cityNpc) {
+            const greetings = [
+                'Dzień dobry, podróżniku!',
+                'Witaj w Stolicy!',
+                'Uważaj na potwory za murami!',
+                'Słyszałeś o dungeonach na pustyni?',
+                'Kupuj mikstury zanim wyruszysz!',
+                'Powodzenia w przygodzie!',
+                'Handlarze mają nowe towary!',
+                'Piękny dzień, nieprawdaż?',
+            ];
+            const msg = greetings[Math.floor(Math.random() * greetings.length)];
+            Game.log(`${cityNpc.name}: "${msg}"`, 'info');
+            return;
+        }
+
         // Well
         if (tile === T.WELL) {
             const cx = Math.floor(tx / World.CHUNK_SIZE);
@@ -338,45 +367,71 @@ const GameInput = {
         }
     },
 
-    pickupGroundLoot(wx, wy) {
+    // Try to pick up ONE item: first under player, then surrounding tiles
+    tryPickupOneItem() {
+        const p = Game.player;
+        if (!p) return false;
+
+        // 1. Check under player
+        if (this.pickupOneItemAt(p.x, p.y)) return true;
+
+        // 2. Check all 8 surrounding tiles
+        const surroundOrder = [
+            {dx:0,dy:-1}, {dx:1,dy:0}, {dx:0,dy:1}, {dx:-1,dy:0},
+            {dx:-1,dy:-1}, {dx:1,dy:-1}, {dx:1,dy:1}, {dx:-1,dy:1}
+        ];
+        for (const d of surroundOrder) {
+            if (this.pickupOneItemAt(p.x + d.dx, p.y + d.dy)) return true;
+        }
+
+        return false;
+    },
+
+    // Pick up exactly ONE item from a specific position
+    pickupOneItemAt(wx, wy) {
         const key = `${wx},${wy}`;
         const loot = World.groundLoot[key];
-        if (!loot || loot.length === 0) return;
+        if (!loot || loot.length === 0) return false;
 
         const p = Game.player;
         const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
         const backpackCount = p.inventory.filter(item => !equippedIds.has(item.id) || item.type === 'consumable').length;
 
-        const picked = [];
-        const remaining = [];
+        // Take the first item
+        const item = loot[0];
 
-        for (const item of loot) {
-            // Check backpack space (20 slots)
-            if (item.type === 'consumable') {
-                const existing = p.inventory.find(i => i.id === item.id);
-                if (existing) {
-                    existing.count = (existing.count || 1) + (item.count || 1);
-                    picked.push(item);
-                    continue;
-                }
-            }
-            if (backpackCount + picked.filter(i => i.type !== 'consumable').length < 20) {
+        // Check backpack space
+        if (item.type === 'consumable') {
+            const existing = p.inventory.find(i => i.id === item.id);
+            if (existing) {
+                existing.count = (existing.count || 1) + (item.count || 1);
+                loot.shift();
+                Game.log(`Podniesiono: ${item.name}`, 'loot');
+            } else if (backpackCount < 20) {
                 p.inventory.push(item);
-                picked.push(item);
+                loot.shift();
                 Game.log(`Podniesiono: ${item.name}`, 'loot');
             } else {
-                remaining.push(item);
                 Game.log('Plecak pełny!', 'info');
+                return true; // still "handled" the interaction
+            }
+        } else {
+            if (backpackCount < 20) {
+                p.inventory.push(item);
+                loot.shift();
+                Game.log(`Podniesiono: ${item.name}`, 'loot');
+            } else {
+                Game.log('Plecak pełny!', 'info');
+                return true;
             }
         }
 
-        if (remaining.length > 0) {
-            World.groundLoot[key] = remaining;
-        } else {
+        if (loot.length === 0) {
             delete World.groundLoot[key];
+            GameUI.hideLootTooltip();
         }
-        GameUI.hideLootTooltip();
         GameUI.updateSidePanel();
+        return true;
     },
 
     useSkillByIndex(idx) {

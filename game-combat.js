@@ -29,6 +29,9 @@ const GameCombat = {
         // Monster AI tick
         this.monsterAI(dt);
 
+        // City NPC wandering AI
+        this.cityNpcAI(dt);
+
         // Auto-attack target if in range
         this.autoAttack(dt);
 
@@ -100,6 +103,12 @@ const GameCombat = {
         m.hp -= dmg;
         Game.log(`Zadajesz ${dmg} obrażeń ${m.name}.`, 'combat');
         this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
+
+        // Tibia-style skill training: each hit that deals damage trains melee
+        if (dmg > 0) {
+            const skillName = p.classId === 'mage' ? 'magic' : 'melee';
+            Game.advanceCombatSkill(skillName);
+        }
 
         // Set auto-attack target
         Game.autoAttackTarget = m;
@@ -635,6 +644,9 @@ const GameCombat = {
         Game.log(`${m.name} zadaje ci ${dmg} obrażeń!`, 'combat');
         this.floatText(`-${dmg}`, p.x, p.y, '#e74c3c');
 
+        // Tibia-style: getting hit trains shielding
+        Game.advanceCombatSkill('shielding');
+
         if (p.hp <= 0) {
             const lastStand = p.buffs.find(b => b.id === 'last_stand');
             if (lastStand) {
@@ -673,6 +685,32 @@ const GameCombat = {
     isInRange(tx, ty) {
         const p = Game.player;
         return Math.abs(tx - p.x) + Math.abs(ty - p.y) <= this.getAttackRange();
+    },
+
+    // ========== CITY NPC WANDERING AI ==========
+    cityNpcAI(dt) {
+        const p = Game.player;
+        if (!p || World.activeDungeon) return;
+        // Only process if player is near capital
+        if (Math.abs(p.x) > 30 || Math.abs(p.y) > 30) return;
+
+        for (const key in World.cityNpcs) {
+            const npc = World.cityNpcs[key];
+            npc.moveTimer += dt;
+            if (npc.moveTimer >= npc.moveSpeed) {
+                npc.moveTimer = 0;
+                // Wander randomly, stay near home
+                const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
+                const d = dirs[Math.floor(Math.random() * 4)];
+                const nx = npc.x + d.dx;
+                const ny = npc.y + d.dy;
+                // Don't wander too far from home
+                const distFromHome = Math.abs(nx - npc.homeX) + Math.abs(ny - npc.homeY);
+                if (distFromHome <= 8 && !(nx === p.x && ny === p.y)) {
+                    World.moveCityNpc(npc, nx, ny);
+                }
+            }
+        }
     },
 
     floatText(text, wx, wy, color) {

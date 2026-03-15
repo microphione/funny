@@ -20,6 +20,7 @@ const World = {
         SHOP_FLOOR: 35, SHOP_WEAPON_NPC: 36, SHOP_ARMOR_NPC: 37,
         SHOP_POTION_NPC: 38, QUEST_ITEM: 39,
         GROUND_LOOT: 40, // visual marker for ground loot
+        HOUSE_DOOR: 41, // buyable house door
     },
 
     BIOME: { PLAINS: 0, FOREST: 1, SWAMP: 2, MOUNTAIN: 3, DESERT: 4 },
@@ -73,6 +74,9 @@ const World = {
         this.monsters = {};
         this.questItems = {};
         this.groundLoot = {}; // "x,y" -> [items]
+        this.cityNpcs = {}; // "x,y" -> npc object (wandering NPCs)
+        this.houses = {}; // "x,y" -> { price, name, owned: false }
+        this.cityNpcsSpawned = false;
     },
 
     // ========== GROUND LOOT SYSTEM ==========
@@ -93,7 +97,7 @@ const World = {
         const temp = Perlin.fbm(wx * scale + 100, wy * scale + 100, 3);
         const moisture = Perlin.fbm(wx * scale + 500, wy * scale + 500, 3);
         const dist = Math.sqrt(wx * wx + wy * wy);
-        if (dist < 20) return this.BIOME.PLAINS; // Starting area is plains (larger safe zone)
+        if (dist < 40) return this.BIOME.PLAINS; // Starting area is plains (larger safe zone for capital)
         if (temp > 0.25) return this.BIOME.DESERT;
         if (temp < -0.25) return this.BIOME.MOUNTAIN;
         if (moisture > 0.2) return this.BIOME.SWAMP;
@@ -116,6 +120,10 @@ const World = {
         return this.chunks[key];
     },
 
+    isCapitalChunk(cx, cy) {
+        return cx >= -1 && cx <= 1 && cy >= -1 && cy <= 1;
+    },
+
     generateChunk(cx, cy) {
         const CS = this.CHUNK_SIZE;
         const T = this.T;
@@ -123,8 +131,8 @@ const World = {
         const ox = cx * CS;
         const oy = cy * CS;
 
-        // Check if this is the starting city chunk (0,0 and neighbors)
-        const isStartingCity = (cx === 0 && cy === 0);
+        // Check if this is the capital city area (3x3 chunks)
+        const isStartingCity = this.isCapitalChunk(cx, cy);
         const isVillage = this.isVillageChunk(cx, cy);
 
         for (let ly = 0; ly < CS; ly++) {
@@ -171,9 +179,9 @@ const World = {
             }
         }
 
-        // Starting city (large, covers the 0,0 chunk)
+        // Starting city (large, covers 3x3 chunks around origin)
         if (isStartingCity) {
-            this.placeStartingCity(tiles, cx, cy, ox, oy);
+            this.placeCapitalChunk(tiles, cx, cy, ox, oy);
         } else if (isVillage) {
             this.placeVillage(tiles, cx, cy, ox, oy);
         }
@@ -212,112 +220,414 @@ const World = {
         return { tiles, biome: this.getBiome(ox + CS/2, oy + CS/2) };
     },
 
-    // ========== STARTING CITY ==========
-    placeStartingCity(tiles, cx, cy, ox, oy) {
+    // ========== CAPITAL CITY (3x3 chunks) ==========
+    placeCapitalChunk(tiles, cx, cy, ox, oy) {
         const CS = this.CHUNK_SIZE;
         const T = this.T;
         const center = Math.floor(CS / 2);
 
-        // Large stone floor area (whole chunk almost)
-        for (let dy = 2; dy < CS - 2; dy++)
-            for (let dx = 2; dx < CS - 2; dx++)
+        // Fill with stone floor
+        for (let dy = 0; dy < CS; dy++)
+            for (let dx = 0; dx < CS; dx++)
                 tiles[dy * CS + dx] = T.STONE_FLOOR;
 
-        // Main paths (cross pattern)
+        // Main paths through center of chunk (connecting to neighbors)
         for (let i = 0; i < CS; i++) {
             tiles[center * CS + i] = T.PATH;
             tiles[i * CS + center] = T.PATH;
         }
 
-        // Well at center (spawn point)
-        tiles[center * CS + center] = T.WELL;
+        // Outer wall only on edges of the 3x3 area
+        if (cx === -1) { for (let dy = 0; dy < CS; dy++) tiles[dy * CS + 0] = T.FENCE; tiles[center * CS + 0] = T.PATH; }
+        if (cx === 1)  { for (let dy = 0; dy < CS; dy++) tiles[dy * CS + (CS-1)] = T.FENCE; tiles[center * CS + (CS-1)] = T.PATH; }
+        if (cy === -1) { for (let dx = 0; dx < CS; dx++) tiles[0 * CS + dx] = T.FENCE; tiles[0 * CS + center] = T.PATH; }
+        if (cy === 1)  { for (let dx = 0; dx < CS; dx++) tiles[(CS-1) * CS + dx] = T.FENCE; tiles[(CS-1) * CS + center] = T.PATH; }
+        // Corner fences
+        if (cx === -1 && cy === -1) tiles[0] = T.FENCE;
+        if (cx === 1 && cy === -1) tiles[CS - 1] = T.FENCE;
+        if (cx === -1 && cy === 1) tiles[(CS-1) * CS] = T.FENCE;
+        if (cx === 1 && cy === 1) tiles[(CS-1) * CS + (CS-1)] = T.FENCE;
 
-        // Statue nearby
-        tiles[(center - 2) * CS + center] = T.STATUE;
+        // Generate specific content based on chunk position
+        if (cx === 0 && cy === 0) this.placeCapitalCenter(tiles, ox, oy);
+        else if (cx === -1 && cy === 0) this.placeCapitalWest(tiles, ox, oy);
+        else if (cx === 1 && cy === 0) this.placeCapitalEast(tiles, ox, oy);
+        else if (cx === 0 && cy === -1) this.placeCapitalNorth(tiles, ox, oy);
+        else if (cx === 0 && cy === 1) this.placeCapitalSouth(tiles, ox, oy);
+        else if (cx === -1 && cy === -1) this.placeCapitalNW(tiles, ox, oy);
+        else if (cx === 1 && cy === -1) this.placeCapitalNE(tiles, ox, oy);
+        else if (cx === -1 && cy === 1) this.placeCapitalSW(tiles, ox, oy);
+        else if (cx === 1 && cy === 1) this.placeCapitalSE(tiles, ox, oy);
 
-        // Sign
-        tiles[(center - 1) * CS + (center + 1)] = T.SIGN;
-        this.signTexts[`${ox + center + 1},${oy + center - 1}`] = 'Witaj w Stolicy Krainy!\nTo twój dom. Bezpieczne miejsce.';
-
-        // === SHOPS (larger buildings) ===
-        const shops = [
-            { npcTile: T.SHOP_WEAPON_NPC, shopType: 'weapon', pos: [3, 3], label: 'Kowal' },
-            { npcTile: T.SHOP_ARMOR_NPC,  shopType: 'armor',  pos: [center + 3, 3], label: 'Płatnerz' },
-            { npcTile: T.SHOP_POTION_NPC, shopType: 'potion', pos: [3, center + 3], label: 'Alchemik' },
-        ];
-
-        shops.forEach(s => {
-            const [bx, by] = s.pos;
-            if (bx + 3 >= CS || by + 3 >= CS) return;
-            // 4x3 building
-            for (let ddy = 0; ddy < 3; ddy++)
-                for (let ddx = 0; ddx < 4; ddx++)
-                    tiles[(by + ddy) * CS + (bx + ddx)] = T.HOUSE;
-            tiles[(by + 1) * CS + (bx + 1)] = T.SHOP_FLOOR;
-            tiles[(by + 1) * CS + (bx + 2)] = T.SHOP_FLOOR;
-            tiles[(by + 2) * CS + (bx + 1)] = s.npcTile;
-
-            // Sign for shop
-            tiles[(by - 1) * CS + (bx + 1)] = T.SIGN;
-            this.signTexts[`${ox + bx + 1},${oy + by - 1}`] = s.label;
-
-            this.npcs[`${ox + bx + 1},${oy + by + 2}`] = {
-                type: 'shop', shopType: s.shopType, difficulty: 1, villageName: 'Stolica'
-            };
-        });
-
-        // Inn (larger)
-        const innPos = [center + 3, center + 3];
-        if (innPos[0] + 3 < CS && innPos[1] + 3 < CS) {
-            for (let ddy = 0; ddy < 3; ddy++)
-                for (let ddx = 0; ddx < 4; ddx++)
-                    tiles[(innPos[1] + ddy) * CS + (innPos[0] + ddx)] = T.HOUSE;
-            tiles[(innPos[1] + 2) * CS + (innPos[0] + 1)] = T.INN;
-            tiles[(innPos[1] - 1) * CS + (innPos[0] + 1)] = T.SIGN;
-            this.signTexts[`${ox + innPos[0] + 1},${oy + innPos[1] - 1}`] = 'Karczma "Pod Smokiem"';
-        }
-
-        // Quest NPCs
-        const q1x = center - 3, q1y = center + 2;
-        tiles[q1y * CS + q1x] = T.NPC_QUEST;
-        this.questNpcs[`${ox+q1x},${oy+q1y}`] = this.generateQuest(cx, cy, 0, 1, 'Stolica');
-        const q2x = center + 3, q2y = center + 2;
-        tiles[q2y * CS + q2x] = T.NPC_QUEST2;
-        this.questNpcs[`${ox+q2x},${oy+q2y}`] = this.generateQuest(cx, cy, 1, 1, 'Stolica');
-
-        // Decorative houses around perimeter
-        const housePositions = [
-            [3, center], [CS-6, center], [center, CS-6],
-            [3, CS-6], [CS-6, CS-6], [CS-6, 3],
-        ];
-        housePositions.forEach(([hx, hy]) => {
-            if (hx >= 2 && hx+2 < CS && hy >= 2 && hy+2 < CS) {
-                for (let ddy = 0; ddy < 2; ddy++)
-                    for (let ddx = 0; ddx < 2; ddx++)
-                        if (tiles[(hy+ddy) * CS + (hx+ddx)] === T.STONE_FLOOR)
-                            tiles[(hy+ddy) * CS + (hx+ddx)] = T.VILLAGE_HUT;
-            }
-        });
-
-        // Fence perimeter
-        for (let dx = 1; dx < CS-1; dx++) {
-            if (tiles[1 * CS + dx] === T.STONE_FLOOR) tiles[1 * CS + dx] = T.FENCE;
-            if (tiles[(CS-2) * CS + dx] === T.STONE_FLOOR) tiles[(CS-2) * CS + dx] = T.FENCE;
-        }
-        for (let dy = 1; dy < CS-1; dy++) {
-            if (tiles[dy * CS + 1] === T.STONE_FLOOR) tiles[dy * CS + 1] = T.FENCE;
-            if (tiles[dy * CS + (CS-2)] === T.STONE_FLOOR) tiles[dy * CS + (CS-2)] = T.FENCE;
-        }
-        // Gates (4 cardinal)
-        tiles[center * CS + 1] = T.PATH;
-        tiles[center * CS + (CS-2)] = T.PATH;
-        tiles[1 * CS + center] = T.PATH;
-        tiles[(CS-2) * CS + center] = T.PATH;
-
+        // Register all capital chunks under "Stolica" village
+        // Well is in center of chunk (0,0) at world coords (center, center)
+        const wellOx = Math.floor(this.CHUNK_SIZE / 2);
+        const wellOy = Math.floor(this.CHUNK_SIZE / 2);
         this.villages[this.getChunkKey(cx, cy)] = {
             name: 'Stolica', difficulty: 1,
-            wellX: ox + center, wellY: oy + center
+            wellX: wellOx, wellY: wellOy
         };
+
+        // Spawn city NPCs once (when center chunk generates)
+        if (cx === 0 && cy === 0 && !this.cityNpcsSpawned) {
+            this.spawnCityNpcs();
+            this.cityNpcsSpawned = true;
+        }
+    },
+
+    // Helper: place a decorative building (not enterable, just visual)
+    placeBuilding(tiles, ox, oy, bx, by, w, h) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+        for (let ddy = 0; ddy < h; ddy++)
+            for (let ddx = 0; ddx < w; ddx++) {
+                const ty = by + ddy, tx = bx + ddx;
+                if (ty >= 0 && ty < CS && tx >= 0 && tx < CS)
+                    tiles[ty * CS + tx] = T.HOUSE;
+            }
+    },
+
+    // Helper: place a buyable house
+    placeBuyableHouse(tiles, ox, oy, bx, by, w, h, price, name) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+        for (let ddy = 0; ddy < h; ddy++)
+            for (let ddx = 0; ddx < w; ddx++) {
+                const ty = by + ddy, tx = bx + ddx;
+                if (ty >= 0 && ty < CS && tx >= 0 && tx < CS)
+                    tiles[ty * CS + tx] = T.HOUSE;
+            }
+        // Door
+        const doorX = bx + Math.floor(w / 2);
+        const doorY = by + h - 1;
+        if (doorX >= 0 && doorX < CS && doorY >= 0 && doorY < CS) {
+            tiles[doorY * CS + doorX] = T.HOUSE_DOOR;
+            this.houses[`${ox + doorX},${oy + doorY}`] = {
+                price, name, owned: false,
+                floorTiles: []
+            };
+            // Mark interior floor tiles
+            for (let ddy = 1; ddy < h - 1; ddy++)
+                for (let ddx = 0; ddx < w; ddx++) {
+                    const fy = by + ddy, fx = bx + ddx;
+                    if (fy >= 0 && fy < CS && fx >= 0 && fx < CS && tiles[fy * CS + fx] === T.HOUSE) {
+                        tiles[fy * CS + fx] = T.SHOP_FLOOR; // reuse as interior floor
+                        this.houses[`${ox + doorX},${oy + doorY}`].floorTiles.push(`${ox+fx},${oy+fy}`);
+                    }
+                }
+        }
+    },
+
+    // Center (0,0): Town square, well, statue, main crossroads
+    placeCapitalCenter(tiles, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+        const c = Math.floor(CS / 2);
+
+        tiles[c * CS + c] = T.WELL;
+        tiles[(c - 2) * CS + c] = T.STATUE;
+        tiles[(c + 2) * CS + c] = T.STATUE;
+        tiles[c * CS + (c - 2)] = T.STATUE;
+        tiles[c * CS + (c + 2)] = T.STATUE;
+
+        // Decorative flowers around square
+        for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) {
+            if (Math.abs(i) + Math.abs(j) === 3) {
+                const fx = c + i, fy = c + j;
+                if (fx > 0 && fx < CS-1 && fy > 0 && fy < CS-1 && tiles[fy*CS+fx] === T.STONE_FLOOR)
+                    tiles[fy * CS + fx] = T.FLOWER;
+            }
+        }
+
+        // Welcome sign
+        tiles[(c - 1) * CS + (c + 1)] = T.SIGN;
+        this.signTexts[`${ox + c + 1},${oy + c - 1}`] = 'Witaj w Stolicy Krainy!\nTo twój dom. Bezpieczne miejsce.';
+
+        // Decorative houses on corners of center chunk
+        this.placeBuilding(tiles, ox, oy, 2, 2, 3, 3);
+        this.placeBuilding(tiles, ox, oy, CS-5, 2, 3, 3);
+        this.placeBuilding(tiles, ox, oy, 2, CS-5, 3, 3);
+        this.placeBuilding(tiles, ox, oy, CS-5, CS-5, 3, 3);
+    },
+
+    // West (-1,0): Market, weapon shop, food stalls
+    placeCapitalWest(tiles, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+
+        // Weapon shop (large)
+        const ws = { npcTile: T.SHOP_WEAPON_NPC, shopType: 'weapon' };
+        for (let ddy = 0; ddy < 4; ddy++)
+            for (let ddx = 0; ddx < 5; ddx++)
+                tiles[(3 + ddy) * CS + (3 + ddx)] = T.HOUSE;
+        tiles[4 * CS + 5] = T.SHOP_FLOOR;
+        tiles[4 * CS + 6] = T.SHOP_FLOOR;
+        tiles[5 * CS + 5] = T.SHOP_FLOOR;
+        tiles[6 * CS + 5] = ws.npcTile;
+        tiles[2 * CS + 5] = T.SIGN;
+        this.signTexts[`${ox + 5},${oy + 2}`] = 'Kowalnia "Stalowe Ostrze"';
+        this.npcs[`${ox + 5},${oy + 6}`] = { type: 'shop', shopType: 'weapon', difficulty: 1, villageName: 'Stolica' };
+
+        // Market stalls (decorative houses)
+        this.placeBuilding(tiles, ox, oy, 3, 10, 4, 3);
+        this.placeBuilding(tiles, ox, oy, 3, 14, 4, 3);
+        tiles[9 * CS + 4] = T.SIGN;
+        this.signTexts[`${ox + 4},${oy + 9}`] = 'Targ Miejski';
+
+        // Buyable houses
+        this.placeBuyableHouse(tiles, ox, oy, 12, 3, 3, 3, 200, 'Dom przy Targu #1');
+        this.placeBuyableHouse(tiles, ox, oy, 12, 8, 3, 3, 250, 'Dom przy Targu #2');
+        this.placeBuyableHouse(tiles, ox, oy, 12, 13, 3, 3, 200, 'Dom przy Targu #3');
+
+        // Trees for decoration
+        tiles[17 * CS + 2] = T.TREE;
+        tiles[17 * CS + 5] = T.TREE;
+    },
+
+    // East (1,0): Armor shop, potion shop
+    placeCapitalEast(tiles, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+
+        // Armor shop
+        for (let ddy = 0; ddy < 4; ddy++)
+            for (let ddx = 0; ddx < 5; ddx++)
+                tiles[(3 + ddy) * CS + (12 + ddx)] = T.HOUSE;
+        tiles[4 * CS + 14] = T.SHOP_FLOOR;
+        tiles[5 * CS + 14] = T.SHOP_FLOOR;
+        tiles[6 * CS + 14] = T.SHOP_ARMOR_NPC;
+        tiles[2 * CS + 14] = T.SIGN;
+        this.signTexts[`${ox + 14},${oy + 2}`] = 'Płatnerz "Żelazny Mur"';
+        this.npcs[`${ox + 14},${oy + 6}`] = { type: 'shop', shopType: 'armor', difficulty: 1, villageName: 'Stolica' };
+
+        // Potion shop
+        for (let ddy = 0; ddy < 4; ddy++)
+            for (let ddx = 0; ddx < 5; ddx++)
+                tiles[(12 + ddy) * CS + (12 + ddx)] = T.HOUSE;
+        tiles[13 * CS + 14] = T.SHOP_FLOOR;
+        tiles[14 * CS + 14] = T.SHOP_FLOOR;
+        tiles[15 * CS + 14] = T.SHOP_POTION_NPC;
+        tiles[11 * CS + 14] = T.SIGN;
+        this.signTexts[`${ox + 14},${oy + 11}`] = 'Alchemik "Złoty Eliksir"';
+        this.npcs[`${ox + 14},${oy + 15}`] = { type: 'shop', shopType: 'potion', difficulty: 1, villageName: 'Stolica' };
+
+        // Buyable houses
+        this.placeBuyableHouse(tiles, ox, oy, 3, 3, 3, 3, 300, 'Dom Wschodni #1');
+        this.placeBuyableHouse(tiles, ox, oy, 3, 8, 3, 3, 300, 'Dom Wschodni #2');
+        this.placeBuyableHouse(tiles, ox, oy, 3, 14, 3, 3, 350, 'Dom Wschodni #3');
+    },
+
+    // North (0,-1): Temple area, quest NPCs
+    placeCapitalNorth(tiles, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+        const c = Math.floor(CS / 2);
+
+        // Temple building (large)
+        for (let ddy = 0; ddy < 5; ddy++)
+            for (let ddx = 0; ddx < 7; ddx++)
+                tiles[(3 + ddy) * CS + (c - 3 + ddx)] = T.HOUSE;
+        tiles[7 * CS + c] = T.DOOR;
+        tiles[2 * CS + c] = T.SIGN;
+        this.signTexts[`${ox + c},${oy + 2}`] = 'Świątynia Światła';
+
+        // Statues flanking temple
+        tiles[7 * CS + (c - 4)] = T.STATUE;
+        tiles[7 * CS + (c + 4)] = T.STATUE;
+
+        // Quest NPCs
+        const q1x = c - 3, q1y = 12;
+        tiles[q1y * CS + q1x] = T.NPC_QUEST;
+        this.questNpcs[`${ox+q1x},${oy+q1y}`] = this.generateQuest(0, -1, 0, 1, 'Stolica');
+        const q2x = c + 3, q2y = 12;
+        tiles[q2y * CS + q2x] = T.NPC_QUEST2;
+        this.questNpcs[`${ox+q2x},${oy+q2y}`] = this.generateQuest(0, -1, 1, 1, 'Stolica');
+
+        // Training ground sign
+        tiles[14 * CS + 3] = T.SIGN;
+        this.signTexts[`${ox + 3},${oy + 14}`] = 'Pole Treningowe\nBij potwory aby\npoprawić umiejętności!';
+
+        // Buyable house
+        this.placeBuyableHouse(tiles, ox, oy, 2, 14, 3, 3, 400, 'Dom Kapłański #1');
+        this.placeBuyableHouse(tiles, ox, oy, CS - 5, 14, 3, 3, 400, 'Dom Kapłański #2');
+    },
+
+    // South (0,1): Residential, inn, medium buyable houses
+    placeCapitalSouth(tiles, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+        const c = Math.floor(CS / 2);
+
+        // Inn (large)
+        for (let ddy = 0; ddy < 4; ddy++)
+            for (let ddx = 0; ddx < 6; ddx++)
+                tiles[(2 + ddy) * CS + (c - 3 + ddx)] = T.HOUSE;
+        tiles[5 * CS + c] = T.INN;
+        tiles[1 * CS + c] = T.SIGN;
+        this.signTexts[`${ox + c},${oy + 1}`] = 'Karczma "Pod Złotym Smokiem"';
+
+        // Buyable houses (residential area)
+        this.placeBuyableHouse(tiles, ox, oy, 2, 8, 4, 3, 500, 'Kamienica Południowa #1');
+        this.placeBuyableHouse(tiles, ox, oy, 8, 8, 4, 3, 500, 'Kamienica Południowa #2');
+        this.placeBuyableHouse(tiles, ox, oy, 14, 8, 4, 3, 500, 'Kamienica Południowa #3');
+        this.placeBuyableHouse(tiles, ox, oy, 2, 13, 4, 3, 600, 'Willa Południowa #1');
+        this.placeBuyableHouse(tiles, ox, oy, 8, 13, 4, 3, 600, 'Willa Południowa #2');
+        this.placeBuyableHouse(tiles, ox, oy, 14, 13, 4, 3, 650, 'Willa Południowa #3');
+    },
+
+    // NW (-1,-1): Park/garden
+    placeCapitalNW(tiles, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+
+        // Park with trees and flowers
+        const parkTrees = [[3,3],[5,2],[8,4],[3,7],[6,6],[4,10],[7,9],[2,14],[5,13],[8,12],[11,3],[13,5],[11,8],[14,11],[12,15]];
+        parkTrees.forEach(([px, py]) => { if (px < CS && py < CS) tiles[py * CS + px] = T.TREE; });
+
+        const flowers = [[4,4],[6,3],[7,5],[4,8],[5,11],[9,3],[12,4],[13,7],[10,10],[14,13]];
+        flowers.forEach(([px, py]) => { if (px < CS && py < CS) tiles[py * CS + px] = T.FLOWER; });
+
+        // Fountain (well)
+        tiles[8 * CS + 8] = T.WELL;
+        tiles[7 * CS + 8] = T.SIGN;
+        this.signTexts[`${ox + 8},${oy + 7}`] = 'Park Królewski\nMiejsce spokoju i odpoczynku.';
+
+        // Bench statues
+        tiles[8 * CS + 6] = T.STATUE;
+        tiles[8 * CS + 10] = T.STATUE;
+    },
+
+    // NE (1,-1): Noble district, expensive buyable houses
+    placeCapitalNE(tiles, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+
+        tiles[2 * CS + 5] = T.SIGN;
+        this.signTexts[`${ox + 5},${oy + 2}`] = 'Dzielnica Szlachecka';
+
+        // Expensive buyable houses
+        this.placeBuyableHouse(tiles, ox, oy, 2, 3, 5, 4, 1000, 'Rezydencja Szlachecka #1');
+        this.placeBuyableHouse(tiles, ox, oy, 10, 3, 5, 4, 1200, 'Rezydencja Szlachecka #2');
+        this.placeBuyableHouse(tiles, ox, oy, 2, 10, 5, 4, 1000, 'Rezydencja Szlachecka #3');
+        this.placeBuyableHouse(tiles, ox, oy, 10, 10, 5, 4, 1500, 'Pałacyk Szlachecki');
+
+        // Garden decorations
+        tiles[8 * CS + 8] = T.STATUE;
+        tiles[15 * CS + 4] = T.FLOWER;
+        tiles[15 * CS + 12] = T.FLOWER;
+        tiles[16 * CS + 8] = T.TREE;
+    },
+
+    // SW (-1,1): Poor district, cheap buyable houses
+    placeCapitalSW(tiles, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+
+        tiles[2 * CS + 5] = T.SIGN;
+        this.signTexts[`${ox + 5},${oy + 2}`] = 'Dzielnica Robotnicza';
+
+        // Cheap buyable houses (small, tightly packed)
+        this.placeBuyableHouse(tiles, ox, oy, 2, 3, 3, 3, 100, 'Chata Robotnicza #1');
+        this.placeBuyableHouse(tiles, ox, oy, 7, 3, 3, 3, 100, 'Chata Robotnicza #2');
+        this.placeBuyableHouse(tiles, ox, oy, 12, 3, 3, 3, 100, 'Chata Robotnicza #3');
+        this.placeBuyableHouse(tiles, ox, oy, 2, 8, 3, 3, 120, 'Chata Robotnicza #4');
+        this.placeBuyableHouse(tiles, ox, oy, 7, 8, 3, 3, 120, 'Chata Robotnicza #5');
+        this.placeBuyableHouse(tiles, ox, oy, 12, 8, 3, 3, 120, 'Chata Robotnicza #6');
+        this.placeBuyableHouse(tiles, ox, oy, 2, 13, 3, 3, 150, 'Domek Robotniczy #1');
+        this.placeBuyableHouse(tiles, ox, oy, 7, 13, 3, 3, 150, 'Domek Robotniczy #2');
+        this.placeBuyableHouse(tiles, ox, oy, 12, 13, 3, 3, 150, 'Domek Robotniczy #3');
+    },
+
+    // SE (1,1): Farm/harbor area
+    placeCapitalSE(tiles, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+
+        tiles[2 * CS + 5] = T.SIGN;
+        this.signTexts[`${ox + 5},${oy + 2}`] = 'Farmy i Stajnie';
+
+        // Farm buildings
+        this.placeBuilding(tiles, ox, oy, 2, 3, 4, 3);
+        this.placeBuilding(tiles, ox, oy, 8, 3, 4, 3);
+        this.placeBuilding(tiles, ox, oy, 14, 3, 4, 3);
+
+        // Farm fields (flowers = crops)
+        for (let dy = 8; dy < 16; dy++)
+            for (let dx = 2; dx < 8; dx++)
+                if (this.rng(ox+dx, oy+dy, 800) < 0.4) tiles[dy * CS + dx] = T.FLOWER;
+
+        // Buyable farmhouses
+        this.placeBuyableHouse(tiles, ox, oy, 10, 10, 4, 3, 300, 'Farma #1');
+        this.placeBuyableHouse(tiles, ox, oy, 10, 15, 4, 3, 350, 'Farma #2');
+    },
+
+    // ========== CITY NPCs (wandering) ==========
+    spawnCityNpcs() {
+        const npcDefs = [
+            { name: 'Strażnik Miejski', sprite: 'npc_quest', role: 'guard', speed: 3.0 },
+            { name: 'Strażnik Bramy', sprite: 'npc_quest', role: 'guard', speed: 3.5 },
+            { name: 'Strażnik Patrolu', sprite: 'npc_quest', role: 'guard', speed: 2.5 },
+            { name: 'Kupiec Tomasz', sprite: 'npc_shopkeeper', role: 'citizen', speed: 4.0 },
+            { name: 'Rolnik Jan', sprite: 'npc_quest2', role: 'citizen', speed: 4.5 },
+            { name: 'Kowalowa Anna', sprite: 'npc_shopkeeper', role: 'citizen', speed: 5.0 },
+            { name: 'Stary Mędrzec', sprite: 'npc_quest2', role: 'citizen', speed: 6.0 },
+            { name: 'Młody Uczeń', sprite: 'npc_quest', role: 'citizen', speed: 2.0 },
+            { name: 'Pani Herbatka', sprite: 'npc_shopkeeper', role: 'citizen', speed: 5.0 },
+            { name: 'Łowca Nagród', sprite: 'npc_quest2', role: 'citizen', speed: 3.0 },
+            { name: 'Kapłan Świątyni', sprite: 'npc_quest', role: 'citizen', speed: 6.0 },
+            { name: 'Bard Podróżnik', sprite: 'npc_quest2', role: 'citizen', speed: 3.5 },
+            { name: 'Kwiaciarka Ola', sprite: 'npc_shopkeeper', role: 'citizen', speed: 4.0 },
+            { name: 'Rycerz Honorowy', sprite: 'npc_quest', role: 'guard', speed: 4.0 },
+            { name: 'Złodziej Kieszonkowy', sprite: 'npc_quest2', role: 'citizen', speed: 1.5 },
+            { name: 'Dziecko', sprite: 'npc_quest2', role: 'child', speed: 1.2 },
+            { name: 'Dziecko', sprite: 'npc_quest2', role: 'child', speed: 1.0 },
+            { name: 'Posłaniec', sprite: 'npc_quest', role: 'citizen', speed: 1.8 },
+        ];
+
+        // Distribute NPCs across capital area (-20..20, -20..20)
+        const positions = [
+            [5, 5], [-5, -5], [10, 0], [0, 10], [-10, 5],
+            [5, -10], [-15, 0], [15, 5], [0, -15], [-5, 15],
+            [8, 8], [-8, -8], [12, -5], [-12, 10], [3, -3],
+            [-3, 3], [7, -7], [-7, 7],
+        ];
+
+        npcDefs.forEach((def, i) => {
+            const [px, py] = positions[i] || [Math.floor(Math.random() * 30 - 15), Math.floor(Math.random() * 30 - 15)];
+            const key = `${px},${py}`;
+            if (this.cityNpcs[key]) return;
+            this.cityNpcs[key] = {
+                id: `citizen_${i}`,
+                name: def.name,
+                sprite: def.sprite,
+                role: def.role,
+                x: px, y: py,
+                homeX: px, homeY: py, // wander around home
+                moveTimer: Math.random() * 2,
+                moveSpeed: def.speed,
+            };
+        });
+    },
+
+    getCityNpcAt(wx, wy) {
+        const npc = this.cityNpcs[`${wx},${wy}`];
+        return npc || null;
+    },
+
+    moveCityNpc(npc, nx, ny) {
+        if (!npc) return;
+        // Stay within capital bounds (-20..19, -20..19)
+        if (nx < -19 || nx > 19 || ny < -19 || ny > 19) return;
+        const oldKey = `${npc.x},${npc.y}`;
+        const newKey = `${nx},${ny}`;
+        if (this.cityNpcs[newKey]) return;
+        if (this.monsters[newKey]) return;
+        const tile = this.getTile(nx, ny);
+        if (this.isTileBlocked(tile)) return;
+        delete this.cityNpcs[oldKey];
+        npc.x = nx;
+        npc.y = ny;
+        this.cityNpcs[newKey] = npc;
     },
 
     // ========== MONSTER SPAWNING ==========
@@ -383,7 +693,7 @@ const World = {
         return [T.WATER, T.WALL, T.TREE, T.HOUSE, T.CAVE_WALL, T.FENCE,
                 T.WELL, T.STATUE, T.ROCK, T.SWAMP_TREE, T.CACTUS, T.VILLAGE_HUT,
                 T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC,
-                T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC, T.INN, T.CHEST].includes(t);
+                T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC, T.INN, T.CHEST, T.HOUSE_DOOR].includes(t);
     },
 
     getMonsterAt(wx, wy) {
@@ -425,7 +735,7 @@ const World = {
 
     // ========== VILLAGE ==========
     isVillageChunk(cx, cy) {
-        if (cx === 0 && cy === 0) return true; // Starting city
+        if (this.isCapitalChunk(cx, cy)) return true; // Capital city 3x3
         const vgrid = 8;
         const vcx = Math.round(cx / vgrid);
         const vcy = Math.round(cy / vgrid);
@@ -588,7 +898,7 @@ const World = {
     },
 
     getVillageName(cx, cy) {
-        if (cx === 0 && cy === 0) return 'Stolica';
+        if (this.isCapitalChunk(cx, cy)) return 'Stolica';
         const pre = ['El','Ald','Kor','Myr','Dra','Val','Syl','Gor','Tar','Nol','Bel','Ith','Zar','Mor','Fen','Ash'];
         const suf = ['doria','heim','wald','grad','burg','ton','ria','lund','gar','mir','oth','ven','dal','sten','rok','vik'];
         return pre[Math.floor(this.rng(cx,cy,350)*pre.length)] + suf[Math.floor(this.rng(cx,cy,351)*suf.length)];
@@ -607,6 +917,7 @@ const World = {
         const t = this.getTile(wx, wy);
         if (this.isTileBlocked(t)) return false;
         if (this.getMonsterAt(wx, wy)) return false;
+        if (this.getCityNpcAt(wx, wy)) return false;
         return true;
     },
 

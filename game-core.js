@@ -112,6 +112,13 @@ const Game = {
             buffs: [], // { id, duration (seconds), ... }
             stealth: false,
             stealthSteps: 0,
+            // Tibia-style combat skills
+            combatSkills: {
+                melee: { level: 10, tries: 0, triesNeeded: 50 },
+                shielding: { level: 10, tries: 0, triesNeeded: 50 },
+                magic: { level: 0, tries: 0, triesNeeded: 30 },
+            },
+            ownedHouses: [], // house door keys "x,y"
         };
         // Starting weapon
         const startWeapon = generateItemForClass(classId, 1, 'weapon');
@@ -159,7 +166,51 @@ const Game = {
             }
         }
 
+        // Combat skill bonuses (Tibia-style)
+        if (p.combatSkills) {
+            const meleeBonus = Math.max(0, p.combatSkills.melee.level - 10);
+            const shieldBonus = Math.max(0, p.combatSkills.shielding.level - 10);
+            const magicBonus = p.combatSkills.magic.level;
+            if (p.classId === 'mage') {
+                atk += magicBonus * 2; // Magic level heavily affects mage damage
+                atk += Math.floor(meleeBonus * 0.3);
+            } else {
+                atk += meleeBonus; // Melee skill adds to ATK
+                atk += Math.floor(magicBonus * 0.3);
+            }
+            def += Math.floor(shieldBonus * 0.7); // Shielding adds to DEF
+        }
+
         return { atk: Math.floor(atk), def: Math.floor(def), agi: Math.floor(agi), maxHp: Math.floor(maxHp), maxMp: Math.floor(maxMp) };
+    },
+
+    // Tibia-style skill advancement
+    // Tries needed formula: floor(50 * 1.1^(skill_level - offset))
+    // offset is 10 for melee/shielding, 0 for magic
+    getTriesNeeded(skillName, level) {
+        const offset = skillName === 'magic' ? 0 : 10;
+        const base = skillName === 'magic' ? 30 : 50;
+        return Math.floor(base * Math.pow(1.1, level - offset));
+    },
+
+    advanceCombatSkill(skillName) {
+        const p = this.player;
+        if (!p || !p.combatSkills) return;
+        const skill = p.combatSkills[skillName];
+        if (!skill) return;
+
+        skill.tries++;
+        const needed = this.getTriesNeeded(skillName, skill.level);
+        skill.triesNeeded = needed;
+
+        if (skill.tries >= needed) {
+            skill.tries = 0;
+            skill.level++;
+            skill.triesNeeded = this.getTriesNeeded(skillName, skill.level);
+            const names = { melee: 'Walka Wręcz', shielding: 'Obrona', magic: 'Magia' };
+            this.log(`${names[skillName]} wzrosła do poziomu ${skill.level}!`, 'info');
+            this.refreshStats();
+        }
     },
 
     refreshStats() {
@@ -221,7 +272,7 @@ const Game = {
         const p = this.player;
         if (!p) return;
         const data = {
-            version: 'pq_save_v6',
+            version: 'pq_save_v7',
             classId: p.classId,
             x: p.x, y: p.y, dir: p.dir,
             level: p.level, xp: p.xp, xpToNext: p.xpToNext,
@@ -247,17 +298,19 @@ const Game = {
             usedWells: [...this.usedWells],
             mainQuestStage: this.mainQuestStage,
             dungeonBossesKilled: [...this.dungeonBossesKilled],
+            combatSkills: p.combatSkills,
+            ownedHouses: p.ownedHouses || [],
         };
-        localStorage.setItem('pq_save_v6', JSON.stringify(data));
+        localStorage.setItem('pq_save_v7', JSON.stringify(data));
         this.log('Gra zapisana!', 'info');
     },
 
     load() {
-        const raw = localStorage.getItem('pq_save_v6') || localStorage.getItem('pq_save_v5');
+        const raw = localStorage.getItem('pq_save_v7') || localStorage.getItem('pq_save_v6') || localStorage.getItem('pq_save_v5');
         if (!raw) return false;
         try {
             const d = JSON.parse(raw);
-            if (d.version !== 'pq_save_v6' && d.version !== 'pq_save_v5') return false;
+            if (!['pq_save_v7','pq_save_v6','pq_save_v5'].includes(d.version)) return false;
 
             this.createPlayer(d.classId);
             const p = this.player;
@@ -290,6 +343,14 @@ const Game = {
             if (d.usedWells) this.usedWells = new Set(d.usedWells);
             this.mainQuestStage = d.mainQuestStage || 0;
             if (d.dungeonBossesKilled) this.dungeonBossesKilled = new Set(d.dungeonBossesKilled);
+            if (d.combatSkills) p.combatSkills = d.combatSkills;
+            if (d.ownedHouses) p.ownedHouses = d.ownedHouses;
+            // Restore owned houses in World
+            if (p.ownedHouses) {
+                p.ownedHouses.forEach(key => {
+                    if (World.houses[key]) World.houses[key].owned = true;
+                });
+            }
 
             this.refreshStats();
             return true;

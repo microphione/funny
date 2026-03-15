@@ -8,6 +8,7 @@ const GameUI = {
         this.updateEqPanel();
         this.updateBpPanel();
         this.updateSkillBar();
+        this.updateCombatSkills();
     },
 
     updateEqPanel() {
@@ -64,7 +65,7 @@ const GameUI = {
                 slot.innerHTML = `<span style="color:${tierCol}">${shortName}</span>`;
                 if (item.count > 1) slot.innerHTML += `<span class="bp-count">x${item.count}</span>`;
                 slot.title = `${item.name}\n${item.desc || ''}`;
-                slot.onclick = () => {
+                slot.onclick = (e) => {
                     if (item.type === 'consumable') {
                         this.useConsumable(p.inventory.indexOf(item));
                         this.updateSidePanel();
@@ -74,6 +75,25 @@ const GameUI = {
                         this.updateSidePanel();
                         GameRender.updateHUD();
                     }
+                };
+                // Right-click to drop
+                slot.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    const idx = p.inventory.indexOf(item);
+                    if (idx === -1) return;
+                    if (item.count > 1) {
+                        const dropped = { ...item, count: 1 };
+                        item.count--;
+                        World.dropGroundLoot(p.x, p.y, [dropped]);
+                    } else {
+                        p.inventory.splice(idx, 1);
+                        // Unequip if equipped
+                        for (const s in p.equipment) { if (p.equipment[s]?.id === item.id) p.equipment[s] = null; }
+                        World.dropGroundLoot(p.x, p.y, [item]);
+                    }
+                    Game.refreshStats();
+                    this.updateSidePanel();
+                    Game.log(`Upuszczono: ${item.name}`, 'info');
                 };
             }
             grid.appendChild(slot);
@@ -105,6 +125,73 @@ const GameUI = {
         }
     },
 
+    // ========== COMBAT SKILLS PANEL ==========
+    updateCombatSkills() {
+        const el = document.getElementById('combat-skills');
+        if (!el || !Game.player) return;
+        const p = Game.player;
+        if (!p.combatSkills) return;
+        const skills = p.combatSkills;
+        const names = { melee: 'Walka', shielding: 'Obrona', magic: 'Magia' };
+        el.innerHTML = '';
+        for (const [key, sk] of Object.entries(skills)) {
+            const needed = Game.getTriesNeeded(key, sk.level);
+            const pct = Math.min(100, (sk.tries / needed) * 100);
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:3px;margin:1px 0;font-size:6px';
+            row.innerHTML = `<span style="color:#888;width:36px">${names[key]}</span>
+                <span style="color:#e67e22;width:16px">${sk.level}</span>
+                <div style="flex:1;height:4px;background:#222;border:1px solid #333;border-radius:1px;overflow:hidden">
+                    <div style="width:${pct}%;height:100%;background:#e67e22"></div>
+                </div>`;
+            el.appendChild(row);
+        }
+    },
+
+    // ========== HOUSE BUY DIALOG ==========
+    showHouseBuyDialog(houseKey, house) {
+        const content = document.getElementById('dialog-content');
+        const title = document.getElementById('dialog-title');
+        if (!content || !title) return;
+        const p = Game.player;
+
+        title.textContent = house.name;
+        content.innerHTML = '';
+
+        const info = document.createElement('div');
+        info.style.cssText = 'text-align:center;font-size:8px;line-height:2.5;color:#aaa;margin-bottom:12px';
+        info.innerHTML = `<div style="color:#f1c40f;font-size:10px;margin-bottom:8px">Na sprzedaż!</div>
+            <div>Cena: <span style="color:#f1c40f">${house.price} złota</span></div>
+            <div>Twoje złoto: <span style="color:${p.gold >= house.price ? '#2ecc71' : '#e74c3c'}">${p.gold}</span></div>
+            <div style="font-size:7px;color:#888;margin-top:8px">Kupując dom możesz przechowywać w nim przedmioty.</div>`;
+        content.appendChild(info);
+
+        if (p.gold >= house.price) {
+            const buyBtn = document.createElement('button');
+            buyBtn.className = 'close-btn';
+            buyBtn.style.background = '#2ecc71';
+            buyBtn.textContent = 'Kup dom!';
+            buyBtn.onclick = () => {
+                p.gold -= house.price;
+                house.owned = true;
+                if (!p.ownedHouses) p.ownedHouses = [];
+                p.ownedHouses.push(houseKey);
+                Game.log(`Kupiono: ${house.name} za ${house.price} złota!`, 'loot');
+                Game.closeAllOverlays();
+                GameRender.updateHUD();
+                this.updateSidePanel();
+            };
+            content.appendChild(buyBtn);
+        } else {
+            const noGold = document.createElement('div');
+            noGold.style.cssText = 'text-align:center;font-size:8px;color:#e74c3c;margin-top:8px';
+            noGold.textContent = 'Za mało złota!';
+            content.appendChild(noGold);
+        }
+
+        this.showOverlay('dialog-overlay');
+    },
+
     // ========== GROUND LOOT TOOLTIP ==========
     showLootTooltip(items) {
         const el = document.getElementById('loot-tooltip');
@@ -114,7 +201,7 @@ const GameUI = {
             const tierCol = item.tier ? (TIERS[item.tier]?.color || '#aaa') : '#aaa';
             html += `<div style="color:${tierCol}">${item.name}</div>`;
         });
-        html += '<div style="color:#888;margin-top:3px">[SPACJA] Podnieś</div>';
+        html += '<div style="color:#888;margin-top:3px">[SPACJA] Podnieś (po jednym)</div>';
         el.innerHTML = html;
         el.style.display = 'block';
         el.style.bottom = '10px';
@@ -168,8 +255,15 @@ const GameUI = {
                 Game.state = 'playing';
                 Game.startTime = Date.now();
                 World.init();
+                // Generate center capital chunk to get the well position
                 World.getChunk(0, 0);
-                Game.lastVillageWell = { x: 0, y: 0 };
+                const wellX = Math.floor(World.CHUNK_SIZE / 2);
+                const wellY = Math.floor(World.CHUNK_SIZE / 2);
+                Game.player.x = wellX;
+                Game.player.y = wellY;
+                Game.player.visualX = wellX;
+                Game.player.visualY = wellY;
+                Game.lastVillageWell = { x: wellX, y: wellY };
                 // Mark starting city well as used
                 Game.usedWells.add('0,0');
                 Music.updateBiome(0, false, false);
