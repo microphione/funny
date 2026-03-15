@@ -246,7 +246,7 @@ const World = {
         return [T.WATER, T.WALL, T.TREE, T.HOUSE, T.CAVE_WALL, T.FENCE,
                 T.WELL, T.STATUE, T.ROCK, T.SWAMP_TREE, T.CACTUS, T.VILLAGE_HUT,
                 T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC,
-                T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC].includes(t);
+                T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC, T.INN, T.CHEST].includes(t);
     },
 
     getMonsterAt(wx, wy) {

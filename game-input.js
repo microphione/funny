@@ -94,19 +94,6 @@ const GameInput = {
         // Collect quest items
         this.checkCollectQuest();
 
-        // Check village well for save point
-        const tile = World.getTile(nx, ny);
-        if (tile === World.T.WELL) {
-            const cx = Math.floor(nx / World.CHUNK_SIZE);
-            const cy = Math.floor(ny / World.CHUNK_SIZE);
-            const vk = World.getChunkKey(cx, cy);
-            if (World.villages[vk]) {
-                Game.lastVillageWell = { x: nx, y: ny };
-                Game.log(`Punkt odrodzenia: ${World.villages[vk].name}`, 'info');
-                Game.save();
-            }
-        }
-
         // Music update
         const biome = World.getBiome(nx, ny);
         const inVillage = World.isVillageChunk(Math.floor(nx / World.CHUNK_SIZE), Math.floor(ny / World.CHUNK_SIZE));
@@ -230,6 +217,19 @@ const GameInput = {
                 const q = { ...quest, progress: 0, completed: false, turned_in: false };
                 Game.quests.push(q);
                 Game.log(`Nowy quest: ${q.title}`, 'info');
+            }
+            return;
+        }
+
+        // Well - save point
+        if (tile === T.WELL) {
+            const cx = Math.floor(tx / World.CHUNK_SIZE);
+            const cy = Math.floor(ty / World.CHUNK_SIZE);
+            const vk = World.getChunkKey(cx, cy);
+            if (World.villages[vk]) {
+                Game.lastVillageWell = { x: tx, y: ty };
+                Game.log(`Punkt odrodzenia: ${World.villages[vk].name}`, 'info');
+                Game.save();
             }
             return;
         }
