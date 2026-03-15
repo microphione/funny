@@ -167,4 +167,23 @@ const Music = {
         }
         return this.muted;
     },
+
+    // Gold drop sound effect
+    playGoldDrop() {
+        if (this.muted || !this.ctx) return;
+        try {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.05);
+            osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+            osc.connect(gain);
+            gain.connect(this.masterGain || this.ctx.destination);
+            osc.start(this.ctx.currentTime);
+            osc.stop(this.ctx.currentTime + 0.2);
+        } catch(e) {}
+    },
 };

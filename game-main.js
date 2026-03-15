@@ -7,12 +7,19 @@
     let hudTimer = 0;
     let minimapTimer = 0;
     let autoSaveTimer = 0;
+    let sidePanelTimer = 0;
 
     function gameLoop(timestamp) {
         const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
         lastTime = timestamp;
 
         if (Game.state === 'playing') {
+            // Realtime combat tick
+            GameCombat.realtimeTick(dt);
+
+            // Handle held movement keys
+            GameInput.handleHeldKeys(dt);
+
             GameRender.render(dt);
 
             // HUD update every 0.25s
@@ -20,6 +27,13 @@
             if (hudTimer > 0.25) {
                 hudTimer = 0;
                 GameRender.updateHUD();
+            }
+
+            // Side panel update every 0.5s
+            sidePanelTimer += dt;
+            if (sidePanelTimer > 0.5) {
+                sidePanelTimer = 0;
+                GameUI.updateSidePanel();
             }
 
             // Minimap every 0.5s
@@ -35,20 +49,32 @@
                 autoSaveTimer = 0;
                 Game.save();
             }
+
+            // Periodic main quest check
+            Game.questCheckTimer = (Game.questCheckTimer || 0) + dt;
+            if (Game.questCheckTimer > 5) {
+                Game.questCheckTimer = 0;
+                Game.checkMainQuest();
+            }
         }
 
         requestAnimationFrame(gameLoop);
     }
 
     function initGame() {
-        // Init canvas
+        // Init canvas - resize to fit container
         Game.canvas = document.getElementById('game-canvas');
         Game.ctx = Game.canvas.getContext('2d');
-        Game.canvas.width = 640;
-        Game.canvas.height = 480;
-        Game.ctx.imageSmoothingEnabled = false;
-        Game.VIEW_W = Math.ceil(Game.canvas.width / Game.TILE);
-        Game.VIEW_H = Math.ceil(Game.canvas.height / Game.TILE);
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            Game.canvas.width = container.clientWidth;
+            Game.canvas.height = container.clientHeight;
+            Game.ctx.imageSmoothingEnabled = false;
+            Game.VIEW_W = Math.ceil(Game.canvas.width / Game.TILE);
+            Game.VIEW_H = Math.ceil(Game.canvas.height / Game.TILE);
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
 
         // Init sprites
         Sprites.init();
