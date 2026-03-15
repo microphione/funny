@@ -128,6 +128,33 @@
 
 ---
 
+## Faza 6: Wersja mobilna
+
+### 6.1 Wykrywanie urządzenia
+- Detekcja touch vs mouse (`'ontouchstart' in window`, `navigator.maxTouchPoints`)
+- Automatyczne przełączanie UI: desktop (klawiatura) vs mobile (touch)
+- Responsywny canvas - skalowanie do rozmiaru ekranu z zachowaniem proporcji
+
+### 6.2 Virtual joystick (ruch)
+- Wirtualny d-pad / joystick w lewym dolnym rogu
+- Ruch po kratkach - swipe lub tap kierunkowy
+- Wizualny feedback (podświetlenie kierunku)
+- Strefa martwa w środku joysticka
+
+### 6.3 Przyciski akcji (mobile)
+- Prawy dolny róg: przycisk Akcja (SPACJA), Ekwipunek (I)
+- W walce: 4 przyciski (Atak, Umiejętność, Mikstura, Ucieczka)
+- Przyciski duże, łatwe do trafienia palcem (min 48x48px)
+
+### 6.4 Responsywny UI
+- Top bar i message log dopasowane do szerokości ekranu
+- Sklep/dialog/inventory: pełnoekranowe overlay na mobile
+- Minimap chowana za przyciskiem na mobile (oszczędność miejsca)
+- Font size skalowany do DPI ekranu
+- Landscape mode preferowany, ale portrait też działa
+
+---
+
 ## Kolejność implementacji
 
 | Priorytet | Zadanie | Złożoność |
@@ -144,3 +171,5 @@
 | 10 | Efekty wizualne + dzień/noc | Średnia |
 | 11 | System questów | Średnia |
 | 12 | Crafting + companiony | Średnia |
+| 13 | Mobile: wykrywanie urządzenia + responsive | Średnia |
+| 14 | Mobile: virtual joystick + przyciski akcji | Średnia |
