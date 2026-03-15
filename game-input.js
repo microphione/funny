@@ -305,6 +305,22 @@ const GameInput = {
             return;
         }
 
+        // Town building door (NPC inside)
+        if (tile === T.TOWN_BUILDING_DOOR) {
+            const bKey = `${tx},${ty}`;
+            const bldg = World.townBuildings && World.townBuildings[bKey];
+            const npcName = bldg ? bldg.npcName : 'Mieszkaniec';
+            const dialogues = [
+                `${npcName}: Witaj podróżniku! Czym mogę służyć?`,
+                `${npcName}: Miło cię widzieć w naszym mieście!`,
+                `${npcName}: Powodzenia w twoich przygodach!`,
+                `${npcName}: Uważaj za murami miasta, pełno tam potworów.`,
+                `${npcName}: Wróć kiedy będziesz potrzebować pomocy!`,
+            ];
+            Game.log(dialogues[Math.floor(Math.random() * dialogues.length)], 'info');
+            return;
+        }
+
         // Buyable house door
         if (tile === T.HOUSE_DOOR) {
             const houseKey = `${tx},${ty}`;
