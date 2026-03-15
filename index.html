@@ -2,19 +2,17 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Pixel Quest - 16-bit RPG</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            background: #1a1a2e;
+            background: #0a0a1a;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -22,454 +20,429 @@
             font-family: 'Press Start 2P', monospace;
             color: #e0e0e0;
             overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         #game-wrapper {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 8px;
+            gap: 4px;
+            width: 100%;
+            max-width: 800px;
         }
 
         #top-bar {
             display: flex;
             justify-content: space-between;
-            width: 640px;
-            background: #16213e;
-            border: 3px solid #0f3460;
-            border-radius: 6px;
-            padding: 8px 16px;
-            font-size: 10px;
+            flex-wrap: wrap;
+            width: 100%;
+            max-width: 640px;
+            background: #12122a;
+            border: 2px solid #1a1a4a;
+            border-radius: 4px;
+            padding: 6px 10px;
+            font-size: 9px;
+            gap: 4px;
         }
 
         #top-bar .stat {
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
         }
 
-        #top-bar .stat-icon {
-            font-size: 14px;
-        }
-
-        .hp-bar-container {
-            width: 80px;
-            height: 10px;
-            background: #333;
-            border: 1px solid #555;
+        .bar-container {
+            width: 60px;
+            height: 8px;
+            background: #222;
+            border: 1px solid #444;
             border-radius: 2px;
             overflow: hidden;
         }
 
-        .hp-bar {
-            height: 100%;
-            background: #e74c3c;
-            transition: width 0.3s;
-        }
-
-        .xp-bar {
-            height: 100%;
-            background: #3498db;
-            transition: width 0.3s;
-        }
+        .hp-fill { height: 100%; background: linear-gradient(#e74c3c, #c0392b); transition: width 0.3s; }
+        .xp-fill { height: 100%; background: linear-gradient(#3498db, #2980b9); transition: width 0.3s; }
 
         #game-container {
             position: relative;
             width: 640px;
             height: 480px;
-            border: 3px solid #0f3460;
-            border-radius: 6px;
+            border: 2px solid #1a1a4a;
+            border-radius: 4px;
             overflow: hidden;
             image-rendering: pixelated;
+            background: #0a0a1a;
         }
 
-        #game-canvas {
-            width: 640px;
-            height: 480px;
+        canvas#game-canvas {
+            width: 100%;
+            height: 100%;
             image-rendering: pixelated;
             display: block;
+        }
+
+        #minimap {
+            position: absolute;
+            top: 6px; right: 6px;
+            border: 2px solid #1a1a4a;
+            border-radius: 3px;
+            z-index: 5;
+            image-rendering: pixelated;
+            background: #111;
+        }
+
+        #location-label {
+            position: absolute;
+            top: 6px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
+            z-index: 5;
+            pointer-events: none;
         }
 
         #message-log {
-            width: 640px;
-            height: 80px;
-            background: #16213e;
-            border: 3px solid #0f3460;
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-size: 9px;
-            line-height: 1.8;
+            width: 100%;
+            max-width: 640px;
+            height: 60px;
+            background: #12122a;
+            border: 2px solid #1a1a4a;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 8px;
+            line-height: 1.7;
             overflow-y: auto;
-            color: #aaa;
+            color: #777;
         }
 
-        #message-log .msg-combat { color: #e74c3c; }
-        #message-log .msg-loot { color: #f1c40f; }
-        #message-log .msg-info { color: #3498db; }
-        #message-log .msg-heal { color: #2ecc71; }
-        #message-log .msg-shop { color: #e67e22; }
+        .msg-combat { color: #e74c3c; }
+        .msg-loot { color: #f1c40f; }
+        .msg-info { color: #3498db; }
+        .msg-heal { color: #2ecc71; }
+        .msg-shop { color: #e67e22; }
 
         #controls-hint {
-            font-size: 8px;
-            color: #555;
+            font-size: 7px;
+            color: #444;
             text-align: center;
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
-        /* Dialog / Shop overlay */
-        #dialog-overlay {
-            display: none;
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.75);
-            z-index: 10;
-            justify-content: center;
-            align-items: center;
-        }
-
-        #dialog-overlay.active {
-            display: flex;
-        }
-
-        #dialog-box {
-            background: #16213e;
-            border: 3px solid #e67e22;
-            border-radius: 8px;
-            padding: 20px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        #dialog-box h2 {
-            font-size: 14px;
-            color: #e67e22;
-            margin-bottom: 16px;
-            text-align: center;
-        }
-
-        .shop-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px;
-            margin: 4px 0;
-            background: #1a1a2e;
-            border-radius: 4px;
-            font-size: 9px;
-            cursor: pointer;
-            border: 2px solid transparent;
-            transition: border-color 0.2s;
-        }
-
-        .shop-item:hover {
-            border-color: #e67e22;
-        }
-
-        .shop-item.cannot-afford {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        .shop-item .item-name { color: #fff; }
-        .shop-item .item-price { color: #f1c40f; }
-        .shop-item .item-desc { color: #888; font-size: 8px; }
-
-        #dialog-close {
-            display: block;
-            margin: 16px auto 0;
-            padding: 8px 24px;
-            background: #e67e22;
-            color: #fff;
-            border: none;
-            border-radius: 4px;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 10px;
-            cursor: pointer;
-        }
-
-        #dialog-close:hover {
-            background: #d35400;
-        }
-
-        /* Combat overlay */
-        #combat-overlay {
+        /* ===== OVERLAYS ===== */
+        .overlay {
             display: none;
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
             background: rgba(0,0,0,0.8);
             z-index: 10;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
         }
+        .overlay.active { display: flex; }
 
-        #combat-overlay.active {
-            display: flex;
+        .overlay-box {
+            background: #12122a;
+            border: 3px solid;
+            border-radius: 6px;
+            padding: 16px;
+            max-width: 90%;
+            width: 480px;
+            max-height: 90%;
+            overflow-y: auto;
         }
 
-        #combat-box {
-            background: #16213e;
-            border: 3px solid #e74c3c;
-            border-radius: 8px;
-            padding: 20px;
-            width: 500px;
+        .overlay-box h2 {
+            font-size: 12px;
+            margin-bottom: 12px;
             text-align: center;
         }
 
-        #combat-box h2 {
-            font-size: 14px;
-            color: #e74c3c;
-            margin-bottom: 12px;
+        .close-btn {
+            display: block;
+            margin: 12px auto 0;
+            padding: 8px 20px;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            cursor: pointer;
         }
 
-        #enemy-display {
-            margin: 12px 0;
-            font-size: 48px;
+        /* Shop */
+        #dialog-overlay .overlay-box { border-color: #e67e22; }
+        #dialog-overlay h2 { color: #e67e22; }
+        #dialog-overlay .close-btn { background: #e67e22; }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 3px 0;
+            background: #0a0a1a;
+            border-radius: 4px;
+            font-size: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: border-color 0.15s;
         }
+        .shop-item:hover { border-color: #e67e22; }
+        .shop-item.cannot-afford { opacity: 0.35; cursor: not-allowed; }
+        .shop-item .item-name { color: #fff; }
+        .shop-item .item-price { color: #f1c40f; white-space: nowrap; }
+        .shop-item .item-desc { color: #888; font-size: 7px; margin-top: 2px; }
+        .shop-item .item-compare { font-size: 7px; margin-top: 2px; }
+        .shop-item .stat-up { color: #2ecc71; }
+        .shop-item .stat-down { color: #e74c3c; }
+        .shop-item .equipped-tag { color: #f1c40f; font-size: 7px; }
+
+        .shop-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 10px;
+        }
+        .shop-tab {
+            flex: 1;
+            padding: 6px;
+            background: #0a0a1a;
+            border: 2px solid #333;
+            border-radius: 4px;
+            color: #888;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 7px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .shop-tab.active { border-color: #e67e22; color: #e67e22; }
+
+        /* Combat */
+        #combat-overlay .overlay-box { border-color: #e74c3c; }
+        #combat-overlay h2 { color: #e74c3c; }
+
+        #enemy-display { text-align: center; margin: 8px 0; font-size: 48px; }
+        #enemy-name { text-align: center; font-size: 10px; color: #fff; margin: 4px 0; }
 
         .enemy-hp-container {
-            width: 200px;
-            height: 14px;
-            background: #333;
-            border: 2px solid #555;
-            border-radius: 3px;
-            margin: 8px auto;
-            overflow: hidden;
+            width: 180px; height: 12px;
+            background: #222; border: 2px solid #444;
+            border-radius: 3px; margin: 6px auto; overflow: hidden;
         }
-
-        .enemy-hp-bar {
-            height: 100%;
-            background: #e74c3c;
-            transition: width 0.3s;
-        }
+        .enemy-hp-bar { height: 100%; background: linear-gradient(#e74c3c, #c0392b); transition: width 0.3s; }
+        #enemy-hp-text { text-align: center; font-size: 8px; color: #aaa; }
 
         #combat-actions {
-            display: flex;
-            gap: 8px;
-            justify-content: center;
-            margin-top: 16px;
+            display: flex; gap: 6px; justify-content: center;
+            margin-top: 12px; flex-wrap: wrap;
         }
 
         .combat-btn {
-            padding: 10px 20px;
+            padding: 8px 14px;
             font-family: 'Press Start 2P', monospace;
-            font-size: 9px;
+            font-size: 8px;
             border: 2px solid;
             border-radius: 4px;
             cursor: pointer;
             transition: transform 0.1s;
         }
-
         .combat-btn:hover { transform: scale(1.05); }
         .combat-btn:active { transform: scale(0.95); }
-
         .btn-attack { background: #e74c3c; color: #fff; border-color: #c0392b; }
         .btn-skill { background: #9b59b6; color: #fff; border-color: #8e44ad; }
         .btn-potion { background: #2ecc71; color: #fff; border-color: #27ae60; }
-        .btn-flee { background: #7f8c8d; color: #fff; border-color: #95a5a6; }
+        .btn-flee { background: #7f8c8d; color: #fff; border-color: #6c7a7b; }
 
-        #combat-log {
-            margin-top: 12px;
-            font-size: 9px;
-            color: #aaa;
-            max-height: 60px;
-            overflow-y: auto;
-        }
+        #combat-log { margin-top: 8px; font-size: 8px; color: #aaa; max-height: 50px; overflow-y: auto; text-align: center; }
 
-        /* Inventory overlay */
-        #inventory-overlay {
-            display: none;
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.75);
-            z-index: 10;
-            justify-content: center;
-            align-items: center;
-        }
-
-        #inventory-overlay.active {
-            display: flex;
-        }
-
-        #inventory-box {
-            background: #16213e;
-            border: 3px solid #3498db;
-            border-radius: 8px;
-            padding: 20px;
-            width: 500px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        #inventory-box h2 {
-            font-size: 14px;
-            color: #3498db;
-            margin-bottom: 16px;
-            text-align: center;
-        }
+        /* Inventory */
+        #inventory-overlay .overlay-box { border-color: #3498db; }
+        #inventory-overlay h2 { color: #3498db; }
+        #inventory-overlay .close-btn { background: #3498db; }
 
         .inv-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 8px;
-            margin: 3px 0;
-            background: #1a1a2e;
-            border-radius: 4px;
-            font-size: 9px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 5px 8px; margin: 2px 0;
+            background: #0a0a1a; border-radius: 4px; font-size: 8px;
         }
-
+        .inv-item.equipped { border: 1px solid #f1c40f; }
         .inv-item .use-btn {
-            padding: 4px 12px;
-            background: #3498db;
-            color: #fff;
-            border: none;
-            border-radius: 3px;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 8px;
-            cursor: pointer;
+            padding: 4px 10px; background: #3498db; color: #fff;
+            border: none; border-radius: 3px;
+            font-family: 'Press Start 2P', monospace; font-size: 7px; cursor: pointer;
         }
 
-        .equipped { border: 1px solid #f1c40f; }
-
-        /* Title screen */
+        /* Title */
         #title-screen {
-            display: flex;
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: #1a1a2e;
-            z-index: 20;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            display: flex; position: absolute; inset: 0;
+            background: #0a0a1a; z-index: 20;
+            flex-direction: column; justify-content: center; align-items: center;
         }
-
         #title-screen h1 {
-            font-size: 28px;
-            color: #e67e22;
-            text-shadow: 3px 3px 0 #c0392b;
-            margin-bottom: 8px;
+            font-size: 24px; color: #e67e22;
+            text-shadow: 3px 3px 0 #c0392b, -1px -1px 0 #000;
+            margin-bottom: 4px;
         }
-
-        #title-screen .subtitle {
-            font-size: 10px;
-            color: #888;
-            margin-bottom: 40px;
-        }
+        #title-screen .subtitle { font-size: 8px; color: #666; margin-bottom: 30px; }
 
         .title-btn {
-            padding: 12px 40px;
-            margin: 6px;
-            font-family: 'Press Start 2P', monospace;
-            font-size: 11px;
-            background: #16213e;
-            color: #e0e0e0;
-            border: 2px solid #0f3460;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
+            padding: 10px 32px; margin: 5px;
+            font-family: 'Press Start 2P', monospace; font-size: 10px;
+            background: #12122a; color: #ccc; border: 2px solid #1a1a4a;
+            border-radius: 4px; cursor: pointer; transition: all 0.2s;
         }
+        .title-btn:hover { background: #1a1a4a; border-color: #e67e22; color: #e67e22; }
 
-        .title-btn:hover {
-            background: #0f3460;
-            border-color: #e67e22;
-            color: #e67e22;
-        }
-
-        /* Location label */
-        #location-label {
-            position: absolute;
-            top: 8px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 10px;
-            color: #fff;
-            text-shadow: 1px 1px 2px #000;
-            z-index: 5;
-            pointer-events: none;
-        }
-
-        /* Damage flash */
-        .damage-flash {
-            animation: flash 0.15s ease-out;
-        }
-        @keyframes flash {
-            0% { filter: brightness(3) saturate(0); }
-            100% { filter: none; }
-        }
-
-        /* Level up effect */
-        .level-up-text {
-            position: absolute;
-            font-size: 16px;
-            color: #f1c40f;
-            text-shadow: 2px 2px 0 #000;
-            z-index: 15;
-            animation: floatUp 2s ease-out forwards;
-            pointer-events: none;
+        /* Floating text */
+        .float-text {
+            position: absolute; z-index: 15; pointer-events: none;
+            font-size: 14px; text-shadow: 2px 2px 0 #000;
+            animation: floatUp 1.5s ease-out forwards;
         }
         @keyframes floatUp {
             0% { opacity: 1; transform: translateY(0); }
-            100% { opacity: 0; transform: translateY(-60px); }
+            100% { opacity: 0; transform: translateY(-50px); }
         }
 
-        /* Mini-map */
-        #minimap {
+        .damage-flash { animation: dflash 0.15s ease-out; }
+        @keyframes dflash { 0% { filter: brightness(3); } 100% { filter: none; } }
+
+        /* ===== MOBILE CONTROLS ===== */
+        #mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: 160px;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        #mobile-dpad {
             position: absolute;
-            top: 8px;
-            right: 8px;
-            border: 2px solid #0f3460;
-            border-radius: 4px;
-            z-index: 5;
-            image-rendering: pixelated;
+            left: 20px; bottom: 20px;
+            width: 130px; height: 130px;
+            pointer-events: auto;
+        }
+
+        .dpad-btn {
+            position: absolute;
+            width: 42px; height: 42px;
+            background: rgba(255,255,255,0.12);
+            border: 2px solid rgba(255,255,255,0.25);
+            border-radius: 8px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background 0.1s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .dpad-btn:active, .dpad-btn.pressed {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+        }
+        .dpad-up { left: 44px; top: 0; }
+        .dpad-down { left: 44px; bottom: 0; }
+        .dpad-left { left: 0; top: 44px; }
+        .dpad-right { right: 0; top: 44px; }
+        .dpad-center {
+            left: 44px; top: 44px;
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.1);
+            font-size: 10px;
+        }
+
+        #mobile-actions {
+            position: absolute;
+            right: 20px; bottom: 20px;
+            display: flex; flex-direction: column;
+            gap: 8px; align-items: flex-end;
+            pointer-events: auto;
+        }
+
+        .mobile-action-row { display: flex; gap: 8px; }
+
+        .mobile-btn {
+            width: 52px; height: 52px;
+            background: rgba(255,255,255,0.12);
+            border: 2px solid rgba(255,255,255,0.25);
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 7px; color: #fff;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .mobile-btn:active { background: rgba(255,255,255,0.3); }
+        .mobile-btn.btn-action { background: rgba(46,204,113,0.25); border-color: rgba(46,204,113,0.5); }
+        .mobile-btn.btn-inv { background: rgba(52,152,219,0.25); border-color: rgba(52,152,219,0.5); }
+        .mobile-btn.btn-map { background: rgba(155,89,182,0.25); border-color: rgba(155,89,182,0.5); }
+
+        /* Combat mobile buttons */
+        #mobile-combat {
+            display: none;
+            position: absolute;
+            right: 20px; bottom: 20px;
+            gap: 8px; flex-wrap: wrap;
+            justify-content: flex-end;
+            max-width: 200px;
+            pointer-events: auto;
+        }
+        #mobile-combat.active { display: flex; }
+
+        .mobile-combat-btn {
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px; color: #fff;
+            border: 2px solid;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 660px) {
+            #game-container { width: 100vw; height: 75vw; max-height: 70vh; }
+            #top-bar { font-size: 7px; padding: 4px 6px; }
+            .bar-container { width: 40px; }
+            #message-log { height: 40px; font-size: 7px; }
+            #controls-hint { display: none; }
+            #minimap { width: 50px; height: 38px; }
+        }
+
+        @media (max-width: 480px) {
+            #top-bar { font-size: 6px; gap: 2px; }
+            .bar-container { width: 30px; }
+            .overlay-box { padding: 10px; }
+            .overlay-box h2 { font-size: 10px; }
+            .shop-item { font-size: 7px; padding: 6px; }
         }
     </style>
 </head>
 <body>
     <div id="game-wrapper">
         <div id="top-bar">
+            <div class="stat">&#9876; LVL <span id="stat-level">1</span></div>
             <div class="stat">
-                <span class="stat-icon">&#9876;</span>
-                <span>LVL <span id="stat-level">1</span></span>
-            </div>
-            <div class="stat">
-                <span class="stat-icon">&#10084;</span>
-                <span>HP</span>
-                <div class="hp-bar-container">
-                    <div class="hp-bar" id="hp-bar" style="width:100%"></div>
-                </div>
+                &#10084; HP
+                <div class="bar-container"><div class="hp-fill" id="hp-bar" style="width:100%"></div></div>
                 <span id="stat-hp">50/50</span>
             </div>
             <div class="stat">
-                <span class="stat-icon">&#9733;</span>
-                <span>XP</span>
-                <div class="hp-bar-container">
-                    <div class="xp-bar" id="xp-bar" style="width:0%"></div>
-                </div>
+                &#9733; XP
+                <div class="bar-container"><div class="xp-fill" id="xp-bar" style="width:0%"></div></div>
             </div>
-            <div class="stat">
-                <span class="stat-icon">&#9733;</span>
-                <span id="stat-gold">0</span> Zł
-            </div>
-            <div class="stat">
-                <span class="stat-icon">&#9876;</span>
-                <span>ATK <span id="stat-atk">5</span></span>
-            </div>
-            <div class="stat">
-                <span class="stat-icon">&#128737;</span>
-                <span>DEF <span id="stat-def">2</span></span>
-            </div>
+            <div class="stat">&#9733; <span id="stat-gold">0</span> Zł</div>
+            <div class="stat">ATK <span id="stat-atk">5</span></div>
+            <div class="stat">DEF <span id="stat-def">2</span></div>
         </div>
 
         <div id="game-container">
-            <canvas id="game-canvas" width="640" height="480"></canvas>
-            <canvas id="minimap" width="80" height="60"></canvas>
+            <canvas id="game-canvas"></canvas>
+            <canvas id="minimap" width="100" height="80"></canvas>
             <div id="location-label"></div>
 
             <div id="title-screen">
@@ -479,23 +452,21 @@
                 <button class="title-btn" id="btn-load-game">Wczytaj Grę</button>
             </div>
 
-            <div id="dialog-overlay">
-                <div id="dialog-box">
+            <div id="dialog-overlay" class="overlay">
+                <div class="overlay-box">
                     <h2 id="dialog-title">Sklep</h2>
                     <div id="dialog-content"></div>
-                    <button id="dialog-close">Zamknij [ESC]</button>
+                    <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#e67e22">Zamknij [ESC]</button>
                 </div>
             </div>
 
-            <div id="combat-overlay">
-                <div id="combat-box">
+            <div id="combat-overlay" class="overlay">
+                <div class="overlay-box">
                     <h2 id="combat-title">Walka!</h2>
                     <div id="enemy-display"></div>
-                    <div id="enemy-name" style="font-size:11px;color:#fff;margin:4px 0;"></div>
-                    <div class="enemy-hp-container">
-                        <div class="enemy-hp-bar" id="enemy-hp-bar" style="width:100%"></div>
-                    </div>
-                    <div id="enemy-hp-text" style="font-size:9px;color:#aaa;margin:4px 0;"></div>
+                    <div id="enemy-name"></div>
+                    <div class="enemy-hp-container"><div class="enemy-hp-bar" id="enemy-hp-bar"></div></div>
+                    <div id="enemy-hp-text"></div>
                     <div id="combat-actions">
                         <button class="combat-btn btn-attack" onclick="Game.combat.doAttack()">Atak [A]</button>
                         <button class="combat-btn btn-skill" onclick="Game.combat.doSkill()">Umiej. [S]</button>
@@ -506,21 +477,47 @@
                 </div>
             </div>
 
-            <div id="inventory-overlay">
-                <div id="inventory-box">
+            <div id="inventory-overlay" class="overlay">
+                <div class="overlay-box">
                     <h2>Ekwipunek</h2>
                     <div id="inventory-content"></div>
-                    <button id="dialog-close-inv" style="display:block;margin:16px auto 0;padding:8px 24px;background:#3498db;color:#fff;border:none;border-radius:4px;font-family:'Press Start 2P',monospace;font-size:10px;cursor:pointer;">Zamknij [ESC]</button>
+                    <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#3498db">Zamknij [ESC]</button>
                 </div>
             </div>
         </div>
 
         <div id="message-log"></div>
         <div id="controls-hint">
-            [WASD / Strzałki] Ruch &nbsp; [SPACJA] Interakcja &nbsp; [I] Ekwipunek &nbsp; [M] Mapa
+            [WASD / Strzałki] Ruch &nbsp; [SPACJA] Interakcja &nbsp; [I] Ekwipunek
         </div>
     </div>
 
+    <!-- Mobile Controls -->
+    <div id="mobile-controls">
+        <div id="mobile-dpad">
+            <div class="dpad-btn dpad-up" data-dir="up">&#9650;</div>
+            <div class="dpad-btn dpad-left" data-dir="left">&#9664;</div>
+            <div class="dpad-btn dpad-center">&#8982;</div>
+            <div class="dpad-btn dpad-right" data-dir="right">&#9654;</div>
+            <div class="dpad-btn dpad-down" data-dir="down">&#9660;</div>
+        </div>
+        <div id="mobile-actions">
+            <div class="mobile-action-row">
+                <div class="mobile-btn btn-action" id="mobile-interact">ACT</div>
+                <div class="mobile-btn btn-inv" id="mobile-inventory">INV</div>
+            </div>
+        </div>
+        <div id="mobile-combat">
+            <div class="mobile-combat-btn btn-attack" onclick="Game.combat.doAttack()">ATK</div>
+            <div class="mobile-combat-btn btn-skill" onclick="Game.combat.doSkill()">SKL</div>
+            <div class="mobile-combat-btn btn-potion" onclick="Game.combat.doPotion()">POT</div>
+            <div class="mobile-combat-btn btn-flee" onclick="Game.combat.doFlee()">RUN</div>
+        </div>
+    </div>
+
+    <script src="perlin.js"></script>
+    <script src="sprites.js"></script>
+    <script src="world.js"></script>
     <script src="game.js"></script>
 </body>
 </html>
