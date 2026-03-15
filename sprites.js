@@ -720,8 +720,91 @@ const Sprites = {
         });
     },
 
+    // ========== MONSTER SPRITES (for overworld) ==========
+    initMonsters() {
+        const px = this.px;
+
+        // Generic monster sprite generator
+        const monsterDefs = {
+            slime:       { body: '#2ecc71', eye: '#fff', h: 8 },
+            goblin:      { body: '#9b59b6', eye: '#ff0', h: 12 },
+            wolf:        { body: '#888', eye: '#f00', h: 10 },
+            spider:      { body: '#333', eye: '#f00', h: 8 },
+            orc:         { body: '#2c8c3c', eye: '#ff0', h: 12 },
+            bandit:      { body: '#8B4513', eye: '#fff', h: 12 },
+            treant:      { body: '#2d8a4e', eye: '#ff0', h: 14 },
+            beetle:      { body: '#4a0', eye: '#f00', h: 6 },
+            ghost:       { body: '#aaccff', eye: '#00f', h: 12 },
+            troll:       { body: '#556b2f', eye: '#f00', h: 14 },
+            golem:       { body: '#808080', eye: '#ff0', h: 14 },
+            griffin:     { body: '#daa520', eye: '#f00', h: 12 },
+            dark_knight: { body: '#2c2c2c', eye: '#f00', h: 14 },
+            scorpion:    { body: '#c4a858', eye: '#f00', h: 6 },
+            mummy:       { body: '#d4c090', eye: '#0f0', h: 12 },
+            djinn:       { body: '#5dade2', eye: '#fff', h: 12 },
+        };
+
+        for (const [key, def] of Object.entries(monsterDefs)) {
+            for (let dir = 0; dir < 2; dir++) { // 0=frame1, 1=frame2
+                this.create(`mob_${key}_${dir}`, (ctx) => {
+                    const S = 16;
+                    const y0 = S - def.h - 2;
+                    const bob = dir === 1 ? -1 : 0;
+
+                    // Shadow
+                    px(ctx, 4, 14, 'rgba(0,0,0,0.3)', 8, 2);
+
+                    if (def.h <= 8) {
+                        // Small creature (slime, beetle, scorpion)
+                        px(ctx, 4, y0 + 2 + bob, def.body, 8, def.h);
+                        px(ctx, 5, y0 + 3 + bob, def.eye, 2, 2);
+                        px(ctx, 9, y0 + 3 + bob, def.eye, 2, 2);
+                        // Pupil
+                        px(ctx, 5, y0 + 3 + bob, '#000', 1, 1);
+                        px(ctx, 9, y0 + 3 + bob, '#000', 1, 1);
+                    } else {
+                        // Humanoid/large creature
+                        // Body
+                        px(ctx, 5, y0 + 4 + bob, def.body, 6, def.h - 4);
+                        // Head
+                        px(ctx, 6, y0 + bob, def.body, 4, 5);
+                        // Eyes
+                        px(ctx, 7, y0 + 2 + bob, def.eye, 1, 1);
+                        px(ctx, 9, y0 + 2 + bob, def.eye, 1, 1);
+                        // Legs
+                        px(ctx, 5 + dir, 13, def.body, 2, 3);
+                        px(ctx, 9 - dir, 13, def.body, 2, 3);
+                    }
+                });
+            }
+            // Elite version (with star)
+            this.create(`mob_${key}_elite`, (ctx) => {
+                const S = 16;
+                const y0 = S - def.h - 2;
+                px(ctx, 4, 14, 'rgba(0,0,0,0.3)', 8, 2);
+                if (def.h <= 8) {
+                    px(ctx, 4, y0 + 2, def.body, 8, def.h);
+                    px(ctx, 5, y0 + 3, def.eye, 2, 2);
+                    px(ctx, 9, y0 + 3, def.eye, 2, 2);
+                } else {
+                    px(ctx, 5, y0 + 4, def.body, 6, def.h - 4);
+                    px(ctx, 6, y0, def.body, 4, 5);
+                    px(ctx, 7, y0 + 2, def.eye, 1, 1);
+                    px(ctx, 9, y0 + 2, def.eye, 1, 1);
+                    px(ctx, 5, 13, def.body, 2, 3);
+                    px(ctx, 9, 13, def.body, 2, 3);
+                }
+                // Star
+                px(ctx, 7, 0, '#f1c40f', 2, 1);
+                px(ctx, 6, 1, '#f1c40f', 4, 1);
+                px(ctx, 7, 2, '#f1c40f', 2, 1);
+            });
+        }
+    },
+
     init() {
         this.initTiles();
         this.initPlayer();
+        this.initMonsters();
     }
 };
