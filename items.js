@@ -40,6 +40,7 @@ const CLASSES = {
         baseStats: { hp: 60, mp: 20, atk: 7, def: 5, agi: 2 },
         hpPerLevel: 8, mpPerLevel: 2, atkPerLevel: 2, defPerLevel: 2, agiPerLevel: 0.3,
         attacksPerTurn: 1,
+        baseAttackSpeed: 1.5, // seconds between attacks
         allowedItems: ['sword','axe','mace','helmet','armor','pants','boots','shield'],
         skills: [
             { level: 1,  id: 'shield_bash', name: 'Uderzenie Tarczą', desc: 'Ogłusza wroga. Obrażenia 1.2x (+0.2x/lv)', cost: 8, type: 'melee', baseMult: 1.2, multPerLv: 0.2 },
@@ -78,6 +79,7 @@ const CLASSES = {
         baseStats: { hp: 40, mp: 30, atk: 6, def: 2, agi: 5 },
         hpPerLevel: 5, mpPerLevel: 3, atkPerLevel: 1.5, defPerLevel: 1, agiPerLevel: 1,
         attacksPerTurn: 2,
+        baseAttackSpeed: 1.0, // rogue attacks faster
         allowedItems: ['dagger','sword','hood','cape','leggings','boots','offhand_dagger'],
         skills: [
             { level: 1,  id: 'stealth', name: 'Niewidzialność', desc: 'Niewidzialny na 5 kratek (+2/lv)', cost: 10, type: 'buff' },
@@ -116,6 +118,7 @@ const CLASSES = {
         baseStats: { hp: 35, mp: 60, atk: 3, def: 1, agi: 3 },
         hpPerLevel: 4, mpPerLevel: 6, atkPerLevel: 1, defPerLevel: 0.5, agiPerLevel: 0.5,
         attacksPerTurn: 1,
+        baseAttackSpeed: 2.0, // mage attacks slower but ranged
         attackRange: 3,
         allowedItems: ['wand','staff','hat','robe','pants','shoes','tome'],
         skills: [

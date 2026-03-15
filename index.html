@@ -15,7 +15,7 @@
             background: #0a0a1a;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
             min-height: 100vh;
             font-family: 'Press Start 2P', monospace;
             color: #e0e0e0;
@@ -25,13 +25,15 @@
             user-select: none;
         }
 
+        /* ===== TIBIA-STYLE LAYOUT ===== */
         #game-wrapper {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
             width: 100%;
-            max-width: 800px;
+            max-width: 1100px;
+            height: 100vh;
+            padding: 4px;
         }
 
         #top-bar {
@@ -39,19 +41,19 @@
             justify-content: space-between;
             flex-wrap: wrap;
             width: 100%;
-            max-width: 640px;
             background: #12122a;
             border: 2px solid #1a1a4a;
             border-radius: 4px;
-            padding: 6px 10px;
-            font-size: 9px;
+            padding: 4px 8px;
+            font-size: 8px;
             gap: 4px;
+            flex-shrink: 0;
         }
 
         #top-bar .stat {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
         }
 
         .bar-container {
@@ -67,10 +69,20 @@
         .mp-fill { height: 100%; background: linear-gradient(#9b59b6, #8e44ad); transition: width 0.3s; }
         .xp-fill { height: 100%; background: linear-gradient(#3498db, #2980b9); transition: width 0.3s; }
 
+        /* Main content area: game + side panel */
+        #main-area {
+            display: flex;
+            flex: 1;
+            width: 100%;
+            gap: 4px;
+            margin-top: 4px;
+            min-height: 0;
+        }
+
         #game-container {
             position: relative;
-            width: 640px;
-            height: 480px;
+            flex: 1;
+            min-width: 0;
             border: 2px solid #1a1a4a;
             border-radius: 4px;
             overflow: hidden;
@@ -85,12 +97,107 @@
             display: block;
         }
 
-        #minimap {
-            position: absolute;
-            top: 6px; right: 6px;
+        /* ===== SIDE PANEL (Equipment + Backpack) ===== */
+        #side-panel {
+            width: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex-shrink: 0;
+            overflow-y: auto;
+        }
+
+        .panel-box {
+            background: #12122a;
             border: 2px solid #1a1a4a;
+            border-radius: 4px;
+            padding: 6px;
+        }
+
+        .panel-title {
+            font-size: 8px;
+            color: #e67e22;
+            margin-bottom: 4px;
+            text-align: center;
+            border-bottom: 1px solid #1a1a4a;
+            padding-bottom: 3px;
+        }
+
+        /* Equipment panel */
+        #eq-panel .eq-slot {
+            display: flex;
+            align-items: center;
+            padding: 2px 4px;
+            margin: 1px 0;
+            font-size: 7px;
+            background: #0a0a1a;
             border-radius: 3px;
-            z-index: 5;
+            border: 1px solid #1a1a4a;
+            cursor: pointer;
+        }
+        #eq-panel .eq-slot:hover { border-color: #333; }
+        #eq-panel .eq-slot .slot-label { color: #666; width: 42px; font-size: 6px; flex-shrink: 0; }
+        #eq-panel .eq-slot .slot-item { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #eq-panel .eq-slot .slot-empty { color: #333; }
+
+        /* Backpack panel */
+        #bp-panel .bp-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 2px;
+        }
+        #bp-panel .bp-slot {
+            aspect-ratio: 1;
+            background: #0a0a1a;
+            border: 1px solid #1a1a4a;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 6px;
+            cursor: pointer;
+            overflow: hidden;
+            position: relative;
+            padding: 1px;
+            text-align: center;
+            line-height: 1.2;
+        }
+        #bp-panel .bp-slot:hover { border-color: #444; }
+        #bp-panel .bp-slot.has-item { border-color: #333; }
+        #bp-panel .bp-slot .bp-count {
+            position: absolute; bottom: 0; right: 1px;
+            font-size: 6px; color: #f1c40f;
+        }
+
+        /* Skill bar */
+        #skill-bar {
+            display: flex;
+            gap: 3px;
+        }
+        #skill-bar .skill-slot {
+            flex: 1;
+            background: #0a0a1a;
+            border: 1px solid #1a1a4a;
+            border-radius: 3px;
+            padding: 3px;
+            font-size: 6px;
+            text-align: center;
+            cursor: pointer;
+            line-height: 1.3;
+        }
+        #skill-bar .skill-slot:hover { border-color: #9b59b6; }
+        #skill-bar .skill-slot .sk-key { color: #f1c40f; }
+
+        /* Minimap in side panel */
+        #minimap-panel canvas {
+            width: 100%;
+            image-rendering: pixelated;
+            display: block;
+        }
+
+        #minimap {
+            border: 1px solid #1a1a4a;
+            border-radius: 3px;
             image-rendering: pixelated;
             background: #111;
         }
@@ -106,15 +213,21 @@
             pointer-events: none;
         }
 
+        /* Bottom bar: message log + controls */
+        #bottom-bar {
+            width: 100%;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+
         #message-log {
             width: 100%;
-            max-width: 640px;
-            height: 60px;
+            height: 80px;
             background: #12122a;
             border: 2px solid #1a1a4a;
             border-radius: 4px;
-            padding: 6px 8px;
-            font-size: 8px;
+            padding: 4px 6px;
+            font-size: 7px;
             line-height: 1.7;
             overflow-y: auto;
             color: #777;
@@ -127,7 +240,7 @@
         .msg-shop { color: #e67e22; }
 
         #controls-hint {
-            font-size: 7px;
+            font-size: 6px;
             color: #444;
             text-align: center;
             margin-top: 2px;
@@ -202,11 +315,7 @@
         .shop-item .stat-up { color: #2ecc71; }
         .shop-item .stat-down { color: #e74c3c; }
 
-        /* Inventory */
-        #inventory-overlay .overlay-box { border-color: #3498db; }
-        #inventory-overlay h2 { color: #3498db; }
-        #inventory-overlay .close-btn { background: #3498db; }
-
+        /* Inventory overlay (still used for detailed view) */
         .inv-item {
             display: flex; justify-content: space-between; align-items: center;
             padding: 5px 8px; margin: 2px 0;
@@ -281,6 +390,20 @@
             border-radius: 6px;
             display: flex; justify-content: center; align-items: center;
             font-size: 14px; cursor: pointer; z-index: 6;
+        }
+
+        /* Ground loot tooltip */
+        #loot-tooltip {
+            display: none;
+            position: absolute;
+            background: #12122a;
+            border: 2px solid #f1c40f;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 7px;
+            z-index: 8;
+            pointer-events: none;
+            max-width: 200px;
         }
 
         /* ===== MOBILE CONTROLS ===== */
@@ -365,21 +488,19 @@
         #fullscreen-btn.is-fullscreen { border-color: rgba(46,204,113,0.5); background: rgba(46,204,113,0.15); }
 
         /* ===== RESPONSIVE ===== */
-        @media (max-width: 660px) {
-            #game-container { width: 100vw; height: 75vw; max-height: 70vh; }
-            #top-bar { font-size: 7px; padding: 4px 6px; }
+        @media (max-width: 800px) {
+            #side-panel { width: 180px; }
             .bar-container { width: 40px; }
-            #message-log { height: 40px; font-size: 7px; }
-            #controls-hint { display: none; }
-            #minimap { width: 50px; height: 38px; }
         }
-
-        @media (max-width: 480px) {
-            #top-bar { font-size: 6px; gap: 2px; }
+        @media (max-width: 660px) {
+            #main-area { flex-direction: column; }
+            #side-panel { width: 100%; flex-direction: row; flex-wrap: wrap; overflow-y: visible; }
+            #side-panel .panel-box { flex: 1; min-width: 150px; }
+            #game-container { height: 50vh; }
+            #top-bar { font-size: 6px; }
             .bar-container { width: 30px; }
-            .overlay-box { padding: 10px; }
-            .overlay-box h2 { font-size: 10px; }
-            .shop-item { font-size: 7px; padding: 6px; }
+            #message-log { height: 50px; font-size: 6px; }
+            #controls-hint { display: none; }
         }
     </style>
 </head>
@@ -410,58 +531,89 @@
             <div class="stat" style="color:#e74c3c;font-size:7px">&#9760;<span id="stat-deaths">0</span></div>
         </div>
 
-        <div id="game-container">
-            <canvas id="game-canvas"></canvas>
-            <canvas id="minimap" width="100" height="80"></canvas>
-            <div id="location-label"></div>
-            <div id="music-btn">&#128266;</div>
+        <div id="main-area">
+            <div id="game-container">
+                <canvas id="game-canvas"></canvas>
+                <div id="location-label"></div>
+                <div id="music-btn">&#128266;</div>
+                <div id="loot-tooltip"></div>
 
-            <div id="title-screen">
-                <h1>PIXEL QUEST</h1>
-                <div class="subtitle">~ 16-bitowa przygoda RPG ~</div>
-                <button class="title-btn" id="btn-new-game">Nowa Gra</button>
-                <button class="title-btn" id="btn-load-game">Wczytaj Gr&#281;</button>
-            </div>
-
-            <div id="class-select"></div>
-
-            <div id="death-overlay">
-                <h1>ZGINALES!</h1>
-                <div id="death-content"></div>
-                <button class="title-btn" id="btn-respawn" style="margin-top:20px">Odrodz sie</button>
-            </div>
-
-            <div id="dialog-overlay" class="overlay">
-                <div class="overlay-box">
-                    <h2 id="dialog-title">Sklep</h2>
-                    <div id="dialog-content"></div>
-                    <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#e67e22">Zamknij [ESC]</button>
+                <div id="title-screen">
+                    <h1>PIXEL QUEST</h1>
+                    <div class="subtitle">~ 16-bitowa przygoda RPG ~</div>
+                    <button class="title-btn" id="btn-new-game">Nowa Gra</button>
+                    <button class="title-btn" id="btn-load-game">Wczytaj Gr&#281;</button>
                 </div>
-            </div>
 
-            <div id="inventory-overlay" class="overlay">
-                <div class="overlay-box">
-                    <h2>Ekwipunek</h2>
-                    <div id="inventory-content"></div>
-                    <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#3498db">Zamknij [ESC]</button>
+                <div id="class-select"></div>
+
+                <div id="death-overlay">
+                    <h1>ZGINALES!</h1>
+                    <div id="death-content"></div>
+                    <button class="title-btn" id="btn-respawn" style="margin-top:20px">Odrodz sie</button>
                 </div>
-            </div>
 
-            <div id="worldmap-overlay" class="overlay">
-                <div class="overlay-box" style="border-color:#2ecc71;width:560px;max-width:95%">
-                    <h2 style="color:#2ecc71">Mapa Świata</h2>
-                    <div style="text-align:center">
-                        <canvas id="worldmap-canvas" width="500" height="380" style="image-rendering:pixelated;border:1px solid #333;background:#111;max-width:100%"></canvas>
+                <div id="dialog-overlay" class="overlay">
+                    <div class="overlay-box">
+                        <h2 id="dialog-title">Sklep</h2>
+                        <div id="dialog-content"></div>
+                        <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#e67e22">Zamknij [ESC]</button>
                     </div>
-                    <div id="worldmap-villages" style="margin-top:8px;max-height:80px;overflow-y:auto"></div>
-                    <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#2ecc71">Zamknij [ESC/N]</button>
+                </div>
+
+                <div id="inventory-overlay" class="overlay">
+                    <div class="overlay-box">
+                        <h2>Ekwipunek</h2>
+                        <div id="inventory-content"></div>
+                        <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#3498db">Zamknij [ESC]</button>
+                    </div>
+                </div>
+
+                <div id="worldmap-overlay" class="overlay">
+                    <div class="overlay-box" style="border-color:#2ecc71;width:560px;max-width:95%">
+                        <h2 style="color:#2ecc71">Mapa Świata</h2>
+                        <div style="text-align:center">
+                            <canvas id="worldmap-canvas" width="500" height="380" style="image-rendering:pixelated;border:1px solid #333;background:#111;max-width:100%"></canvas>
+                        </div>
+                        <div id="worldmap-villages" style="margin-top:8px;max-height:80px;overflow-y:auto"></div>
+                        <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#2ecc71">Zamknij [ESC/N]</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SIDE PANEL (Tibia-style) -->
+            <div id="side-panel">
+                <!-- Minimap -->
+                <div class="panel-box" id="minimap-panel">
+                    <div class="panel-title">Minimapa</div>
+                    <canvas id="minimap" width="210" height="120"></canvas>
+                </div>
+
+                <!-- Equipment -->
+                <div class="panel-box" id="eq-panel">
+                    <div class="panel-title">Wyposażenie</div>
+                    <div id="eq-slots"></div>
+                </div>
+
+                <!-- Skills bar -->
+                <div class="panel-box">
+                    <div class="panel-title">Umiejętności [1-3]</div>
+                    <div id="skill-bar"></div>
+                </div>
+
+                <!-- Backpack -->
+                <div class="panel-box" id="bp-panel">
+                    <div class="panel-title">Plecak <span id="bp-count">0/20</span></div>
+                    <div class="bp-grid" id="bp-grid"></div>
                 </div>
             </div>
         </div>
 
-        <div id="message-log"></div>
-        <div id="controls-hint">
-            [WASD] Ruch &nbsp; [SPACJA] Interakcja &nbsp; [E] Atak &nbsp; [I] Ekwipunek &nbsp; [K] Umiejetnosci &nbsp; [J] Questy &nbsp; [N] Mapa &nbsp; [1-5] Skille &nbsp; [M] Muzyka &nbsp; [P] Zapis
+        <div id="bottom-bar">
+            <div id="message-log"></div>
+            <div id="controls-hint">
+                [WASD] Ruch &nbsp; [SPACJA] Interakcja/Podniez &nbsp; [E] Atak &nbsp; [1-3] Skille &nbsp; [F1/F2] Mikstury HP/MP &nbsp; [I] Ekwipunek &nbsp; [K] Umiejetnosci &nbsp; [J] Questy &nbsp; [N] Mapa &nbsp; [M] Muzyka &nbsp; [P] Zapis
+            </div>
         </div>
     </div>
 

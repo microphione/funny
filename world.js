@@ -19,37 +19,44 @@ const World = {
         NPC_QUEST: 31, NPC_QUEST2: 32, NPC_SHOPKEEPER: 33,
         SHOP_FLOOR: 35, SHOP_WEAPON_NPC: 36, SHOP_ARMOR_NPC: 37,
         SHOP_POTION_NPC: 38, QUEST_ITEM: 39,
+        GROUND_LOOT: 40, // visual marker for ground loot
     },
 
     BIOME: { PLAINS: 0, FOREST: 1, SWAMP: 2, MOUNTAIN: 3, DESERT: 4 },
 
-    // Monster definitions per biome with sprite keys
+    // Monster definitions per biome with level tiers
     MONSTERS: {
         plains: [
-            { name: 'Slime',  sprite: 'slime',  hp: 10, atk: 2, def: 0, xp: 5,  gold: [2,5] },
-            { name: 'Goblin', sprite: 'goblin', hp: 15, atk: 3, def: 1, xp: 8,  gold: [3,8] },
-            { name: 'Wilk',   sprite: 'wolf',   hp: 18, atk: 5, def: 1, xp: 10, gold: [2,6] },
+            { name: 'Slime',       sprite: 'slime',   hp: 10, atk: 2,  def: 0, xp: 5,  gold: [2,5],   minDiff: 1, maxDiff: 6 },
+            { name: 'Goblin',      sprite: 'goblin',  hp: 15, atk: 3,  def: 1, xp: 8,  gold: [3,8],   minDiff: 1, maxDiff: 10 },
+            { name: 'Wilk',        sprite: 'wolf',    hp: 18, atk: 5,  def: 1, xp: 10, gold: [2,6],   minDiff: 2, maxDiff: 12 },
+            { name: 'Dziki Koń',   sprite: 'wolf',    hp: 30, atk: 8,  def: 3, xp: 20, gold: [5,12],  minDiff: 6, maxDiff: 20 },
+            { name: 'Centaur',     sprite: 'bandit',  hp: 50, atk: 14, def: 5, xp: 35, gold: [10,20], minDiff: 12, maxDiff: 99 },
         ],
         forest: [
-            { name: 'Pająk',    sprite: 'spider',  hp: 12, atk: 6, def: 0, xp: 10, gold: [2,5] },
-            { name: 'Ork',      sprite: 'orc',     hp: 25, atk: 7, def: 2, xp: 18, gold: [5,12] },
-            { name: 'Bandyta',  sprite: 'bandit',   hp: 22, atk: 6, def: 3, xp: 15, gold: [8,15] },
-            { name: 'Drzewiec', sprite: 'treant',   hp: 35, atk: 5, def: 5, xp: 20, gold: [4,10] },
+            { name: 'Pająk',       sprite: 'spider',  hp: 12, atk: 6,  def: 0, xp: 10, gold: [2,5],   minDiff: 1, maxDiff: 8 },
+            { name: 'Ork',         sprite: 'orc',     hp: 25, atk: 7,  def: 2, xp: 18, gold: [5,12],  minDiff: 3, maxDiff: 14 },
+            { name: 'Bandyta',     sprite: 'bandit',  hp: 22, atk: 6,  def: 3, xp: 15, gold: [8,15],  minDiff: 2, maxDiff: 10 },
+            { name: 'Drzewiec',    sprite: 'treant',  hp: 35, atk: 5,  def: 5, xp: 20, gold: [4,10],  minDiff: 5, maxDiff: 16 },
+            { name: 'Leśny Mag',   sprite: 'djinn',   hp: 45, atk: 15, def: 4, xp: 40, gold: [12,25], minDiff: 10, maxDiff: 99 },
         ],
         swamp: [
-            { name: 'Żuk',    sprite: 'beetle', hp: 14, atk: 8, def: 1, xp: 12, gold: [3,7] },
-            { name: 'Widmo',  sprite: 'ghost',  hp: 20, atk: 10,def: 0, xp: 18, gold: [5,12] },
-            { name: 'Troll',  sprite: 'troll',  hp: 40, atk: 7, def: 4, xp: 25, gold: [8,18] },
+            { name: 'Żuk',         sprite: 'beetle',  hp: 14, atk: 8,  def: 1, xp: 12, gold: [3,7],   minDiff: 2, maxDiff: 10 },
+            { name: 'Widmo',       sprite: 'ghost',   hp: 20, atk: 10, def: 0, xp: 18, gold: [5,12],  minDiff: 4, maxDiff: 14 },
+            { name: 'Troll',       sprite: 'troll',   hp: 40, atk: 7,  def: 4, xp: 25, gold: [8,18],  minDiff: 6, maxDiff: 18 },
+            { name: 'Bagiennik',   sprite: 'troll',   hp: 55, atk: 12, def: 6, xp: 35, gold: [10,22], minDiff: 10, maxDiff: 99 },
         ],
         mountain: [
-            { name: 'Golem',   sprite: 'golem',       hp: 45, atk: 8, def: 6, xp: 30, gold: [10,20] },
-            { name: 'Gryf',    sprite: 'griffin',      hp: 30, atk: 12,def: 3, xp: 25, gold: [8,16] },
-            { name: 'Rycerz',  sprite: 'dark_knight', hp: 35, atk: 14,def: 5, xp: 35, gold: [12,25] },
+            { name: 'Golem',       sprite: 'golem',   hp: 45, atk: 8,  def: 6, xp: 30, gold: [10,20], minDiff: 5, maxDiff: 18 },
+            { name: 'Gryf',        sprite: 'griffin',  hp: 30, atk: 12, def: 3, xp: 25, gold: [8,16],  minDiff: 6, maxDiff: 20 },
+            { name: 'Rycerz Cieni',sprite: 'dark_knight', hp: 35, atk: 14, def: 5, xp: 35, gold: [12,25], minDiff: 8, maxDiff: 99 },
+            { name: 'Smok Młody',  sprite: 'griffin',  hp: 80, atk: 20, def: 8, xp: 60, gold: [20,40], minDiff: 14, maxDiff: 99 },
         ],
         desert: [
-            { name: 'Skorpion', sprite: 'scorpion', hp: 18, atk: 9, def: 2, xp: 14, gold: [4,10] },
-            { name: 'Mumia',    sprite: 'mummy',    hp: 30, atk: 8, def: 3, xp: 20, gold: [6,14] },
-            { name: 'Dżinn',    sprite: 'djinn',    hp: 25, atk: 15,def: 2, xp: 30, gold: [10,22] },
+            { name: 'Skorpion',    sprite: 'scorpion', hp: 18, atk: 9,  def: 2, xp: 14, gold: [4,10],  minDiff: 3, maxDiff: 12 },
+            { name: 'Mumia',       sprite: 'mummy',    hp: 30, atk: 8,  def: 3, xp: 20, gold: [6,14],  minDiff: 5, maxDiff: 16 },
+            { name: 'Dżinn',       sprite: 'djinn',    hp: 25, atk: 15, def: 2, xp: 30, gold: [10,22], minDiff: 7, maxDiff: 20 },
+            { name: 'Sfinks',      sprite: 'djinn',    hp: 60, atk: 18, def: 6, xp: 50, gold: [15,35], minDiff: 12, maxDiff: 99 },
         ],
     },
 
@@ -63,8 +70,16 @@ const World = {
         this.villages = {};
         this.npcs = {};
         this.questNpcs = {};
-        this.monsters = {};  // key: "x,y" -> monster object
-        this.questItems = {}; // key: "x,y" -> { questId, itemName }
+        this.monsters = {};
+        this.questItems = {};
+        this.groundLoot = {}; // "x,y" -> [items]
+    },
+
+    // ========== GROUND LOOT SYSTEM ==========
+    dropGroundLoot(wx, wy, items) {
+        const key = `${wx},${wy}`;
+        if (!this.groundLoot[key]) this.groundLoot[key] = [];
+        this.groundLoot[key].push(...items);
     },
 
     rng(x, y, extra) {
@@ -78,7 +93,7 @@ const World = {
         const temp = Perlin.fbm(wx * scale + 100, wy * scale + 100, 3);
         const moisture = Perlin.fbm(wx * scale + 500, wy * scale + 500, 3);
         const dist = Math.sqrt(wx * wx + wy * wy);
-        if (dist < 12) return this.BIOME.PLAINS;
+        if (dist < 20) return this.BIOME.PLAINS; // Starting area is plains (larger safe zone)
         if (temp > 0.25) return this.BIOME.DESERT;
         if (temp < -0.25) return this.BIOME.MOUNTAIN;
         if (moisture > 0.2) return this.BIOME.SWAMP;
@@ -86,10 +101,8 @@ const World = {
         return this.BIOME.PLAINS;
     },
 
-    // Normalized zone-based difficulty: each zone is a ring from center
     getDifficulty(wx, wy) {
         const dist = Math.sqrt(wx * wx + wy * wy);
-        // Smooth rings, each 25 tiles wide = 1 level
         return Math.max(1, Math.floor(dist / 25) + 1);
     },
 
@@ -109,6 +122,9 @@ const World = {
         const tiles = new Array(CS * CS);
         const ox = cx * CS;
         const oy = cy * CS;
+
+        // Check if this is the starting city chunk (0,0 and neighbors)
+        const isStartingCity = (cx === 0 && cy === 0);
         const isVillage = this.isVillageChunk(cx, cy);
 
         for (let ly = 0; ly < CS; ly++) {
@@ -155,10 +171,15 @@ const World = {
             }
         }
 
-        if (isVillage) this.placeVillage(tiles, cx, cy, ox, oy);
+        // Starting city (large, covers the 0,0 chunk)
+        if (isStartingCity) {
+            this.placeStartingCity(tiles, cx, cy, ox, oy);
+        } else if (isVillage) {
+            this.placeVillage(tiles, cx, cy, ox, oy);
+        }
 
-        // Dungeon entrance
-        if (!isVillage && this.rng(cx, cy, 100) < 0.06) {
+        // Dungeon entrance (not in villages or starting city)
+        if (!isVillage && !isStartingCity && this.rng(cx, cy, 100) < 0.06) {
             const dx = Math.floor(this.rng(cx, cy, 101) * (CS - 4)) + 2;
             const dy = Math.floor(this.rng(cx, cy, 102) * (CS - 4)) + 2;
             if (tiles[dy * CS + dx] !== T.WATER) {
@@ -172,7 +193,7 @@ const World = {
         }
 
         // Chests
-        if (this.rng(cx, cy, 200) < 0.15) {
+        if (this.rng(cx, cy, 200) < 0.15 && !isStartingCity) {
             const chx = Math.floor(this.rng(cx, cy, 201) * (CS - 2)) + 1;
             const chy = Math.floor(this.rng(cx, cy, 202) * (CS - 2)) + 1;
             const cidx = chy * CS + chx;
@@ -185,10 +206,118 @@ const World = {
             }
         }
 
-        // Spawn monsters in non-village chunks
-        if (!isVillage) this.spawnChunkMonsters(cx, cy, ox, oy, tiles);
+        // Spawn monsters (not in villages or starting city)
+        if (!isVillage && !isStartingCity) this.spawnChunkMonsters(cx, cy, ox, oy, tiles);
 
         return { tiles, biome: this.getBiome(ox + CS/2, oy + CS/2) };
+    },
+
+    // ========== STARTING CITY ==========
+    placeStartingCity(tiles, cx, cy, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+        const center = Math.floor(CS / 2);
+
+        // Large stone floor area (whole chunk almost)
+        for (let dy = 2; dy < CS - 2; dy++)
+            for (let dx = 2; dx < CS - 2; dx++)
+                tiles[dy * CS + dx] = T.STONE_FLOOR;
+
+        // Main paths (cross pattern)
+        for (let i = 0; i < CS; i++) {
+            tiles[center * CS + i] = T.PATH;
+            tiles[i * CS + center] = T.PATH;
+        }
+
+        // Well at center (spawn point)
+        tiles[center * CS + center] = T.WELL;
+
+        // Statue nearby
+        tiles[(center - 2) * CS + center] = T.STATUE;
+
+        // Sign
+        tiles[(center - 1) * CS + (center + 1)] = T.SIGN;
+        this.signTexts[`${ox + center + 1},${oy + center - 1}`] = 'Witaj w Stolicy Krainy!\nTo twój dom. Bezpieczne miejsce.';
+
+        // === SHOPS (larger buildings) ===
+        const shops = [
+            { npcTile: T.SHOP_WEAPON_NPC, shopType: 'weapon', pos: [3, 3], label: 'Kowal' },
+            { npcTile: T.SHOP_ARMOR_NPC,  shopType: 'armor',  pos: [center + 3, 3], label: 'Płatnerz' },
+            { npcTile: T.SHOP_POTION_NPC, shopType: 'potion', pos: [3, center + 3], label: 'Alchemik' },
+        ];
+
+        shops.forEach(s => {
+            const [bx, by] = s.pos;
+            if (bx + 3 >= CS || by + 3 >= CS) return;
+            // 4x3 building
+            for (let ddy = 0; ddy < 3; ddy++)
+                for (let ddx = 0; ddx < 4; ddx++)
+                    tiles[(by + ddy) * CS + (bx + ddx)] = T.HOUSE;
+            tiles[(by + 1) * CS + (bx + 1)] = T.SHOP_FLOOR;
+            tiles[(by + 1) * CS + (bx + 2)] = T.SHOP_FLOOR;
+            tiles[(by + 2) * CS + (bx + 1)] = s.npcTile;
+
+            // Sign for shop
+            tiles[(by - 1) * CS + (bx + 1)] = T.SIGN;
+            this.signTexts[`${ox + bx + 1},${oy + by - 1}`] = s.label;
+
+            this.npcs[`${ox + bx + 1},${oy + by + 2}`] = {
+                type: 'shop', shopType: s.shopType, difficulty: 1, villageName: 'Stolica'
+            };
+        });
+
+        // Inn (larger)
+        const innPos = [center + 3, center + 3];
+        if (innPos[0] + 3 < CS && innPos[1] + 3 < CS) {
+            for (let ddy = 0; ddy < 3; ddy++)
+                for (let ddx = 0; ddx < 4; ddx++)
+                    tiles[(innPos[1] + ddy) * CS + (innPos[0] + ddx)] = T.HOUSE;
+            tiles[(innPos[1] + 2) * CS + (innPos[0] + 1)] = T.INN;
+            tiles[(innPos[1] - 1) * CS + (innPos[0] + 1)] = T.SIGN;
+            this.signTexts[`${ox + innPos[0] + 1},${oy + innPos[1] - 1}`] = 'Karczma "Pod Smokiem"';
+        }
+
+        // Quest NPCs
+        const q1x = center - 3, q1y = center + 2;
+        tiles[q1y * CS + q1x] = T.NPC_QUEST;
+        this.questNpcs[`${ox+q1x},${oy+q1y}`] = this.generateQuest(cx, cy, 0, 1, 'Stolica');
+        const q2x = center + 3, q2y = center + 2;
+        tiles[q2y * CS + q2x] = T.NPC_QUEST2;
+        this.questNpcs[`${ox+q2x},${oy+q2y}`] = this.generateQuest(cx, cy, 1, 1, 'Stolica');
+
+        // Decorative houses around perimeter
+        const housePositions = [
+            [3, center], [CS-6, center], [center, CS-6],
+            [3, CS-6], [CS-6, CS-6], [CS-6, 3],
+        ];
+        housePositions.forEach(([hx, hy]) => {
+            if (hx >= 2 && hx+2 < CS && hy >= 2 && hy+2 < CS) {
+                for (let ddy = 0; ddy < 2; ddy++)
+                    for (let ddx = 0; ddx < 2; ddx++)
+                        if (tiles[(hy+ddy) * CS + (hx+ddx)] === T.STONE_FLOOR)
+                            tiles[(hy+ddy) * CS + (hx+ddx)] = T.VILLAGE_HUT;
+            }
+        });
+
+        // Fence perimeter
+        for (let dx = 1; dx < CS-1; dx++) {
+            if (tiles[1 * CS + dx] === T.STONE_FLOOR) tiles[1 * CS + dx] = T.FENCE;
+            if (tiles[(CS-2) * CS + dx] === T.STONE_FLOOR) tiles[(CS-2) * CS + dx] = T.FENCE;
+        }
+        for (let dy = 1; dy < CS-1; dy++) {
+            if (tiles[dy * CS + 1] === T.STONE_FLOOR) tiles[dy * CS + 1] = T.FENCE;
+            if (tiles[dy * CS + (CS-2)] === T.STONE_FLOOR) tiles[dy * CS + (CS-2)] = T.FENCE;
+        }
+        // Gates (4 cardinal)
+        tiles[center * CS + 1] = T.PATH;
+        tiles[center * CS + (CS-2)] = T.PATH;
+        tiles[1 * CS + center] = T.PATH;
+        tiles[(CS-2) * CS + center] = T.PATH;
+
+        this.villages[this.getChunkKey(cx, cy)] = {
+            name: 'Stolica', difficulty: 1,
+            wellX: ox + center, wellY: oy + center
+        };
     },
 
     // ========== MONSTER SPAWNING ==========
@@ -200,7 +329,11 @@ const World = {
         if (!pool) return;
 
         const diff = this.getDifficulty(ox + CS/2, oy + CS/2);
-        const count = 3 + Math.floor(this.rng(cx, cy, 500) * 2); // 3-4 monsters
+        const count = 3 + Math.floor(this.rng(cx, cy, 500) * 2);
+
+        // Filter monsters by difficulty tier
+        const validPool = pool.filter(m => diff >= m.minDiff && diff <= m.maxDiff);
+        if (validPool.length === 0) return;
 
         for (let i = 0; i < count; i++) {
             const mx = Math.floor(this.rng(cx, cy, 510 + i) * (CS - 4)) + 2;
@@ -209,13 +342,12 @@ const World = {
             const wy = oy + my;
             const mKey = `${wx},${wy}`;
 
-            // Don't spawn on blocked tiles or existing monsters
             if (this.monsters[mKey]) continue;
             const tile = tiles[my * CS + mx];
             if (this.isTileBlocked(tile)) continue;
 
-            const base = pool[Math.floor(this.rng(cx, cy, 530 + i) * pool.length)];
-            const scale = 1 + (diff - 1) * 0.4;
+            const base = validPool[Math.floor(this.rng(cx, cy, 530 + i) * validPool.length)];
+            const scale = 1 + (diff - 1) * 0.35;
             const isElite = this.rng(cx, cy, 540 + i) < 0.08;
             const eMult = isElite ? 2.5 : 1;
 
@@ -234,9 +366,13 @@ const World = {
                 level: diff,
                 isElite,
                 biome: biomeKey,
-                stunned: 0,
-                poisoned: 0,
-                frozen: 0,
+                // Realtime timers
+                stunDuration: 0,
+                poisonDuration: 0,
+                frozenDuration: 0,
+                poisonTimer: 0,
+                moveTimer: Math.random() * 0.5, // stagger initial movement
+                attackTimer: 0,
                 alive: true,
             };
         }
@@ -289,6 +425,7 @@ const World = {
 
     // ========== VILLAGE ==========
     isVillageChunk(cx, cy) {
+        if (cx === 0 && cy === 0) return true; // Starting city
         const vgrid = 8;
         const vcx = Math.round(cx / vgrid);
         const vcy = Math.round(cy / vgrid);
@@ -304,26 +441,21 @@ const World = {
         const diff = this.getDifficulty(ox + center, oy + center);
         const villageName = this.getVillageName(cx, cy);
 
-        // Village square
         for (let dy = center - 4; dy <= center + 4; dy++)
             for (let dx = center - 4; dx <= center + 4; dx++)
                 if (dy >= 0 && dy < CS && dx >= 0 && dx < CS)
                     tiles[dy * CS + dx] = T.STONE_FLOOR;
 
-        // Paths
         for (let i = 0; i < CS; i++) {
             tiles[center * CS + i] = T.PATH;
             tiles[i * CS + center] = T.PATH;
         }
 
-        // Well
         tiles[center * CS + center] = T.WELL;
 
-        // Sign
         tiles[(center - 1) * CS + (center + 1)] = T.SIGN;
         this.signTexts[`${ox + center + 1},${oy + center - 1}`] = `Witaj w ${villageName}!\nPoziom: ${diff}`;
 
-        // === SEPARATE SHOP BUILDINGS (one NPC per shop type) ===
         const shops = [
             { npcTile: T.SHOP_WEAPON_NPC, shopType: 'weapon', pos: [center - 5, center - 5] },
             { npcTile: T.SHOP_ARMOR_NPC,  shopType: 'armor',  pos: [center + 3, center - 5] },
@@ -337,7 +469,7 @@ const World = {
                 for (let ddx = 0; ddx < 3; ddx++)
                     tiles[(by + ddy) * CS + (bx + ddx)] = T.HOUSE;
             tiles[(by + 1) * CS + (bx + 1)] = T.SHOP_FLOOR;
-            tiles[(by + 2) * CS + (bx + 1)] = s.npcTile;  // NPC on exterior side
+            tiles[(by + 2) * CS + (bx + 1)] = s.npcTile;
             tiles[(by) * CS + (bx + 1)] = T.HOUSE;
 
             this.npcs[`${ox + bx + 1},${oy + by + 2}`] = {
@@ -388,7 +520,6 @@ const World = {
                 if (center+7 < CS) tiles[dy*CS+(center+7)] = T.FENCE;
             }
         }
-        // Gates
         tiles[center*CS+(center-7)] = T.PATH;
         tiles[center*CS+(center+7)] = T.PATH;
         if (center-7 >= 0) tiles[(center-7)*CS+center] = T.PATH;
@@ -407,7 +538,9 @@ const World = {
         const pool = this.MONSTERS[area];
 
         if (isKillQuest && pool) {
-            const target = pool[Math.floor(this.rng(cx,cy,410+idx) * pool.length)].name;
+            const validPool = pool.filter(m => difficulty >= m.minDiff && difficulty <= m.maxDiff);
+            const usePool = validPool.length > 0 ? validPool : pool;
+            const target = usePool[Math.floor(this.rng(cx,cy,410+idx) * usePool.length)].name;
             const count = 3 + Math.floor(this.rng(cx,cy,420+idx) * 5);
             return {
                 id: `kill_${cx}_${cy}_${idx}`, type: 'kill',
@@ -439,7 +572,7 @@ const World = {
     spawnQuestItems(quest) {
         if (quest.type !== 'collect' || !quest.targetX) return;
         const count = quest.required;
-        for (let i = 0; i < count + 3; i++) { // spawn a few extra
+        for (let i = 0; i < count + 3; i++) {
             const angle = (i / (count + 3)) * Math.PI * 2 + this.rng(quest.targetX, i, 600) * 0.5;
             const dist = 2 + Math.floor(this.rng(quest.targetY, i, 601) * 6);
             const qx = quest.targetX + Math.floor(Math.cos(angle) * dist);
@@ -455,6 +588,7 @@ const World = {
     },
 
     getVillageName(cx, cy) {
+        if (cx === 0 && cy === 0) return 'Stolica';
         const pre = ['El','Ald','Kor','Myr','Dra','Val','Syl','Gor','Tar','Nol','Bel','Ith','Zar','Mor','Fen','Ash'];
         const suf = ['doria','heim','wald','grad','burg','ton','ria','lund','gar','mir','oth','ven','dal','sten','rok','vik'];
         return pre[Math.floor(this.rng(cx,cy,350)*pre.length)] + suf[Math.floor(this.rng(cx,cy,351)*suf.length)];
@@ -505,8 +639,8 @@ const World = {
         { id: 'shadow_realm', name: 'Kraina Cieni', monsters: ['ghost','djinn'], boss: { name: 'Władca Cieni', sprite: 'djinn', hpMult: 20, atkMult: 6, defMult: 5, xpMult: 30, goldMult: 40 }, floors: 5, biome: 'shadow' },
     ],
 
-    activeDungeon: null, // { type, floor, tiles, monsters, exitX, exitY, size }
-    dungeonReturnPos: null, // { x, y } - where player was before entering
+    activeDungeon: null,
+    dungeonReturnPos: null,
 
     getDungeonType(wx, wy) {
         const idx = Math.abs((wx * 13 + wy * 7 + this.worldSeed) % this.DUNGEON_TYPES.length);
@@ -534,7 +668,6 @@ const World = {
         const tiles = new Array(S * S).fill(this.T.CAVE_WALL);
         const isBossFloor = d.floor >= d.type.floors;
 
-        // Simple room-based dungeon generation
         const rooms = [];
         const roomCount = 4 + d.floor;
         for (let i = 0; i < roomCount; i++) {
@@ -548,7 +681,6 @@ const World = {
                     tiles[y * S + x] = this.T.CAVE_FLOOR;
         }
 
-        // Connect rooms with corridors
         for (let i = 1; i < rooms.length; i++) {
             const a = rooms[i-1], b = rooms[i];
             let cx = a.cx, cy = a.cy;
@@ -562,28 +694,22 @@ const World = {
             }
         }
 
-        // Place entrance in first room
         const startRoom = rooms[0];
         tiles[startRoom.cy * S + startRoom.cx] = this.T.CAVE_ENTRY;
         d.entryX = startRoom.cx;
         d.entryY = startRoom.cy;
 
-        // Place exit/boss in last room
         const endRoom = rooms[rooms.length - 1];
         if (isBossFloor) {
-            // Boss marker - just a floor tile, boss is a monster
             tiles[endRoom.cy * S + endRoom.cx] = this.T.CAVE_FLOOR;
         } else {
-            // Stairs down
             tiles[endRoom.cy * S + endRoom.cx] = this.T.CAVE_ENTRY;
             d.exitX = endRoom.cx;
             d.exitY = endRoom.cy;
         }
 
-        // Clear dungeon monsters
         d.monsters = {};
 
-        // Spawn dungeon monsters
         const monsterPool = d.type.monsters;
         const monsterCount = 3 + d.floor * 2;
         for (let i = 0; i < monsterCount; i++) {
@@ -614,11 +740,12 @@ const World = {
                 gold: [Math.floor(base.gold[0] * scale * eMult), Math.floor(base.gold[1] * scale * eMult * 1.5)],
                 level: d.difficulty + d.floor,
                 isElite, biome: 'dungeon',
-                stunned: 0, poisoned: 0, frozen: 0, alive: true,
+                stunDuration: 0, poisonDuration: 0, frozenDuration: 0, poisonTimer: 0,
+                moveTimer: Math.random() * 0.5, attackTimer: 0,
+                alive: true,
             };
         }
 
-        // Spawn boss on boss floor
         if (isBossFloor) {
             const boss = d.type.boss;
             const allMobs = Object.values(this.MONSTERS).flat();
@@ -637,11 +764,12 @@ const World = {
                 gold: [Math.floor(base.gold[0] * scale * boss.goldMult), Math.floor(base.gold[1] * scale * boss.goldMult)],
                 level: d.difficulty + d.floor + 2,
                 isElite: false, isBoss: true, biome: 'dungeon',
-                stunned: 0, poisoned: 0, frozen: 0, alive: true,
+                stunDuration: 0, poisonDuration: 0, frozenDuration: 0, poisonTimer: 0,
+                moveTimer: 0, attackTimer: 0,
+                alive: true,
             };
         }
 
-        // Place a chest in a random room
         if (rooms.length > 2) {
             const chestRoom = rooms[Math.floor(rooms.length / 2)];
             tiles[chestRoom.cy * S + (chestRoom.cx + 1)] = this.T.CHEST;
@@ -652,7 +780,6 @@ const World = {
 
         d.tiles = tiles;
 
-        // Position player at entrance
         Game.player.x = d.entryX;
         Game.player.y = d.entryY;
         Game.player.visualX = d.entryX;
@@ -684,7 +811,6 @@ const World = {
         Game.log(`Piętro ${d.floor}/${d.type.floors}`, 'info');
     },
 
-    // Dungeon-aware tile/monster access
     getDungeonTile(x, y) {
         const d = this.activeDungeon;
         if (!d || x < 0 || y < 0 || x >= d.size || y >= d.size) return this.T.CAVE_WALL;
@@ -735,7 +861,6 @@ const World = {
             const [cx, cy] = key.split(',').map(Number);
             if (Math.abs(cx-pcx) > maxDist || Math.abs(cy-pcy) > maxDist) {
                 delete this.chunks[key];
-                // Clean up monsters in that chunk
                 const ox = cx * this.CHUNK_SIZE, oy = cy * this.CHUNK_SIZE;
                 for (let y = oy; y < oy + this.CHUNK_SIZE; y++)
                     for (let x = ox; x < ox + this.CHUNK_SIZE; x++)

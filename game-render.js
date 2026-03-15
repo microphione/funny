@@ -154,6 +154,20 @@ const GameRender = {
                     ctx.fill();
                     ctx.globalAlpha = 1;
                 }
+
+                // Ground loot indicator (bag icon)
+                const lootKey = `${wx},${wy}`;
+                if (World.groundLoot[lootKey] && World.groundLoot[lootKey].length > 0) {
+                    const pulse = 0.6 + Math.sin(Date.now() / 300 + wx * 3 + wy * 5) * 0.3;
+                    ctx.globalAlpha = pulse;
+                    ctx.fillStyle = '#e67e22';
+                    ctx.fillRect(sx + 10, sy + 18, 12, 10);
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.fillRect(sx + 12, sy + 14, 8, 6);
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(sx + 14, sy + 16, 4, 2);
+                    ctx.globalAlpha = 1;
+                }
             }
         }
 
@@ -227,6 +241,16 @@ const GameRender = {
         ctx.fillRect(px, py - 9, phpW * p.hp / p.maxHp, 2);
         ctx.fillStyle = '#3498db';
         ctx.fillRect(px, py - 6, phpW * p.mp / p.maxMp, 2);
+
+        // Attack cooldown bar (below player)
+        if (G.attackCooldown > 0) {
+            const atkSpeed = G.getAttackSpeed();
+            const atkPct = G.attackCooldown / atkSpeed;
+            ctx.fillStyle = '#000';
+            ctx.fillRect(px - 1, py + TILE + 2, phpW + 2, 3);
+            ctx.fillStyle = '#e67e22';
+            ctx.fillRect(px, py + TILE + 3, phpW * (1 - atkPct), 1);
+        }
 
         // Targeting crosshair
         if (G.targeting) {

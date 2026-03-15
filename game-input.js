@@ -1,17 +1,30 @@
 // ============================================================
-// GAME INPUT - Keyboard, touch, movement, interactions
+// GAME INPUT - Keyboard, touch, movement (realtime Tibia-style)
 // ============================================================
 
 const GameInput = {
     keys: {},
-    moveRepeatTimer: 0,
-    moveRepeatDelay: 0.18,
+    heldDir: null, // currently held movement direction
     selectedSkill: null,
 
     init() {
         window.addEventListener('keydown', e => this.onKeyDown(e));
-        window.addEventListener('keyup', e => { this.keys[e.code] = false; });
+        window.addEventListener('keyup', e => {
+            this.keys[e.code] = false;
+            // Clear held direction when key released
+            if (['KeyW','ArrowUp','KeyS','ArrowDown','KeyA','ArrowLeft','KeyD','ArrowRight'].includes(e.code)) {
+                this.heldDir = this.getHeldDirection();
+            }
+        });
         this.initMobileControls();
+    },
+
+    getHeldDirection() {
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) return { dx: 0, dy: -1, dir: 'up' };
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) return { dx: 0, dy: 1, dir: 'down' };
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) return { dx: -1, dy: 0, dir: 'left' };
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) return { dx: 1, dy: 0, dir: 'right' };
+        return null;
     },
 
     onKeyDown(e) {
@@ -24,13 +37,15 @@ const GameInput = {
             return;
         }
 
-        // Movement
-        if (['KeyW','ArrowUp'].includes(e.code)) { this.tryMove(0, -1, 'up'); e.preventDefault(); }
-        else if (['KeyS','ArrowDown'].includes(e.code)) { this.tryMove(0, 1, 'down'); e.preventDefault(); }
-        else if (['KeyA','ArrowLeft'].includes(e.code)) { this.tryMove(-1, 0, 'left'); e.preventDefault(); }
-        else if (['KeyD','ArrowRight'].includes(e.code)) { this.tryMove(1, 0, 'right'); e.preventDefault(); }
-        // Interact
+        // Movement keys - set held direction for continuous movement
+        if (['KeyW','ArrowUp'].includes(e.code)) { this.heldDir = { dx: 0, dy: -1, dir: 'up' }; this.tryMove(0, -1, 'up'); e.preventDefault(); }
+        else if (['KeyS','ArrowDown'].includes(e.code)) { this.heldDir = { dx: 0, dy: 1, dir: 'down' }; this.tryMove(0, 1, 'down'); e.preventDefault(); }
+        else if (['KeyA','ArrowLeft'].includes(e.code)) { this.heldDir = { dx: -1, dy: 0, dir: 'left' }; this.tryMove(-1, 0, 'left'); e.preventDefault(); }
+        else if (['KeyD','ArrowRight'].includes(e.code)) { this.heldDir = { dx: 1, dy: 0, dir: 'right' }; this.tryMove(1, 0, 'right'); e.preventDefault(); }
+        // Interact / Pick up loot
         else if (e.code === 'Space') { this.interact(); e.preventDefault(); }
+        // Manual attack (E or Enter)
+        else if (e.code === 'Enter' || e.code === 'KeyE') { this.manualAttack(); e.preventDefault(); }
         // Inventory
         else if (e.code === 'KeyI') { GameUI.openInventory(); e.preventDefault(); }
         // Skills
@@ -43,42 +58,57 @@ const GameInput = {
         else if (e.code === 'KeyP') { Game.save(); e.preventDefault(); }
         // Music toggle
         else if (e.code === 'KeyM') { this.toggleMusic(); e.preventDefault(); }
-        // Skill shortcuts (1-5)
-        else if (e.code >= 'Digit1' && e.code <= 'Digit5') {
+        // Skill shortcuts (1-3)
+        else if (e.code >= 'Digit1' && e.code <= 'Digit3') {
             const idx = parseInt(e.code.charAt(5)) - 1;
             this.useSkillByIndex(idx);
             e.preventDefault();
         }
-        // Attack (Enter or E)
-        else if (e.code === 'Enter' || e.code === 'KeyE') {
-            this.attackInDirection();
-            e.preventDefault();
-        }
-        // Targeting cancel
+        // Quick potions: F1 = HP potion, F2 = MP potion
+        else if (e.code === 'F1') { this.useQuickPotion('hp'); e.preventDefault(); }
+        else if (e.code === 'F2') { this.useQuickPotion('mp'); e.preventDefault(); }
+        // Escape
         else if (e.code === 'Escape') {
             if (Game.targeting) { Game.targeting = false; this.selectedSkill = null; }
+            Game.autoAttackTarget = null;
         }
+    },
+
+    // Called every frame for held movement keys (realtime movement)
+    handleHeldKeys(dt) {
+        if (Game.state !== 'playing' || Game.activeOverlay) return;
+        const dir = this.getHeldDirection();
+        if (!dir) return;
+        if (Game.walkCooldown > 0) return;
+        this.tryMove(dir.dx, dir.dy, dir.dir);
     },
 
     tryMove(dx, dy, dir) {
         const p = Game.player;
         if (!p || Game.animating) return;
         if (Game.state !== 'playing') return;
+        if (Game.walkCooldown > 0) return;
 
         p.dir = dir;
 
         const nx = p.x + dx;
         const ny = p.y + dy;
 
-        // Check for monster - bump attack
+        // Check for monster - bump attack (manual)
         const monster = World.getMonsterAt(nx, ny);
         if (monster) {
-            this.performPlayerTurn(() => GameCombat.playerAttack(nx, ny));
+            if (Game.attackCooldown <= 0) {
+                GameCombat.playerAttack(nx, ny);
+                Game.attackCooldown = Game.getAttackSpeed();
+            }
             return;
         }
 
         // Check walkable
         if (!World.isWalkable(nx, ny)) return;
+
+        // Set walk cooldown
+        Game.walkCooldown = Game.getWalkSpeed();
 
         // Start smooth movement
         Game.animFromX = p.visualX;
@@ -98,16 +128,20 @@ const GameInput = {
         }
 
         // Stealth step counter
-        if (Game.player.stealth && Game.player.stealthSteps > 0) {
-            Game.player.stealthSteps--;
-            if (Game.player.stealthSteps <= 0) {
-                Game.player.stealth = false;
+        if (p.stealth && p.stealthSteps > 0) {
+            p.stealthSteps--;
+            if (p.stealthSteps <= 0) {
+                p.stealth = false;
                 Game.log('Niewidzialność się skończyła.', 'info');
             }
         }
 
-        // After movement - end turn
-        this.endPlayerTurn();
+        // Check for ground loot at destination
+        const lootKey = `${nx},${ny}`;
+        const groundLoot = World.groundLoot[lootKey];
+        if (groundLoot && groundLoot.length > 0) {
+            GameUI.showLootTooltip(groundLoot);
+        }
 
         // Collect quest items (overworld only)
         if (!World.activeDungeon) this.checkCollectQuest();
@@ -121,62 +155,70 @@ const GameInput = {
         }
 
         // Cleanup far chunks periodically
-        if (!World.activeDungeon && Game.turnNumber % 20 === 0) World.cleanupChunks(nx, ny);
+        if (!World.activeDungeon && Math.random() < 0.05) World.cleanupChunks(nx, ny);
     },
 
-    performPlayerTurn(action) {
+    manualAttack() {
         const p = Game.player;
+        if (!p || Game.attackCooldown > 0) return;
+
         const cls = CLASSES[p.classId];
-        if (Game.turnPhase !== 'player') return;
+        const range = cls.attackRange || 1;
+        const dirs = { up: {dx:0,dy:-1}, down: {dx:0,dy:1}, left: {dx:-1,dy:0}, right: {dx:1,dy:0} };
+        const d = dirs[p.dir] || {dx:0,dy:1};
 
-        if (Game.playerActionsLeft <= 0) {
-            Game.playerActionsLeft = cls.attacksPerTurn;
+        for (let i = 1; i <= range; i++) {
+            const tx = p.x + d.dx * i;
+            const ty = p.y + d.dy * i;
+            const m = World.getMonsterAt(tx, ty);
+            if (m) {
+                GameCombat.playerAttack(tx, ty);
+                Game.attackCooldown = Game.getAttackSpeed();
+                return;
+            }
+            if (World.isTileBlocked(World.getTile(tx, ty))) break;
         }
-
-        const result = action();
-        if (!result) return;
-
-        Game.playerActionsLeft--;
-        if (Game.playerActionsLeft <= 0) {
-            this.endPlayerTurn();
-        }
-    },
-
-    endPlayerTurn() {
-        Game.turnNumber++;
-        Game.turnPhase = 'monsters';
-        GameCombat.monstersTurn();
-        Game.turnPhase = 'player';
-        const cls = CLASSES[Game.player.classId];
-        Game.playerActionsLeft = cls.attacksPerTurn;
-        GameRender.updateHUD();
-        // Periodic main quest check
-        if (Game.turnNumber % 10 === 0) Game.checkMainQuest();
     },
 
     interact() {
         const p = Game.player;
         if (!p) return;
+
+        // First check: pick up ground loot at current position
+        const standKey = `${p.x},${p.y}`;
+        const standLoot = World.groundLoot[standKey];
+        if (standLoot && standLoot.length > 0) {
+            this.pickupGroundLoot(p.x, p.y);
+            return;
+        }
+
+        // Check adjacent tile in facing direction
         const dirs = { up: {dx:0,dy:-1}, down: {dx:0,dy:1}, left: {dx:-1,dy:0}, right: {dx:1,dy:0} };
         const d = dirs[p.dir] || {dx:0,dy:1};
         const tx = p.x + d.dx;
         const ty = p.y + d.dy;
+
+        // Check ground loot at faced tile
+        const faceKey = `${tx},${ty}`;
+        const faceLoot = World.groundLoot[faceKey];
+        if (faceLoot && faceLoot.length > 0) {
+            this.pickupGroundLoot(tx, ty);
+            return;
+        }
+
         const tile = World.getTile(tx, ty);
         const T = World.T;
 
-        // Cave entry - enter/navigate dungeon
+        // Cave entry
         if (tile === T.CAVE_ENTRY) {
             if (World.activeDungeon) {
-                const d = World.activeDungeon;
-                if (tx === d.entryX && ty === d.entryY) {
-                    // Exit dungeon
+                const dd = World.activeDungeon;
+                if (tx === dd.entryX && ty === dd.entryY) {
                     World.exitDungeon();
-                } else if (tx === d.exitX && ty === d.exitY) {
-                    // Next floor
+                } else if (tx === dd.exitX && ty === dd.exitY) {
                     World.nextDungeonFloor();
                 }
             } else {
-                // Enter dungeon from overworld
                 World.enterDungeon(tx, ty);
             }
             GameRender.updateHUD();
@@ -186,37 +228,30 @@ const GameInput = {
         // Chest
         if (tile === T.CHEST) {
             const key = `${tx},${ty}`;
-            // Dungeon chests
             if (World.activeDungeon) {
                 const dc = World.activeDungeon.chests && World.activeDungeon.chests[key];
                 if (!dc) { Game.log('Ta skrzynia jest już pusta.', 'info'); return; }
                 p.gold += dc.gold;
                 Game.log(`Skrzynia: +${dc.gold} złota!`, 'loot');
+                Music.playGoldDrop();
                 delete World.activeDungeon.chests[key];
                 if (Math.random() < 0.6) {
                     const loot = generateLootForClass(p.classId, World.activeDungeon.difficulty + World.activeDungeon.floor);
-                    if (loot) { p.inventory.push(loot); Game.log(`Znaleziono: ${loot.name}!`, 'loot'); }
+                    if (loot) World.dropGroundLoot(tx, ty, [loot]);
                 }
                 GameRender.updateHUD();
                 return;
             }
-            if (World.openedChests.has(key)) {
-                Game.log('Ta skrzynia jest już pusta.', 'info');
-                return;
-            }
+            if (World.openedChests.has(key)) { Game.log('Ta skrzynia jest już pusta.', 'info'); return; }
             World.openedChests.add(key);
             const chest = World.chests[key];
             if (chest) {
                 p.gold += chest.gold;
                 Game.log(`Skrzynia: +${chest.gold} złota!`, 'loot');
-
-                // Chance for item
+                Music.playGoldDrop();
                 if (Math.random() < 0.5) {
                     const loot = generateLootForClass(p.classId, World.getDifficulty(tx, ty));
-                    if (loot) {
-                        p.inventory.push(loot);
-                        Game.log(`Znaleziono: ${loot.name}!`, 'loot');
-                    }
+                    if (loot) World.dropGroundLoot(tx, ty, [loot]);
                 }
             }
             GameRender.updateHUD();
@@ -251,12 +286,9 @@ const GameInput = {
         if (tile === T.NPC_QUEST || tile === T.NPC_QUEST2) {
             const quest = World.questNpcs[`${tx},${ty}`];
             if (!quest) return;
-
-            // Check if already accepted
             const existing = Game.quests.find(q => q.id === quest.id);
             if (existing) {
                 if (existing.completed && !existing.turned_in) {
-                    // Turn in
                     existing.turned_in = true;
                     p.gold += existing.reward.gold;
                     Game.addXp(existing.reward.xp);
@@ -268,7 +300,6 @@ const GameInput = {
                     Game.log(`Quest w toku: ${existing.progress}/${existing.required}`, 'info');
                 }
             } else {
-                // Accept quest
                 const q = { ...quest, progress: 0, completed: false, turned_in: false };
                 Game.quests.push(q);
                 if (q.type === 'collect') World.spawnQuestItems(q);
@@ -277,7 +308,7 @@ const GameInput = {
             return;
         }
 
-        // Well - save point + register for teleport
+        // Well
         if (tile === T.WELL) {
             const cx = Math.floor(tx / World.CHUNK_SIZE);
             const cy = Math.floor(ty / World.CHUNK_SIZE);
@@ -291,7 +322,7 @@ const GameInput = {
             return;
         }
 
-        // Inn - heal
+        // Inn
         if (tile === T.INN) {
             const cost = 5 + p.level * 2;
             if (p.gold >= cost) {
@@ -305,36 +336,52 @@ const GameInput = {
             }
             return;
         }
-
-        // Attack in direction (for ranged)
-        this.attackInDirection();
     },
 
-    attackInDirection() {
-        const p = Game.player;
-        const cls = CLASSES[p.classId];
-        const range = cls.attackRange || 1;
-        const dirs = { up: {dx:0,dy:-1}, down: {dx:0,dy:1}, left: {dx:-1,dy:0}, right: {dx:1,dy:0} };
-        const d = dirs[p.dir] || {dx:0,dy:1};
+    pickupGroundLoot(wx, wy) {
+        const key = `${wx},${wy}`;
+        const loot = World.groundLoot[key];
+        if (!loot || loot.length === 0) return;
 
-        // Find first monster in line of sight within range
-        for (let i = 1; i <= range; i++) {
-            const tx = p.x + d.dx * i;
-            const ty = p.y + d.dy * i;
-            const m = World.getMonsterAt(tx, ty);
-            if (m) {
-                this.performPlayerTurn(() => GameCombat.playerAttack(tx, ty));
-                return;
+        const p = Game.player;
+        const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
+        const backpackCount = p.inventory.filter(item => !equippedIds.has(item.id) || item.type === 'consumable').length;
+
+        const picked = [];
+        const remaining = [];
+
+        for (const item of loot) {
+            // Check backpack space (20 slots)
+            if (item.type === 'consumable') {
+                const existing = p.inventory.find(i => i.id === item.id);
+                if (existing) {
+                    existing.count = (existing.count || 1) + (item.count || 1);
+                    picked.push(item);
+                    continue;
+                }
             }
-            // Stop if wall
-            if (World.isTileBlocked(World.getTile(tx, ty))) break;
+            if (backpackCount + picked.filter(i => i.type !== 'consumable').length < 20) {
+                p.inventory.push(item);
+                picked.push(item);
+                Game.log(`Podniesiono: ${item.name}`, 'loot');
+            } else {
+                remaining.push(item);
+                Game.log('Plecak pełny!', 'info');
+            }
         }
+
+        if (remaining.length > 0) {
+            World.groundLoot[key] = remaining;
+        } else {
+            delete World.groundLoot[key];
+        }
+        GameUI.hideLootTooltip();
+        GameUI.updateSidePanel();
     },
 
     useSkillByIndex(idx) {
         const p = Game.player;
         const cls = CLASSES[p.classId];
-        // Use active skill slots (3 slots max)
         if (idx >= 3) return;
         const skillId = p.activeSkills[idx];
         if (!skillId) { Game.log('Brak umiejętności w tym slocie.', 'info'); return; }
@@ -345,11 +392,13 @@ const GameInput = {
             Game.log(`Za mało many na ${skill.name} (${skill.cost} MP)`, 'info');
             return;
         }
+        if (Game.skillCooldowns[skillId] > 0) {
+            Game.log(`${skill.name} się ładuje!`, 'info');
+            return;
+        }
 
-        // For targeted skills, find target
         if (['melee','ranged','ranged_aoe'].includes(skill.type)) {
             const target = GameCombat.getTargetTile();
-            // For ranged, search in direction
             if (skill.type === 'ranged' || skill.type === 'ranged_aoe') {
                 const range = cls.attackRange || 3;
                 const dirs = { up: {dx:0,dy:-1}, down: {dx:0,dy:1}, left: {dx:-1,dy:0}, right: {dx:1,dy:0} };
@@ -359,31 +408,40 @@ const GameInput = {
                     const ty = p.y + d.dy * i;
                     const m = World.getMonsterAt(tx, ty);
                     if (m) {
-                        this.performPlayerTurn(() => GameCombat.useSkill(skill.id, tx, ty));
+                        GameCombat.useSkill(skill.id, tx, ty);
                         return;
                     }
                     if (World.isTileBlocked(World.getTile(tx, ty))) break;
                 }
-                // For AOE, use target tile even without monster
                 if (skill.type === 'ranged_aoe') {
-                    this.performPlayerTurn(() => GameCombat.useSkill(skill.id, target.x, target.y));
+                    GameCombat.useSkill(skill.id, target.x, target.y);
                     return;
                 }
                 Game.log('Brak celu w zasięgu.', 'info');
             } else {
-                // Melee - check adjacent
                 const m = World.getMonsterAt(target.x, target.y);
                 if (m) {
-                    this.performPlayerTurn(() => GameCombat.useSkill(skill.id, target.x, target.y));
+                    GameCombat.useSkill(skill.id, target.x, target.y);
                 } else {
                     Game.log('Brak wroga w tym kierunku.', 'info');
                 }
             }
         } else if (skill.type === 'buff') {
-            this.performPlayerTurn(() => GameCombat.useSkill(skill.id, p.x, p.y));
+            GameCombat.useSkill(skill.id, p.x, p.y);
         } else if (skill.type === 'aoe') {
-            this.performPlayerTurn(() => GameCombat.useSkill(skill.id, p.x, p.y));
+            GameCombat.useSkill(skill.id, p.x, p.y);
         }
+    },
+
+    useQuickPotion(subtype) {
+        const p = Game.player;
+        if (!p) return;
+        const idx = p.inventory.findIndex(i => i.type === 'consumable' && i.subtype === subtype);
+        if (idx === -1) {
+            Game.log(`Brak mikstur ${subtype === 'hp' ? 'HP' : 'MP'}!`, 'info');
+            return;
+        }
+        GameUI.useConsumable(idx);
     },
 
     checkCollectQuest() {
@@ -399,7 +457,6 @@ const GameInput = {
                 if (q.progress >= q.required) {
                     q.completed = true;
                     Game.log(`Quest "${q.title}" ukończony! Wróć do zleceniodawcy.`, 'info');
-                    // Clean up remaining items for this quest
                     for (const k in World.questItems) {
                         if (World.questItems[k].questId === q.id) delete World.questItems[k];
                     }
@@ -426,7 +483,6 @@ const GameInput = {
             if (fsBtn) fsBtn.style.display = 'flex';
         }
 
-        // D-pad
         document.querySelectorAll('.dpad-btn[data-dir]').forEach(btn => {
             const handler = (e) => {
                 e.preventDefault();
@@ -440,7 +496,6 @@ const GameInput = {
             btn.addEventListener('mousedown', handler);
         });
 
-        // Center = interact
         const center = document.querySelector('.dpad-center');
         if (center) {
             const handler = (e) => { e.preventDefault(); this.interact(); };
@@ -448,7 +503,6 @@ const GameInput = {
             center.addEventListener('mousedown', handler);
         }
 
-        // Action buttons
         const interactBtn = document.getElementById('mobile-interact');
         if (interactBtn) {
             const handler = (e) => { e.preventDefault(); this.interact(); };
@@ -461,7 +515,6 @@ const GameInput = {
             invBtn.addEventListener('touchstart', handler, { passive: false });
         }
 
-        // Fullscreen
         if (fsBtn) {
             fsBtn.addEventListener('click', () => {
                 if (document.fullscreenElement || document.webkitFullscreenElement) {

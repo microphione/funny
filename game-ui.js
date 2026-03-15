@@ -3,6 +3,130 @@
 // ============================================================
 
 const GameUI = {
+    // ========== SIDE PANEL RENDERING (Tibia-style) ==========
+    updateSidePanel() {
+        this.updateEqPanel();
+        this.updateBpPanel();
+        this.updateSkillBar();
+    },
+
+    updateEqPanel() {
+        const el = document.getElementById('eq-slots');
+        if (!el || !Game.player) return;
+        const p = Game.player;
+        el.innerHTML = '';
+        for (const [slot, label] of Object.entries(EQUIP_SLOTS)) {
+            const item = p.equipment[slot];
+            const div = document.createElement('div');
+            div.className = 'eq-slot';
+            const tierCol = item?.tier ? (TIERS[item.tier]?.color || '#aaa') : '#333';
+            div.innerHTML = `<span class="slot-label">${label}</span>
+                <span class="slot-item ${item ? '' : 'slot-empty'}" style="color:${tierCol}">${item ? item.name : '-'}</span>`;
+            if (item) {
+                div.title = `${item.name}\n${item.desc || ''}`;
+                div.onclick = () => {
+                    // Unequip to backpack
+                    const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
+                    const backpackCount = p.inventory.filter(i => !equippedIds.has(i.id) || i.type === 'consumable').length;
+                    if (backpackCount < 20) {
+                        p.equipment[slot] = null;
+                        Game.refreshStats();
+                        this.updateSidePanel();
+                        GameRender.updateHUD();
+                    } else {
+                        Game.log('Plecak pełny!', 'info');
+                    }
+                };
+            }
+            el.appendChild(div);
+        }
+    },
+
+    updateBpPanel() {
+        const grid = document.getElementById('bp-grid');
+        const countEl = document.getElementById('bp-count');
+        if (!grid || !Game.player) return;
+        const p = Game.player;
+        const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
+        const backpackItems = p.inventory.filter(item => !equippedIds.has(item.id) || item.type === 'consumable');
+
+        if (countEl) countEl.textContent = `${backpackItems.length}/20`;
+        grid.innerHTML = '';
+
+        for (let i = 0; i < 20; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'bp-slot';
+            const item = backpackItems[i];
+            if (item) {
+                slot.classList.add('has-item');
+                const tierCol = item.tier ? (TIERS[item.tier]?.color || '#aaa') : '#aaa';
+                const shortName = item.name.length > 8 ? item.name.slice(0, 7) + '..' : item.name;
+                slot.innerHTML = `<span style="color:${tierCol}">${shortName}</span>`;
+                if (item.count > 1) slot.innerHTML += `<span class="bp-count">x${item.count}</span>`;
+                slot.title = `${item.name}\n${item.desc || ''}`;
+                slot.onclick = () => {
+                    if (item.type === 'consumable') {
+                        this.useConsumable(p.inventory.indexOf(item));
+                        this.updateSidePanel();
+                    } else if (item.type === 'equipment' && canEquip(item, p.classId, p.level)) {
+                        p.equipment[item.slot] = item;
+                        Game.refreshStats();
+                        this.updateSidePanel();
+                        GameRender.updateHUD();
+                    }
+                };
+            }
+            grid.appendChild(slot);
+        }
+    },
+
+    updateSkillBar() {
+        const bar = document.getElementById('skill-bar');
+        if (!bar || !Game.player) return;
+        const p = Game.player;
+        const cls = CLASSES[p.classId];
+        bar.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            const sid = p.activeSkills[i];
+            const sk = sid ? cls.skills.find(s => s.id === sid) : null;
+            const lv = sid ? (p.skillLevels[sid] || 1) : 0;
+            const slot = document.createElement('div');
+            slot.className = 'skill-slot';
+            if (sk) {
+                const canUse = p.mp >= sk.cost;
+                const onCd = Game.skillCooldowns[sid] > 0;
+                const cdText = onCd ? ` (${Math.ceil(Game.skillCooldowns[sid])}s)` : '';
+                const color = onCd ? '#555' : (canUse ? '#9b59b6' : '#555');
+                slot.innerHTML = `<div class="sk-key">[${i+1}]</div><div style="color:${color}">${sk.name}${cdText}</div><div style="color:#888">Lv${lv}</div>`;
+            } else {
+                slot.innerHTML = `<div class="sk-key">[${i+1}]</div><div style="color:#333">-</div>`;
+            }
+            bar.appendChild(slot);
+        }
+    },
+
+    // ========== GROUND LOOT TOOLTIP ==========
+    showLootTooltip(items) {
+        const el = document.getElementById('loot-tooltip');
+        if (!el) return;
+        let html = '<div style="color:#f1c40f;margin-bottom:3px">Przedmioty na ziemi:</div>';
+        items.forEach(item => {
+            const tierCol = item.tier ? (TIERS[item.tier]?.color || '#aaa') : '#aaa';
+            html += `<div style="color:${tierCol}">${item.name}</div>`;
+        });
+        html += '<div style="color:#888;margin-top:3px">[SPACJA] Podnieś</div>';
+        el.innerHTML = html;
+        el.style.display = 'block';
+        el.style.bottom = '10px';
+        el.style.left = '50%';
+        el.style.transform = 'translateX(-50%)';
+    },
+
+    hideLootTooltip() {
+        const el = document.getElementById('loot-tooltip');
+        if (el) el.style.display = 'none';
+    },
+
     hideAllOverlays() {
         document.querySelectorAll('.overlay').forEach(o => o.classList.remove('active'));
         const deathEl = document.getElementById('death-overlay');
@@ -44,12 +168,14 @@ const GameUI = {
                 Game.state = 'playing';
                 Game.startTime = Date.now();
                 World.init();
-                // Ensure starting area chunks load
                 World.getChunk(0, 0);
                 Game.lastVillageWell = { x: 0, y: 0 };
+                // Mark starting city well as used
+                Game.usedWells.add('0,0');
                 Music.updateBiome(0, false, false);
                 Game.log(`Wybrano klasę: ${cls.name}!`, 'info');
-                Game.log('Użyj WASD aby się poruszać, SPACJA aby wchodzić w interakcje.', 'info');
+                Game.log('Witaj w Stolicy! WASD = ruch, SPACJA = interakcja/podnieś, E = atak', 'info');
+                Game.log('1-3 = umiejętności, F1/F2 = mikstury HP/MP, I = ekwipunek', 'info');
             };
 
             const icon = document.createElement('div');
@@ -67,7 +193,7 @@ const GameUI = {
             const statsDiv = document.createElement('div');
             statsDiv.style.cssText = "font-size:7px;color:#888;font-family:'Press Start 2P',monospace;line-height:2";
             const bs = cls.baseStats;
-            statsDiv.innerHTML = `HP:${bs.hp} MP:${bs.mp}<br>ATK:${bs.atk} DEF:${bs.def} AGI:${bs.agi}<br>Ataki/turę: ${cls.attacksPerTurn}${cls.attackRange ? '<br>Zasięg: '+cls.attackRange : ''}`;
+            statsDiv.innerHTML = `HP:${bs.hp} MP:${bs.mp}<br>ATK:${bs.atk} DEF:${bs.def} AGI:${bs.agi}`;
 
             card.append(icon, name, desc, statsDiv);
             container.appendChild(card);
@@ -76,7 +202,7 @@ const GameUI = {
     },
 
     // ========== DEATH SCREEN ==========
-    showDeathScreen(goldLoss) {
+    showDeathScreen(goldLoss, itemsLost) {
         const el = document.getElementById('death-overlay');
         if (!el) return;
         el.classList.add('active');
@@ -90,10 +216,12 @@ const GameUI = {
                 <div>Zabójstwa: ${Game.killCount}</div>
                 <div>Śmierci: ${Game.deathCount}</div>
                 <div style="color:#e74c3c">Stracono ${goldLoss} złota</div>
+                ${itemsLost > 0 ? `<div style="color:#e74c3c">Upuszczono ${itemsLost} przedmiotów z plecaka!</div>` : ''}
+                <div style="color:#888;font-size:7px;margin-top:8px">Wyposażenie zachowane. Przedmioty z plecaka na miejscu śmierci.</div>
             </div>`;
     },
 
-    // ========== SHOP ==========
+    // ========== SHOP (with sell functionality) ==========
     openShop(shopType, difficulty) {
         const p = Game.player;
         const cls = CLASSES[p.classId];
@@ -131,6 +259,12 @@ const GameUI = {
         content.innerHTML = '';
         const p = Game.player;
 
+        // BUY section header
+        const buyHeader = document.createElement('div');
+        buyHeader.style.cssText = 'font-size:9px;color:#e67e22;margin-bottom:6px;border-bottom:1px solid #333;padding-bottom:4px';
+        buyHeader.textContent = 'Kup';
+        content.appendChild(buyHeader);
+
         Game.shopItems.forEach((item, idx) => {
             const div = document.createElement('div');
             div.className = 'shop-item' + (p.gold < item.price ? ' cannot-afford' : '');
@@ -140,7 +274,6 @@ const GameUI = {
             const descSpan = `<div class="item-desc">${item.desc || ''}</div>`;
             const priceSpan = `<span class="item-price">${item.price} zł</span>`;
 
-            // Compare with equipped (all stats)
             let compare = '';
             if (item.slot) {
                 const eq = p.equipment[item.slot];
@@ -163,29 +296,80 @@ const GameUI = {
             }
             content.appendChild(div);
         });
+
+        // SELL section - show player's backpack items they can sell
+        const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
+        const backpackItems = p.inventory.filter(item => !equippedIds.has(item.id) || item.type === 'consumable');
+        if (backpackItems.length > 0) {
+            const sellHeader = document.createElement('div');
+            sellHeader.style.cssText = 'font-size:9px;color:#2ecc71;margin:12px 0 6px;border-bottom:1px solid #333;padding-bottom:4px';
+            sellHeader.textContent = 'Sprzedaj';
+            content.appendChild(sellHeader);
+
+            backpackItems.forEach(item => {
+                if (!item.price) return;
+                const sellPrice = Math.floor(item.price * 0.25);
+                const div = document.createElement('div');
+                div.className = 'shop-item';
+                const tierCol = item.tier ? (TIERS[item.tier]?.color || '#aaa') : '#aaa';
+                const count = item.count > 1 ? ` x${item.count}` : '';
+                div.innerHTML = `<div><span class="item-name" style="color:${tierCol}">${item.name}${count}</span>
+                    <div class="item-desc">${item.desc || ''}</div></div>
+                    <span class="item-price" style="color:#2ecc71">+${sellPrice} zł</span>`;
+                div.onclick = () => {
+                    const idx = p.inventory.indexOf(item);
+                    if (idx === -1) return;
+                    p.gold += sellPrice;
+                    if (Object.values(p.equipment).some(e => e && e.id === item.id)) {
+                        for (const s in p.equipment) { if (p.equipment[s]?.id === item.id) p.equipment[s] = null; }
+                    }
+                    if (item.count > 1) {
+                        item.count--;
+                    } else {
+                        p.inventory.splice(idx, 1);
+                    }
+                    Game.refreshStats();
+                    this.renderShopItems();
+                    this.updateSidePanel();
+                    GameRender.updateHUD();
+                    Game.log(`Sprzedano: ${item.name} za ${sellPrice}zł`, 'shop');
+                };
+                content.appendChild(div);
+            });
+        }
     },
 
     buyItem(idx) {
         const item = Game.shopItems[idx];
         if (!item || Game.player.gold < item.price) return;
-        Game.player.gold -= item.price;
 
-        // Stack consumables
+        // Check backpack space
+        const p = Game.player;
+        const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
+        const backpackCount = p.inventory.filter(i => !equippedIds.has(i.id) || i.type === 'consumable').length;
+
         if (item.type === 'consumable') {
-            const existing = Game.player.inventory.find(i => i.id === item.id);
-            if (existing) { existing.count = (existing.count || 1) + 1; }
-            else Game.player.inventory.push({ ...item });
+            const existing = p.inventory.find(i => i.id === item.id);
+            if (existing) {
+                existing.count = (existing.count || 1) + 1;
+            } else {
+                if (backpackCount >= 20) { Game.log('Plecak pełny!', 'info'); return; }
+                p.inventory.push({ ...item });
+            }
         } else {
-            Game.player.inventory.push(item);
+            if (backpackCount >= 20) { Game.log('Plecak pełny!', 'info'); return; }
+            p.inventory.push(item);
         }
 
+        p.gold -= item.price;
         Game.log(`Kupiono: ${item.name} za ${item.price} zł`, 'shop');
         Game.shopItems.splice(idx, 1);
         this.renderShopItems();
+        this.updateSidePanel();
         GameRender.updateHUD();
     },
 
-    // ========== INVENTORY ==========
+    // ========== INVENTORY (no sell - only at shops) ==========
     openInventory() {
         this.renderInventory();
         this.showOverlay('inventory-overlay');
@@ -212,14 +396,14 @@ const GameUI = {
                 const btn = document.createElement('button');
                 btn.className = 'use-btn';
                 btn.textContent = 'Zdejmij';
-                btn.onclick = () => { p.equipment[slot] = null; Game.refreshStats(); this.renderInventory(); GameRender.updateHUD(); };
+                btn.onclick = () => { p.equipment[slot] = null; Game.refreshStats(); this.renderInventory(); this.updateSidePanel(); GameRender.updateHUD(); };
                 row.appendChild(btn);
             }
             eqDiv.appendChild(row);
         }
         content.appendChild(eqDiv);
 
-        // Inventory items (filter out equipped items)
+        // Backpack items
         const invDiv = document.createElement('div');
         invDiv.innerHTML = '<div style="font-size:9px;color:#3498db;margin-bottom:6px">Plecak</div>';
         const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
@@ -235,37 +419,22 @@ const GameUI = {
             row.innerHTML = `<span style="color:${tierCol};flex:1">${item.name}${count}</span>
                 <span style="font-size:7px;color:#888;margin:0 6px">${item.desc || ''}</span>`;
 
-            // Stat comparison for equipment items
+            // Stat comparison for equipment
             if (item.type === 'equipment') {
                 const equipped = p.equipment[item.slot];
-                if (equipped) {
-                    const stats = ['atk','def','agi'];
-                    let compareHtml = '';
-                    for (const stat of stats) {
-                        const cur = equipped[stat] || 0;
-                        const nw = item[stat] || 0;
-                        const diff = nw - cur;
-                        if (diff > 0) compareHtml += `<span style="color:#2ecc71;font-size:7px;margin-left:4px">+${diff} ${stat.toUpperCase()}</span>`;
-                        else if (diff < 0) compareHtml += `<span style="color:#e74c3c;font-size:7px;margin-left:4px">${diff} ${stat.toUpperCase()}</span>`;
-                    }
-                    if (compareHtml) {
-                        const cmp = document.createElement('span');
-                        cmp.innerHTML = compareHtml;
-                        row.appendChild(cmp);
-                    }
-                } else {
-                    // No item equipped in slot - show as upgrade
-                    const stats = ['atk','def','agi'];
-                    let compareHtml = '';
-                    for (const stat of stats) {
-                        const nw = item[stat] || 0;
-                        if (nw > 0) compareHtml += `<span style="color:#2ecc71;font-size:7px;margin-left:4px">+${nw} ${stat.toUpperCase()}</span>`;
-                    }
-                    if (compareHtml) {
-                        const cmp = document.createElement('span');
-                        cmp.innerHTML = compareHtml;
-                        row.appendChild(cmp);
-                    }
+                const stats = ['atk','def','agi'];
+                let compareHtml = '';
+                for (const stat of stats) {
+                    const cur = equipped ? (equipped[stat] || 0) : 0;
+                    const nw = item[stat] || 0;
+                    const diff = nw - cur;
+                    if (diff > 0) compareHtml += `<span style="color:#2ecc71;font-size:7px;margin-left:4px">+${diff} ${stat.toUpperCase()}</span>`;
+                    else if (diff < 0) compareHtml += `<span style="color:#e74c3c;font-size:7px;margin-left:4px">${diff} ${stat.toUpperCase()}</span>`;
+                }
+                if (compareHtml) {
+                    const cmp = document.createElement('span');
+                    cmp.innerHTML = compareHtml;
+                    row.appendChild(cmp);
                 }
 
                 if (canEquip(item, p.classId, p.level)) {
@@ -276,6 +445,7 @@ const GameUI = {
                         p.equipment[item.slot] = item;
                         Game.refreshStats();
                         this.renderInventory();
+                        this.updateSidePanel();
                         GameRender.updateHUD();
                     };
                     row.appendChild(btn);
@@ -286,31 +456,40 @@ const GameUI = {
                 const btn = document.createElement('button');
                 btn.className = 'use-btn';
                 btn.textContent = 'Użyj';
-                btn.onclick = () => this.useConsumable(idx);
+                btn.onclick = () => { this.useConsumable(idx); this.renderInventory(); };
                 row.appendChild(btn);
             }
 
-            // Sell button
-            if (item.price) {
-                const sellBtn = document.createElement('button');
-                sellBtn.className = 'use-btn';
-                sellBtn.style.background = '#e67e22';
-                sellBtn.textContent = `${Math.floor(item.price * 0.25)}zł`;
-                sellBtn.onclick = () => {
-                    p.gold += Math.floor(item.price * 0.25);
-                    if (Object.values(p.equipment).some(e => e && e.id === item.id)) {
-                        for (const s in p.equipment) { if (p.equipment[s]?.id === item.id) p.equipment[s] = null; }
-                    }
+            // Drop button (drop item on ground)
+            const dropBtn = document.createElement('button');
+            dropBtn.className = 'use-btn';
+            dropBtn.style.background = '#e74c3c';
+            dropBtn.textContent = 'Wyrzuć';
+            dropBtn.onclick = () => {
+                if (item.count > 1) {
+                    const dropped = { ...item, count: 1 };
+                    item.count--;
+                    World.dropGroundLoot(p.x, p.y, [dropped]);
+                } else {
                     p.inventory.splice(idx, 1);
-                    Game.refreshStats();
-                    this.renderInventory();
-                    GameRender.updateHUD();
-                    Game.log(`Sprzedano: ${item.name}`, 'shop');
-                };
-                row.appendChild(sellBtn);
-            }
+                    World.dropGroundLoot(p.x, p.y, [item]);
+                }
+                Game.refreshStats();
+                this.renderInventory();
+                this.updateSidePanel();
+                Game.log(`Wyrzucono: ${item.name}`, 'info');
+            };
+            row.appendChild(dropBtn);
+
             invDiv.appendChild(row);
         });
+
+        // Hint about selling
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:7px;color:#555;text-align:center;margin-top:8px';
+        hint.textContent = 'Sprzedawaj przedmioty u NPC w sklepach.';
+        invDiv.appendChild(hint);
+
         content.appendChild(invDiv);
     },
 
@@ -331,7 +510,7 @@ const GameUI = {
 
         item.count = (item.count || 1) - 1;
         if (item.count <= 0) p.inventory.splice(idx, 1);
-        this.renderInventory();
+        this.updateSidePanel();
         GameRender.updateHUD();
     },
 
@@ -346,7 +525,7 @@ const GameUI = {
         title.textContent = `Umiejętności (${p.skillPoints} pkt)`;
         content.innerHTML = '';
 
-        // Active skill slots (3 slots)
+        // Active skill slots
         const slotsDiv = document.createElement('div');
         slotsDiv.innerHTML = '<div style="font-size:8px;color:#f1c40f;margin-bottom:6px">Aktywne Sloty (klawisze 1-3)</div>';
         slotsDiv.style.cssText = 'display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap';
@@ -375,8 +554,7 @@ const GameUI = {
             row.style.opacity = unlocked ? '1' : '0.4';
             row.style.borderColor = isActive ? '#f1c40f' : 'transparent';
 
-            const upgradeCost = 1;
-            const canUpgrade = unlocked && p.skillPoints >= upgradeCost;
+            const canUpgrade = unlocked && p.skillPoints >= 1;
 
             row.innerHTML = `<div style="flex:1"><span style="color:${unlocked ? '#9b59b6' : '#555'}">${sk.name}${lv > 0 ? ` Lv.${lv}` : ''}</span>
                 ${isActive ? `<span style="font-size:7px;color:#f1c40f"> [${activeSlot+1}]</span>` : ''}
@@ -387,7 +565,6 @@ const GameUI = {
             btnGroup.style.cssText = 'display:flex;gap:4px;align-items:center';
 
             if (unlocked) {
-                // Upgrade button
                 if (canUpgrade) {
                     const upBtn = document.createElement('button');
                     upBtn.className = 'use-btn';
@@ -403,7 +580,6 @@ const GameUI = {
                     btnGroup.appendChild(upBtn);
                 }
 
-                // Assign/remove from active slots
                 if (isActive) {
                     const removeBtn = document.createElement('button');
                     removeBtn.className = 'use-btn';
@@ -427,7 +603,6 @@ const GameUI = {
                         if (emptySlot !== -1) {
                             p.activeSkills[emptySlot] = sk.id;
                         } else {
-                            // Replace first slot
                             p.activeSkills[0] = sk.id;
                         }
                         this.openSkillTree();
@@ -441,7 +616,7 @@ const GameUI = {
         });
         content.appendChild(skillsDiv);
 
-        // Visual Passive Tree (canvas-based tree shape)
+        // Passive Tree
         const treeContainer = document.createElement('div');
         treeContainer.style.cssText = 'margin-top:10px';
         treeContainer.innerHTML = '<div style="font-size:8px;color:#e67e22;margin-bottom:6px">Drzewko Pasywne</div>';
@@ -461,7 +636,6 @@ const GameUI = {
         tctx.fillStyle = '#0a0a1a';
         tctx.fillRect(0, 0, treeW, treeH);
 
-        // Draw trunk
         const trunkX = treeW / 2;
         tctx.strokeStyle = '#5c3a1e';
         tctx.lineWidth = 4;
@@ -470,14 +644,12 @@ const GameUI = {
         tctx.lineTo(trunkX, 40);
         tctx.stroke();
 
-        // Node positions for click handling
         const nodePositions = [];
 
         branches.forEach(([branchKey, branch], bi) => {
             const startX = 40 + bi * hGap;
             const branchColor = bi === 0 ? '#3498db' : '#e74c3c';
 
-            // Branch line from trunk
             tctx.strokeStyle = '#5c3a1e';
             tctx.lineWidth = 2;
             tctx.beginPath();
@@ -492,7 +664,6 @@ const GameUI = {
                 const prevOwned = ni === 0 || p.treeProgress[branch.nodes[ni-1].id];
                 const canBuy = !owned && prevOwned && p.skillPoints > 0;
 
-                // Connect to previous node
                 if (ni > 0) {
                     tctx.strokeStyle = owned ? '#2ecc71' : '#333';
                     tctx.lineWidth = 2;
@@ -502,7 +673,6 @@ const GameUI = {
                     tctx.stroke();
                 }
 
-                // Node circle
                 tctx.fillStyle = owned ? '#2ecc71' : canBuy ? '#e67e22' : '#222';
                 tctx.strokeStyle = owned ? '#2ecc71' : canBuy ? '#e67e22' : '#444';
                 tctx.lineWidth = 2;
@@ -511,15 +681,12 @@ const GameUI = {
                 tctx.fill();
                 tctx.stroke();
 
-                // Node label
                 tctx.fillStyle = '#fff';
                 tctx.font = '6px "Press Start 2P"';
                 tctx.textAlign = 'center';
-                const shortName = node.name.slice(0, 6);
-                tctx.fillText(shortName, nx + nodeSize/2, ny + nodeSize + 10);
+                tctx.fillText(node.name.slice(0, 6), nx + nodeSize/2, ny + nodeSize + 10);
                 tctx.textAlign = 'left';
 
-                // Owned check
                 if (owned) {
                     tctx.fillStyle = '#fff';
                     tctx.font = '12px "Press Start 2P"';
@@ -531,7 +698,6 @@ const GameUI = {
                 nodePositions.push({ node, nx, ny, owned, canBuy, branchKey });
             });
 
-            // Branch name
             tctx.fillStyle = branchColor;
             tctx.font = '7px "Press Start 2P"';
             tctx.textAlign = 'center';
@@ -539,7 +705,6 @@ const GameUI = {
             tctx.textAlign = 'left';
         });
 
-        // Click handler for canvas
         treeCanvas.onclick = (e) => {
             const rect = treeCanvas.getBoundingClientRect();
             const scaleX = treeCanvas.width / rect.width;
@@ -580,19 +745,13 @@ const GameUI = {
         ctx.fillRect(0, 0, w, h);
 
         const CS = World.CHUNK_SIZE;
-        const chunkPixels = 4; // pixels per chunk on map
+        const chunkPixels = 4;
         const halfW = Math.floor(w / chunkPixels / 2);
         const halfH = Math.floor(h / chunkPixels / 2);
         const pcx = Math.floor(p.x / CS);
         const pcy = Math.floor(p.y / CS);
 
-        const biomeColors = {
-            0: '#4a8c3f', // plains
-            1: '#2d5a2a', // forest
-            2: '#556b2f', // swamp
-            3: '#808080', // mountain
-            4: '#daa520', // desert
-        };
+        const biomeColors = { 0: '#4a8c3f', 1: '#2d5a2a', 2: '#556b2f', 3: '#808080', 4: '#daa520' };
 
         for (let dy = -halfH; dy <= halfH; dy++) {
             for (let dx = -halfW; dx <= halfW; dx++) {
@@ -600,7 +759,6 @@ const GameUI = {
                 const cy = pcy + dy;
                 const key = `${cx},${cy}`;
                 const explored = Game.exploredChunks.has(key);
-
                 const sx = (dx + halfW) * chunkPixels;
                 const sy = (dy + halfH) * chunkPixels;
 
@@ -616,7 +774,6 @@ const GameUI = {
                 ctx.fillStyle = biomeColors[biome] || '#333';
                 ctx.fillRect(sx, sy, chunkPixels, chunkPixels);
 
-                // Village marker
                 if (World.villages[key]) {
                     ctx.fillStyle = '#f1c40f';
                     ctx.fillRect(sx, sy, chunkPixels, chunkPixels);
@@ -632,7 +789,7 @@ const GameUI = {
         ctx.arc(ppx, ppy, 3, 0, Math.PI * 2);
         ctx.fill();
 
-        // Quest target markers
+        // Quest markers
         Game.quests.forEach(q => {
             if (q.turned_in || !q.targetX) return;
             const qcx = Math.floor(q.targetX / CS) - pcx;

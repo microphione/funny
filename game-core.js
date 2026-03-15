@@ -13,10 +13,11 @@ const Game = {
     lastVillageWell: null,
     quests: [],
     combatLog: [],
-    exploredChunks: new Set(), // tracks explored chunk keys for world map
-    usedWells: new Set(), // tracks wells used for teleporting
-    mainQuestStage: 0, // main story progression
-    dungeonBossesKilled: new Set(), // track which dungeon bosses defeated
+    exploredChunks: new Set(),
+    usedWells: new Set(),
+    mainQuestStage: 0,
+    dungeonBossesKilled: new Set(),
+    questCheckTimer: 0,
 
     // Canvas
     canvas: null,
@@ -30,7 +31,7 @@ const Game = {
     cameraY: 0,
     animating: false,
     animProgress: 0,
-    animSpeed: 8, // tiles per second for smooth move
+    animSpeed: 8,
     animFromX: 0,
     animFromY: 0,
     animToX: 0,
@@ -40,10 +41,14 @@ const Game = {
     monsterAnimFrame: 0,
     monsterAnimTimer: 0,
 
-    // Turn state
-    turnPhase: 'player', // player, monsters
-    playerActionsLeft: 0,
-    turnNumber: 0,
+    // Realtime combat state
+    walkCooldown: 0,        // current walk cooldown remaining
+    walkSpeed: 0.15,        // seconds between steps (lower = faster)
+    attackCooldown: 0,      // current attack cooldown remaining
+    attackSpeed: 1.0,       // seconds between attacks (base, modified by class/agi)
+    skillCooldowns: {},     // { skillId: remaining seconds }
+    autoAttackTarget: null, // monster being auto-attacked
+    combatTimer: 0,         // time in combat for buff ticking
 
     // Overlay state
     activeOverlay: null,
@@ -54,6 +59,29 @@ const Game = {
     targeting: false,
     targetX: 0,
     targetY: 0,
+
+    getAttackSpeed() {
+        const p = this.player;
+        if (!p) return 1.0;
+        const cls = CLASSES[p.classId];
+        const stats = this.getStats();
+        // Base attack speed from class, AGI reduces cooldown
+        let speed = cls.baseAttackSpeed || 1.5;
+        speed *= Math.max(0.3, 1 - stats.agi * 0.01); // AGI reduces cooldown, min 30%
+        // Rogue is faster
+        if (p.classId === 'rogue') speed *= 0.7;
+        return speed;
+    },
+
+    getWalkSpeed() {
+        const p = this.player;
+        if (!p) return 0.15;
+        const stats = this.getStats();
+        // Base walk speed, AGI makes movement faster
+        let speed = 0.18;
+        speed *= Math.max(0.08, 1 - stats.agi * 0.008);
+        return speed;
+    },
 
     createPlayer(classId) {
         const cls = CLASSES[classId];
@@ -77,15 +105,15 @@ const Game = {
             equipment: { weapon: null, head: null, chest: null, legs: null, feet: null, offhand: null },
             inventory: [],
             skillPoints: 0,
-            treeProgress: {}, // { nodeId: true }
+            treeProgress: {},
             unlockedSkills: [],
-            skillLevels: {}, // { skillId: level } - upgradeable
-            activeSkills: [null, null, null], // 3 active skill slots
-            buffs: [], // { id, turns }
+            skillLevels: {},
+            activeSkills: [null, null, null],
+            buffs: [], // { id, duration (seconds), ... }
             stealth: false,
-            stealthSteps: 0, // remaining stealth steps
+            stealthSteps: 0,
         };
-        // Give starting items
+        // Starting weapon
         const startWeapon = generateItemForClass(classId, 1, 'weapon');
         if (startWeapon) {
             startWeapon.tier = 'normal';
@@ -93,8 +121,8 @@ const Game = {
             this.player.equipment.weapon = startWeapon;
         }
         // Starting potions
-        this.player.inventory.push({ id: 'hp_potion', name: 'Mikstura HP', type: 'consumable', subtype: 'hp', heal: 25, count: 3, price: 10, desc: 'Leczy 25 HP' });
-        this.player.inventory.push({ id: 'mp_potion', name: 'Mikstura Many', type: 'consumable', subtype: 'mp', mana: 20, count: 2, price: 12, desc: '+20 MP' });
+        this.player.inventory.push({ id: 'hp_potion', name: 'Mikstura HP', type: 'consumable', subtype: 'hp', heal: 25, count: 5, price: 10, desc: 'Leczy 25 HP' });
+        this.player.inventory.push({ id: 'mp_potion', name: 'Mikstura Many', type: 'consumable', subtype: 'mp', mana: 20, count: 3, price: 12, desc: '+20 MP' });
     },
 
     getStats() {
@@ -156,13 +184,11 @@ const Game = {
             p.hp = p.maxHp;
             p.mp = p.maxMp;
             this.log(`Poziom ${p.level}! +1 Punkt Umiejętności`, 'info');
-            // Check new skills
             const cls = CLASSES[p.classId];
             cls.skills.forEach(sk => {
                 if (sk.level <= p.level && !p.unlockedSkills.includes(sk.id)) {
                     p.unlockedSkills.push(sk.id);
                     p.skillLevels[sk.id] = 1;
-                    // Auto-assign to first empty active slot
                     const emptySlot = p.activeSkills.indexOf(null);
                     if (emptySlot !== -1) p.activeSkills[emptySlot] = sk.id;
                     this.log(`Nowa umiejętność: ${sk.name}!`, 'info');
@@ -179,7 +205,6 @@ const Game = {
         span.textContent = msg;
         el.appendChild(span);
         el.scrollTop = el.scrollHeight;
-        // Keep max 50 messages
         while (el.children.length > 50) el.removeChild(el.firstChild);
     },
 
@@ -196,7 +221,7 @@ const Game = {
         const p = this.player;
         if (!p) return;
         const data = {
-            version: 'pq_save_v5',
+            version: 'pq_save_v6',
             classId: p.classId,
             x: p.x, y: p.y, dir: p.dir,
             level: p.level, xp: p.xp, xpToNext: p.xpToNext,
@@ -223,16 +248,16 @@ const Game = {
             mainQuestStage: this.mainQuestStage,
             dungeonBossesKilled: [...this.dungeonBossesKilled],
         };
-        localStorage.setItem('pq_save_v5', JSON.stringify(data));
+        localStorage.setItem('pq_save_v6', JSON.stringify(data));
         this.log('Gra zapisana!', 'info');
     },
 
     load() {
-        const raw = localStorage.getItem('pq_save_v5');
+        const raw = localStorage.getItem('pq_save_v6') || localStorage.getItem('pq_save_v5');
         if (!raw) return false;
         try {
             const d = JSON.parse(raw);
-            if (d.version !== 'pq_save_v5') return false;
+            if (d.version !== 'pq_save_v6' && d.version !== 'pq_save_v5') return false;
 
             this.createPlayer(d.classId);
             const p = this.player;
@@ -275,10 +300,31 @@ const Game = {
     die() {
         this.deathCount++;
         this.state = 'dead';
-        const goldLoss = Math.floor(this.player.gold * 0.1 * this.player.level / 5);
-        this.player.gold = Math.max(0, this.player.gold - goldLoss);
+        const p = this.player;
+
+        // Drop all backpack items on the ground (Tibia-style death penalty)
+        const equippedSet = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
+        const droppedItems = [];
+        const keptItems = [];
+        for (const item of p.inventory) {
+            if (equippedSet.has(item.id) && item.type === 'equipment') {
+                keptItems.push(item); // Keep equipped items
+            } else {
+                droppedItems.push(item);
+            }
+        }
+        // Drop items on ground at death location
+        if (droppedItems.length > 0) {
+            World.dropGroundLoot(p.x, p.y, droppedItems);
+        }
+        p.inventory = keptItems;
+
+        // Gold loss
+        const goldLoss = Math.floor(p.gold * 0.15);
+        p.gold = Math.max(0, p.gold - goldLoss);
+
         Music.stopMelody();
-        GameUI.showDeathScreen(goldLoss);
+        GameUI.showDeathScreen(goldLoss, droppedItems.length);
     },
 
     respawn() {
@@ -288,7 +334,12 @@ const Game = {
         p.hp = Math.floor(p.maxHp * 0.5);
         p.mp = Math.floor(p.maxMp * 0.5);
 
-        // Respawn at last village well
+        // Exit dungeon if in one
+        if (World.activeDungeon) {
+            World.activeDungeon = null;
+            World.dungeonReturnPos = null;
+        }
+
         if (this.lastVillageWell) {
             p.x = this.lastVillageWell.x;
             p.y = this.lastVillageWell.y;
@@ -299,7 +350,9 @@ const Game = {
         p.visualY = p.y;
         p.stealth = false;
         p.buffs = [];
-        this.turnPhase = 'player';
+        this.attackCooldown = 0;
+        this.walkCooldown = 0;
+        this.autoAttackTarget = null;
         this.activeOverlay = null;
         GameUI.hideAllOverlays();
         this.log('Odrodzono w wiosce.', 'info');
@@ -328,7 +381,6 @@ const Game = {
             if (next) {
                 this.log(`[Główny Quest] ${stage.title} - Ukończono!`, 'loot');
                 this.log(`[Główny Quest] Nowy cel: ${next.title}`, 'info');
-                // Reward
                 this.player.gold += 50 + this.mainQuestStage * 30;
                 this.addXp(30 + this.mainQuestStage * 20);
             }
