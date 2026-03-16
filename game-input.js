@@ -340,6 +340,48 @@ const GameInput = {
                 }
                 return;
             }
+            if (quest.type === 'quest_board') {
+                this.handleQuestBoard();
+                return;
+            }
+            if (quest.type === 'daily_quest') {
+                this.handleDailyQuestBoard();
+                return;
+            }
+            if (quest.type === 'town_npc') {
+                const npcName = quest.name || 'Mieszkaniec';
+                if (npcName === 'Bankier') {
+                    GameUI.openBank();
+                    return;
+                }
+                if (npcName === 'Stajennik') {
+                    const mountPrice = 500;
+                    if (p.ownedMounts && p.ownedMounts.length > 0) {
+                        Game.log(`Stajennik: Twój koń czeka! Naciśnij R by wsiadać/zsiadać.`, 'info');
+                    } else {
+                        GameUI.confirmAction(`Kupić wierzchowca za ${mountPrice} złota?`, () => {
+                            if (p.gold >= mountPrice) {
+                                p.gold -= mountPrice;
+                                p.ownedMounts = p.ownedMounts || [];
+                                p.ownedMounts.push('horse');
+                                Game.log(`Kupiono wierzchowca! Naciśnij R.`, 'loot');
+                                GameRender.updateHUD();
+                            } else {
+                                Game.log(`Za mało złota! (${mountPrice})`, 'info');
+                            }
+                        });
+                    }
+                    return;
+                }
+                const dialogues = [
+                    `${npcName}: Witaj podróżniku!`,
+                    `${npcName}: Miło cię widzieć!`,
+                    `${npcName}: Powodzenia w przygodach!`,
+                    `${npcName}: Uważaj za murami, pełno tam potworów.`,
+                ];
+                Game.log(dialogues[Math.floor(Math.random() * dialogues.length)], 'info');
+                return;
+            }
 
             const existing = Game.quests.find(q => q.id === quest.id);
             if (existing) {
@@ -468,6 +510,96 @@ const GameInput = {
             }
             return;
         }
+    },
+
+    // ========== QUEST BOARD (level-gated main quests) ==========
+    handleQuestBoard() {
+        const p = Game.player;
+        // Find next available quest for player level
+        const available = MAIN_QUESTS.filter(q => {
+            if (p.level < q.minLevel) return false;
+            const existing = Game.quests.find(e => e.id === q.id);
+            if (existing) return false; // already taken or completed
+            return true;
+        });
+
+        if (available.length === 0) {
+            const nextQuest = MAIN_QUESTS.find(q => !Game.quests.find(e => e.id === q.id) && p.level < q.minLevel);
+            if (nextQuest) {
+                Game.log(`Tablica Questów: Następny quest od poziomu ${nextQuest.minLevel}.`, 'info');
+            } else {
+                Game.log('Tablica Questów: Brak dostępnych questów!', 'info');
+            }
+            return;
+        }
+
+        // Check for completed quests to turn in
+        for (const q of Game.quests) {
+            if (q.completed && !q.turned_in && MAIN_QUESTS.find(m => m.id === q.id)) {
+                q.turned_in = true;
+                p.gold += q.gold;
+                Game.addXp(q.xp);
+                Game.log(`Quest "${q.title}" oddany! +${q.gold}zł, +${q.xp} XP`, 'loot');
+                GameRender.updateHUD();
+                return;
+            }
+        }
+
+        // Give the first available quest
+        const quest = available[0];
+        const q = {
+            ...quest,
+            progress: 0,
+            required: quest.count,
+            completed: false,
+            turned_in: false,
+            reward: { gold: quest.gold, xp: quest.xp },
+        };
+
+        // Check dungeon/visit quests auto-completion
+        if (q.type === 'dungeon') {
+            q.progress = Game.dungeonBossesKilled.has(q.target) ? 1 : 0;
+            if (q.progress >= q.required) q.completed = true;
+        }
+        if (q.type === 'visit_city') {
+            const city = World.CITIES.find(c => c.name === q.target);
+            if (city && Game.usedWells.has(World.getChunkKey(city.cx, city.cy))) {
+                q.progress = 1;
+                q.completed = true;
+            }
+        }
+
+        Game.quests.push(q);
+        Game.log(`Nowy quest: ${q.title} - ${q.desc}`, 'info');
+    },
+
+    // ========== DAILY QUEST BOARD ==========
+    handleDailyQuestBoard() {
+        const p = Game.player;
+        if (p.level < 20) {
+            Game.log('Zleceniodawca: Wróć na poziomie 20!', 'info');
+            return;
+        }
+
+        // Check if player already has an active daily quest
+        const activeDaily = Game.quests.find(q => q.isDaily && !q.turned_in);
+        if (activeDaily) {
+            if (activeDaily.completed) {
+                activeDaily.turned_in = true;
+                p.gold += activeDaily.gold;
+                Game.addXp(activeDaily.xp);
+                Game.log(`Dzienny quest oddany! +${activeDaily.gold}zł, +${activeDaily.xp} XP`, 'loot');
+                GameRender.updateHUD();
+            } else {
+                Game.log(`Dzienny quest w toku: ${activeDaily.progress}/${activeDaily.required}`, 'info');
+            }
+            return;
+        }
+
+        // Generate new daily quest
+        const daily = generateDailyQuest(p.level);
+        Game.quests.push(daily);
+        Game.log(`Nowy dzienny quest: ${daily.title} - ${daily.desc}`, 'info');
     },
 
     // ========== STARTER ISLAND QUEST SYSTEM ==========

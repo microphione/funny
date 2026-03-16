@@ -415,27 +415,67 @@ const World = {
             }
     },
 
-    // Helper: place a town building with door and NPC inside
+    // Helper: place a town building with proper walls, roof, floor, door + NPC inside
     placeTownBuilding(tiles, ox, oy, bx, by, w, h, npcName) {
         const CS = this.CHUNK_SIZE;
         const T = this.T;
-        // Walls
-        for (let ddy = 0; ddy < h; ddy++)
-            for (let ddx = 0; ddx < w; ddx++) {
-                const ty = by + ddy, tx = bx + ddx;
-                if (ty >= 0 && ty < CS && tx >= 0 && tx < CS)
-                    tiles[ty * CS + tx] = T.TOWN_BUILDING;
-            }
-        // Door at bottom center
         const doorX = bx + Math.floor(w / 2);
         const doorY = by + h - 1;
-        if (doorX >= 0 && doorX < CS && doorY >= 0 && doorY < CS) {
-            tiles[doorY * CS + doorX] = T.TOWN_BUILDING_DOOR;
-            // Store NPC info for this building door
-            const doorKey = `${ox + doorX},${oy + doorY}`;
-            this.townBuildings = this.townBuildings || {};
-            this.townBuildings[doorKey] = { npcName: npcName || 'Mieszkaniec' };
+        const houseId = `tb_${ox + doorX},${oy + doorY}`;
+
+        const floorTiles = [];
+        const roofTiles = [];
+        const wallTiles = [];
+
+        for (let ddy = 0; ddy < h; ddy++) {
+            for (let ddx = 0; ddx < w; ddx++) {
+                const ty = by + ddy, tx = bx + ddx;
+                if (ty < 0 || ty >= CS || tx < 0 || tx >= CS) continue;
+                const idx = ty * CS + tx;
+                const isEdge = ddy === 0 || ddy === h - 1 || ddx === 0 || ddx === w - 1;
+                const isDoor = tx === doorX && ty === doorY;
+
+                if (isDoor) {
+                    tiles[idx] = T.TOWN_BUILDING_DOOR;
+                } else if (isEdge) {
+                    const isMidH = ddx === Math.floor(w / 2) && ddy === 0;
+                    const isMidV = ddy === Math.floor(h / 2) && (ddx === 0 || ddx === w - 1);
+                    if ((isMidH || isMidV) && w >= 4) {
+                        tiles[idx] = T.HOUSE_WINDOW;
+                    } else {
+                        tiles[idx] = T.HOUSE_WALL;
+                    }
+                    wallTiles.push(`${ox + tx},${oy + ty}`);
+                } else {
+                    tiles[idx] = T.HOUSE_FLOOR;
+                    floorTiles.push(`${ox + tx},${oy + ty}`);
+                }
+                roofTiles.push(`${ox + tx},${oy + ty}`);
+            }
         }
+
+        // Place NPC on interior tile
+        const npcX = bx + Math.floor(w / 2);
+        const npcY = by + 1;
+        if (npcX >= 0 && npcX < CS && npcY >= 0 && npcY < CS) {
+            tiles[npcY * CS + npcX] = T.NPC_QUEST;
+            this.questNpcs[`${ox + npcX},${oy + npcY}`] = {
+                id: `npc_${npcName}_${ox + npcX}`, type: 'town_npc',
+                name: npcName || 'Mieszkaniec',
+            };
+        }
+
+        // Register as house for roof hiding system
+        this.houses[houseId] = {
+            price: 0, name: `Budynek: ${npcName}`, owned: true,
+            floorTiles, roofTiles, wallTiles,
+            bx: ox + bx, by: oy + by, w, h, isTownBuilding: true,
+        };
+
+        // Store door info
+        const doorKey = `${ox + doorX},${oy + doorY}`;
+        this.townBuildings = this.townBuildings || {};
+        this.townBuildings[doorKey] = { npcName: npcName || 'Mieszkaniec', houseId };
     },
 
     // Helper: place a buyable house with proper walls, roof, floor, door
@@ -525,6 +565,16 @@ const World = {
         this.placeTownBuilding(tiles, ox, oy, 2, CS-5, 3, 3, 'Alchemik');
         this.placeTownBuilding(tiles, ox, oy, CS-5, CS-5, 3, 3, 'Jubiler');
         this.placeTownBuilding(tiles, ox, oy, 8, CS-5, 3, 3, 'Bankier');
+
+        // Quest Board NPC (main quests + daily quests)
+        tiles[(c + 3) * CS + (c - 4)] = T.NPC_QUEST;
+        this.questNpcs[`${ox + c - 4},${oy + c + 3}`] = {
+            id: 'quest_board', type: 'quest_board', name: 'Tablica Questów',
+        };
+        tiles[(c + 3) * CS + (c + 4)] = T.NPC_QUEST;
+        this.questNpcs[`${ox + c + 4},${oy + c + 3}`] = {
+            id: 'daily_board', type: 'daily_quest', name: 'Dzienny Zleceniodawca',
+        };
     },
 
     // West (-1,0): Market, weapon shop, food stalls
@@ -664,8 +714,8 @@ const World = {
         const flowers = [[4,4],[6,3],[7,5],[4,8],[5,11],[9,3],[12,4],[13,7],[10,10],[14,13]];
         flowers.forEach(([px, py]) => { if (px < CS && py < CS) tiles[py * CS + px] = T.FLOWER; });
 
-        // Fountain (well)
-        tiles[8 * CS + 8] = T.WELL;
+        // Fountain (decorative - not a save point)
+        tiles[8 * CS + 8] = T.STATUE;
         tiles[7 * CS + 8] = T.SIGN;
         this.signTexts[`${ox + 8},${oy + 7}`] = 'Park Królewski\nMiejsce spokoju i odpoczynku.';
 
@@ -1125,7 +1175,7 @@ const World = {
                 T.WELL, T.STATUE, T.ROCK, T.SWAMP_TREE, T.CACTUS, T.VILLAGE_HUT,
                 T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC,
                 T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC, T.INN, T.CHEST,
-                T.TOWN_BUILDING, T.TOWN_BUILDING_DOOR, T.LAVA, T.SNOW_PINE,
+                T.TOWN_BUILDING, T.LAVA, T.SNOW_PINE,
                 T.HOUSE_WALL, T.HOUSE_ROOF, T.HOUSE_WINDOW].includes(t);
     },
 

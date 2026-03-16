@@ -3,12 +3,45 @@
 // ============================================================
 
 const GameUI = {
+    // ========== PANEL TOGGLE (minimize/expand) ==========
+    togglePanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        const content = panel.querySelector('.panel-content');
+        const btn = panel.querySelector('.panel-minimize');
+        if (!content) return;
+        if (content.style.display === 'none') {
+            content.style.display = '';
+            if (btn) btn.textContent = '[-]';
+        } else {
+            content.style.display = 'none';
+            if (btn) btn.textContent = '[+]';
+        }
+    },
+
     // ========== SIDE PANEL RENDERING (Tibia-style) ==========
     updateSidePanel() {
+        this.updateCharStats();
         this.updateEqPanel();
         this.updateBpPanel();
         this.updateSkillBar();
-        this.updateCombatSkills();
+    },
+
+    updateCharStats() {
+        const el = document.getElementById('char-stats');
+        if (!el || !Game.player) return;
+        const p = Game.player;
+        const stats = Game.getStats();
+        const cls = CLASSES[p.classId];
+        const xpPct = p.xpToNext > 0 ? Math.floor(p.xp / p.xpToNext * 100) : 0;
+        el.innerHTML = `
+            <div style="color:${cls.color}">${cls.name} Lv.${p.level}</div>
+            <div>XP: ${xpPct}% do Lv.${p.level + 1}</div>
+            <div style="color:#f1c40f">Złoto: ${formatCurrency(p.gold)}</div>
+            <div>DMG:${stats.damage} PNC:${stats.armor} CEL:${stats.accuracy}</div>
+            <div>KRIT:${stats.critChance}% UNIK:${stats.dodge}</div>
+            <div>Pkt stat: ${p.statPoints || 0} | Pkt skill: ${p.skillPoints || 0}</div>
+        `;
     },
 
     updateEqPanel() {
@@ -46,12 +79,14 @@ const GameUI = {
     updateBpPanel() {
         const grid = document.getElementById('bp-grid');
         const countEl = document.getElementById('bp-count');
+        const goldEl = document.getElementById('bp-gold');
         if (!grid || !Game.player) return;
         const p = Game.player;
         const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
         const backpackItems = p.inventory.filter(item => !equippedIds.has(item.id) || item.type === 'consumable');
 
         if (countEl) countEl.textContent = `${backpackItems.length}/20`;
+        if (goldEl) goldEl.textContent = `💰 ${formatCurrency(p.gold)}`;
         grid.innerHTML = '';
 
         for (let i = 0; i < 20; i++) {

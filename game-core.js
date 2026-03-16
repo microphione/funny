@@ -280,7 +280,7 @@ const Game = {
             skill.tries = 0;
             skill.level++;
             skill.triesNeeded = this.getTriesNeeded(skillName, skill.level);
-            const names = { melee: 'Walka Wręcz', shielding: 'Obrona', magic: 'Magia' };
+            const names = { melee: 'Walka Wręcz', shielding: 'Obrona', magic: 'Magia', distance: 'Dystans' };
             this.log(`${names[skillName]} wzrosła do poziomu ${skill.level}!`, 'info');
             this.refreshStats();
         }

@@ -167,8 +167,14 @@ const GameCombat = {
         const stats = Game.getStats();
         const sLv = p.skillLevels[skillId] || 1;
         p.mp -= skill.cost;
-        // Set skill cooldown (2-5 seconds based on skill cost)
-        Game.skillCooldowns[skillId] = Math.max(1.5, skill.cost * 0.15);
+        // Set skill cooldown (2-5 seconds based on skill cost, reduced by CDR)
+        const baseCd = Math.max(1.5, skill.cost * 0.15);
+        Game.skillCooldowns[skillId] = baseCd * Math.max(0.5, 1 - stats.cdr * 0.01);
+
+        // Train magic skill when using any skill (mage) or all classes for their respective skill
+        const trainSkill = p.classId === 'mage' ? 'magic' :
+                           p.classId === 'archer' ? 'distance' : 'melee';
+        Game.advanceCombatSkill(trainSkill);
 
         switch (skillId) {
             // ===== KNIGHT SKILLS =====
@@ -649,11 +655,27 @@ const GameCombat = {
         }
 
         Game.quests.forEach(q => {
-            if (q.type === 'kill' && !q.completed && q.target === m.baseName) {
+            if (q.completed || q.turned_in) return;
+            if (q.type === 'kill' && q.target === (m.baseName || m.name)) {
                 q.progress++;
                 if (q.progress >= q.required) {
                     q.completed = true;
                     Game.log(`Quest "${q.title}" ukończony! Wróć do zleceniodawcy.`, 'info');
+                }
+            }
+            // Daily quest types
+            if (q.type === 'kill_any') {
+                q.progress++;
+                if (q.progress >= q.required && !q.completed) {
+                    q.completed = true;
+                    Game.log(`Dzienny quest "${q.title}" ukończony!`, 'info');
+                }
+            }
+            if (q.type === 'kill_elite' && m.isElite) {
+                q.progress++;
+                if (q.progress >= q.required && !q.completed) {
+                    q.completed = true;
+                    Game.log(`Dzienny quest "${q.title}" ukończony!`, 'info');
                 }
             }
         });
