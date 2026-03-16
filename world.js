@@ -21,9 +21,14 @@ const World = {
         SHOP_POTION_NPC: 38, QUEST_ITEM: 39,
         GROUND_LOOT: 40, // visual marker for ground loot
         HOUSE_DOOR: 41, // buyable house door
+        TOWN_BUILDING: 42, // non-buyable building
+        TOWN_BUILDING_DOOR: 43, // door to town building with NPC
+        LAVA: 44,
+        SNOW: 45,
+        SNOW_PINE: 46,
     },
 
-    BIOME: { PLAINS: 0, FOREST: 1, SWAMP: 2, MOUNTAIN: 3, DESERT: 4 },
+    BIOME: { PLAINS: 0, FOREST: 1, SWAMP: 2, MOUNTAIN: 3, DESERT: 4, SNOW: 5 },
 
     // Monster definitions per biome with level tiers
     MONSTERS: {
@@ -31,6 +36,7 @@ const World = {
             { name: 'Slime',       sprite: 'slime',   hp: 10, atk: 2,  def: 0, xp: 5,  gold: [2,5],   minDiff: 1, maxDiff: 6 },
             { name: 'Goblin',      sprite: 'goblin',  hp: 15, atk: 3,  def: 1, xp: 8,  gold: [3,8],   minDiff: 1, maxDiff: 10 },
             { name: 'Wilk',        sprite: 'wolf',    hp: 18, atk: 5,  def: 1, xp: 10, gold: [2,6],   minDiff: 2, maxDiff: 12 },
+            { name: 'Szkielet',    sprite: 'skeleton', hp: 22, atk: 7, def: 2, xp: 15, gold: [4,10],  minDiff: 4, maxDiff: 14 },
             { name: 'Dziki Koń',   sprite: 'wolf',    hp: 30, atk: 8,  def: 3, xp: 20, gold: [5,12],  minDiff: 6, maxDiff: 20 },
             { name: 'Centaur',     sprite: 'bandit',  hp: 50, atk: 14, def: 5, xp: 35, gold: [10,20], minDiff: 12, maxDiff: 99 },
         ],
@@ -40,24 +46,37 @@ const World = {
             { name: 'Bandyta',     sprite: 'bandit',  hp: 22, atk: 6,  def: 3, xp: 15, gold: [8,15],  minDiff: 2, maxDiff: 10 },
             { name: 'Drzewiec',    sprite: 'treant',  hp: 35, atk: 5,  def: 5, xp: 20, gold: [4,10],  minDiff: 5, maxDiff: 16 },
             { name: 'Leśny Mag',   sprite: 'djinn',   hp: 45, atk: 15, def: 4, xp: 40, gold: [12,25], minDiff: 10, maxDiff: 99 },
+            { name: 'Wyrm Leśny',  sprite: 'wyrm',    hp: 70, atk: 18, def: 6, xp: 55, gold: [18,35], minDiff: 14, maxDiff: 99 },
         ],
         swamp: [
             { name: 'Żuk',         sprite: 'beetle',  hp: 14, atk: 8,  def: 1, xp: 12, gold: [3,7],   minDiff: 2, maxDiff: 10 },
+            { name: 'Szkielet',    sprite: 'skeleton', hp: 20, atk: 9, def: 1, xp: 15, gold: [5,10],  minDiff: 3, maxDiff: 12 },
             { name: 'Widmo',       sprite: 'ghost',   hp: 20, atk: 10, def: 0, xp: 18, gold: [5,12],  minDiff: 4, maxDiff: 14 },
             { name: 'Troll',       sprite: 'troll',   hp: 40, atk: 7,  def: 4, xp: 25, gold: [8,18],  minDiff: 6, maxDiff: 18 },
             { name: 'Bagiennik',   sprite: 'troll',   hp: 55, atk: 12, def: 6, xp: 35, gold: [10,22], minDiff: 10, maxDiff: 99 },
+            { name: 'Demon Bagien',sprite: 'demon',   hp: 75, atk: 16, def: 5, xp: 50, gold: [15,30], minDiff: 14, maxDiff: 99 },
         ],
         mountain: [
             { name: 'Golem',       sprite: 'golem',   hp: 45, atk: 8,  def: 6, xp: 30, gold: [10,20], minDiff: 5, maxDiff: 18 },
             { name: 'Gryf',        sprite: 'griffin',  hp: 30, atk: 12, def: 3, xp: 25, gold: [8,16],  minDiff: 6, maxDiff: 20 },
             { name: 'Rycerz Cieni',sprite: 'dark_knight', hp: 35, atk: 14, def: 5, xp: 35, gold: [12,25], minDiff: 8, maxDiff: 99 },
-            { name: 'Smok Młody',  sprite: 'griffin',  hp: 80, atk: 20, def: 8, xp: 60, gold: [20,40], minDiff: 14, maxDiff: 99 },
+            { name: 'Lodowy Golem',sprite: 'ice_golem', hp: 55, atk: 11, def: 8, xp: 40, gold: [14,28], minDiff: 10, maxDiff: 99 },
+            { name: 'Smok Młody',  sprite: 'wyrm',    hp: 80, atk: 20, def: 8, xp: 60, gold: [20,40], minDiff: 14, maxDiff: 99 },
         ],
         desert: [
             { name: 'Skorpion',    sprite: 'scorpion', hp: 18, atk: 9,  def: 2, xp: 14, gold: [4,10],  minDiff: 3, maxDiff: 12 },
             { name: 'Mumia',       sprite: 'mummy',    hp: 30, atk: 8,  def: 3, xp: 20, gold: [6,14],  minDiff: 5, maxDiff: 16 },
             { name: 'Dżinn',       sprite: 'djinn',    hp: 25, atk: 15, def: 2, xp: 30, gold: [10,22], minDiff: 7, maxDiff: 20 },
+            { name: 'Ognisty Elem',sprite: 'fire_elemental', hp: 40, atk: 16, def: 3, xp: 38, gold: [12,24], minDiff: 9, maxDiff: 22 },
             { name: 'Sfinks',      sprite: 'djinn',    hp: 60, atk: 18, def: 6, xp: 50, gold: [15,35], minDiff: 12, maxDiff: 99 },
+            { name: 'Demon Piasków',sprite: 'demon',   hp: 85, atk: 22, def: 7, xp: 65, gold: [22,45], minDiff: 16, maxDiff: 99 },
+        ],
+        snow: [
+            { name: 'Wilk Śnieżny',sprite: 'wolf',     hp: 24, atk: 8,  def: 2, xp: 16, gold: [4,10],  minDiff: 3, maxDiff: 14 },
+            { name: 'Lodowy Golem', sprite: 'ice_golem', hp: 50, atk: 10, def: 7, xp: 32, gold: [10,20], minDiff: 6, maxDiff: 20 },
+            { name: 'Szkielet Mróz',sprite: 'skeleton',  hp: 28, atk: 10, def: 3, xp: 20, gold: [6,14],  minDiff: 4, maxDiff: 16 },
+            { name: 'Widmo Zimy',   sprite: 'ghost',     hp: 35, atk: 14, def: 2, xp: 28, gold: [8,18],  minDiff: 8, maxDiff: 22 },
+            { name: 'Mroźny Wyrm',  sprite: 'wyrm',      hp: 90, atk: 22, def: 9, xp: 70, gold: [25,50], minDiff: 15, maxDiff: 99 },
         ],
     },
 
@@ -76,6 +95,7 @@ const World = {
         this.groundLoot = {}; // "x,y" -> [items]
         this.cityNpcs = {}; // "x,y" -> npc object (wandering NPCs)
         this.houses = {}; // "x,y" -> { price, name, owned: false }
+        this.townBuildings = {}; // "x,y" -> { npcName }
         this.cityNpcsSpawned = false;
     },
 
@@ -99,6 +119,7 @@ const World = {
         const dist = Math.sqrt(wx * wx + wy * wy);
         if (dist < 40) return this.BIOME.PLAINS; // Starting area is plains (larger safe zone for capital)
         if (temp > 0.25) return this.BIOME.DESERT;
+        if (temp < -0.35) return this.BIOME.SNOW;
         if (temp < -0.25) return this.BIOME.MOUNTAIN;
         if (moisture > 0.2) return this.BIOME.SWAMP;
         if (moisture < -0.1) return this.BIOME.FOREST;
@@ -169,6 +190,11 @@ const World = {
                         case this.BIOME.DESERT:
                             tile = T.DESERT;
                             if (this.rng(wx, wy, 7) < 0.015) tile = T.CACTUS;
+                            break;
+                        case this.BIOME.SNOW:
+                            tile = T.SNOW;
+                            if (this.rng(wx, wy, 8) < 0.12) tile = T.SNOW_PINE;
+                            if (elev > 0.3) tile = T.ROCK;
                             break;
                     }
                 }
@@ -287,6 +313,29 @@ const World = {
             }
     },
 
+    // Helper: place a town building with door and NPC inside
+    placeTownBuilding(tiles, ox, oy, bx, by, w, h, npcName) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+        // Walls
+        for (let ddy = 0; ddy < h; ddy++)
+            for (let ddx = 0; ddx < w; ddx++) {
+                const ty = by + ddy, tx = bx + ddx;
+                if (ty >= 0 && ty < CS && tx >= 0 && tx < CS)
+                    tiles[ty * CS + tx] = T.TOWN_BUILDING;
+            }
+        // Door at bottom center
+        const doorX = bx + Math.floor(w / 2);
+        const doorY = by + h - 1;
+        if (doorX >= 0 && doorX < CS && doorY >= 0 && doorY < CS) {
+            tiles[doorY * CS + doorX] = T.TOWN_BUILDING_DOOR;
+            // Store NPC info for this building door
+            const doorKey = `${ox + doorX},${oy + doorY}`;
+            this.townBuildings = this.townBuildings || {};
+            this.townBuildings[doorKey] = { npcName: npcName || 'Mieszkaniec' };
+        }
+    },
+
     // Helper: place a buyable house
     placeBuyableHouse(tiles, ox, oy, bx, by, w, h, price, name) {
         const CS = this.CHUNK_SIZE;
@@ -343,11 +392,11 @@ const World = {
         tiles[(c - 1) * CS + (c + 1)] = T.SIGN;
         this.signTexts[`${ox + c + 1},${oy + c - 1}`] = 'Witaj w Stolicy Krainy!\nTo twój dom. Bezpieczne miejsce.';
 
-        // Decorative houses on corners of center chunk
-        this.placeBuilding(tiles, ox, oy, 2, 2, 3, 3);
-        this.placeBuilding(tiles, ox, oy, CS-5, 2, 3, 3);
-        this.placeBuilding(tiles, ox, oy, 2, CS-5, 3, 3);
-        this.placeBuilding(tiles, ox, oy, CS-5, CS-5, 3, 3);
+        // Town buildings on corners of center chunk with NPCs inside
+        this.placeTownBuilding(tiles, ox, oy, 2, 2, 3, 3, 'Bibliotekarz');
+        this.placeTownBuilding(tiles, ox, oy, CS-5, 2, 3, 3, 'Kartograf');
+        this.placeTownBuilding(tiles, ox, oy, 2, CS-5, 3, 3, 'Alchemik');
+        this.placeTownBuilding(tiles, ox, oy, CS-5, CS-5, 3, 3, 'Jubiler');
     },
 
     // West (-1,0): Market, weapon shop, food stalls
@@ -368,9 +417,9 @@ const World = {
         this.signTexts[`${ox + 5},${oy + 2}`] = 'Kowalnia "Stalowe Ostrze"';
         this.npcs[`${ox + 5},${oy + 6}`] = { type: 'shop', shopType: 'weapon', difficulty: 1, villageName: 'Stolica' };
 
-        // Market stalls (decorative houses)
-        this.placeBuilding(tiles, ox, oy, 3, 10, 4, 3);
-        this.placeBuilding(tiles, ox, oy, 3, 14, 4, 3);
+        // Market stalls (town buildings with NPCs)
+        this.placeTownBuilding(tiles, ox, oy, 3, 10, 4, 3, 'Handlarz Warzyw');
+        this.placeTownBuilding(tiles, ox, oy, 3, 14, 4, 3, 'Piekarz');
         tiles[9 * CS + 4] = T.SIGN;
         this.signTexts[`${ox + 4},${oy + 9}`] = 'Targ Miejski';
 
@@ -546,10 +595,10 @@ const World = {
         tiles[2 * CS + 5] = T.SIGN;
         this.signTexts[`${ox + 5},${oy + 2}`] = 'Farmy i Stajnie';
 
-        // Farm buildings
-        this.placeBuilding(tiles, ox, oy, 2, 3, 4, 3);
-        this.placeBuilding(tiles, ox, oy, 8, 3, 4, 3);
-        this.placeBuilding(tiles, ox, oy, 14, 3, 4, 3);
+        // Farm buildings with NPCs
+        this.placeTownBuilding(tiles, ox, oy, 2, 3, 4, 3, 'Rolnik');
+        this.placeTownBuilding(tiles, ox, oy, 8, 3, 4, 3, 'Stajennik');
+        this.placeTownBuilding(tiles, ox, oy, 14, 3, 4, 3, 'Ogrodnik');
 
         // Farm fields (flowers = crops)
         for (let dy = 8; dy < 16; dy++)
@@ -564,24 +613,24 @@ const World = {
     // ========== CITY NPCs (wandering) ==========
     spawnCityNpcs() {
         const npcDefs = [
-            { name: 'Strażnik Miejski', sprite: 'npc_quest', role: 'guard', speed: 3.0 },
-            { name: 'Strażnik Bramy', sprite: 'npc_quest', role: 'guard', speed: 3.5 },
-            { name: 'Strażnik Patrolu', sprite: 'npc_quest', role: 'guard', speed: 2.5 },
-            { name: 'Kupiec Tomasz', sprite: 'npc_shopkeeper', role: 'citizen', speed: 4.0 },
-            { name: 'Rolnik Jan', sprite: 'npc_quest2', role: 'citizen', speed: 4.5 },
-            { name: 'Kowalowa Anna', sprite: 'npc_shopkeeper', role: 'citizen', speed: 5.0 },
-            { name: 'Stary Mędrzec', sprite: 'npc_quest2', role: 'citizen', speed: 6.0 },
-            { name: 'Młody Uczeń', sprite: 'npc_quest', role: 'citizen', speed: 2.0 },
-            { name: 'Pani Herbatka', sprite: 'npc_shopkeeper', role: 'citizen', speed: 5.0 },
-            { name: 'Łowca Nagród', sprite: 'npc_quest2', role: 'citizen', speed: 3.0 },
-            { name: 'Kapłan Świątyni', sprite: 'npc_quest', role: 'citizen', speed: 6.0 },
-            { name: 'Bard Podróżnik', sprite: 'npc_quest2', role: 'citizen', speed: 3.5 },
-            { name: 'Kwiaciarka Ola', sprite: 'npc_shopkeeper', role: 'citizen', speed: 4.0 },
-            { name: 'Rycerz Honorowy', sprite: 'npc_quest', role: 'guard', speed: 4.0 },
-            { name: 'Złodziej Kieszonkowy', sprite: 'npc_quest2', role: 'citizen', speed: 1.5 },
-            { name: 'Dziecko', sprite: 'npc_quest2', role: 'child', speed: 1.2 },
-            { name: 'Dziecko', sprite: 'npc_quest2', role: 'child', speed: 1.0 },
-            { name: 'Posłaniec', sprite: 'npc_quest', role: 'citizen', speed: 1.8 },
+            { name: 'Strażnik Miejski', sprite: 'city_guard', role: 'guard', speed: 3.0 },
+            { name: 'Strażnik Bramy', sprite: 'city_guard', role: 'guard', speed: 3.5 },
+            { name: 'Strażnik Patrolu', sprite: 'city_guard', role: 'guard', speed: 2.5 },
+            { name: 'Kupiec Tomasz', sprite: 'city_merchant', role: 'citizen', speed: 4.0 },
+            { name: 'Rolnik Jan', sprite: 'city_elder', role: 'citizen', speed: 4.5 },
+            { name: 'Kowalowa Anna', sprite: 'city_woman', role: 'citizen', speed: 5.0 },
+            { name: 'Stary Mędrzec', sprite: 'city_elder', role: 'citizen', speed: 6.0 },
+            { name: 'Młody Uczeń', sprite: 'city_bard', role: 'citizen', speed: 2.0 },
+            { name: 'Pani Herbatka', sprite: 'city_woman', role: 'citizen', speed: 5.0 },
+            { name: 'Łowca Nagród', sprite: 'city_merchant', role: 'citizen', speed: 3.0 },
+            { name: 'Kapłan Świątyni', sprite: 'city_priest', role: 'citizen', speed: 6.0 },
+            { name: 'Bard Podróżnik', sprite: 'city_bard', role: 'citizen', speed: 3.5 },
+            { name: 'Kwiaciarka Ola', sprite: 'city_woman', role: 'citizen', speed: 4.0 },
+            { name: 'Rycerz Honorowy', sprite: 'city_guard', role: 'guard', speed: 4.0 },
+            { name: 'Złodziej Kieszonkowy', sprite: 'city_merchant', role: 'citizen', speed: 1.5 },
+            { name: 'Dziecko', sprite: 'city_bard', role: 'child', speed: 1.2 },
+            { name: 'Dziecko', sprite: 'city_bard', role: 'child', speed: 1.0 },
+            { name: 'Posłaniec', sprite: 'city_merchant', role: 'citizen', speed: 1.8 },
         ];
 
         // Distribute NPCs across capital area (-20..20, -20..20)
@@ -634,7 +683,7 @@ const World = {
     spawnChunkMonsters(cx, cy, ox, oy, tiles) {
         const CS = this.CHUNK_SIZE;
         const biome = this.getBiome(ox + CS/2, oy + CS/2);
-        const biomeKey = ['plains','forest','swamp','mountain','desert'][biome] || 'plains';
+        const biomeKey = ['plains','forest','swamp','mountain','desert','snow'][biome] || 'plains';
         const pool = this.MONSTERS[biomeKey];
         if (!pool) return;
 
@@ -693,7 +742,8 @@ const World = {
         return [T.WATER, T.WALL, T.TREE, T.HOUSE, T.CAVE_WALL, T.FENCE,
                 T.WELL, T.STATUE, T.ROCK, T.SWAMP_TREE, T.CACTUS, T.VILLAGE_HUT,
                 T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC,
-                T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC, T.INN, T.CHEST, T.HOUSE_DOOR].includes(t);
+                T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC, T.INN, T.CHEST, T.HOUSE_DOOR,
+                T.TOWN_BUILDING, T.TOWN_BUILDING_DOOR, T.LAVA, T.SNOW_PINE].includes(t);
     },
 
     getMonsterAt(wx, wy) {
@@ -927,7 +977,7 @@ const World = {
         const key = this.getChunkKey(cx, cy);
         if (this.villages[key]) return this.villages[key].name;
         const biome = this.getBiome(wx, wy);
-        const names = ['Równiny','Mroczny Las','Bagno','Góry','Pustkowia'];
+        const names = ['Równiny','Mroczny Las','Bagno','Góry','Pustkowia','Lodowe Pustkowia'];
         return `${names[biome]} (Lv.${this.getDifficulty(wx,wy)})`;
     },
 
@@ -948,6 +998,9 @@ const World = {
         { id: 'spider_nest', name: 'Gniazdo Pająków', monsters: ['spider','beetle'], boss: { name: 'Matka Pająków', sprite: 'spider', hpMult: 12, atkMult: 3, defMult: 2, xpMult: 12, goldMult: 18 }, floors: 3, biome: 'cave' },
         { id: 'dragon_lair', name: 'Smocze Leże', monsters: ['dark_knight','golem'], boss: { name: 'Prastarzy Smok', sprite: 'griffin', hpMult: 15, atkMult: 5, defMult: 4, xpMult: 25, goldMult: 30 }, floors: 5, biome: 'fire' },
         { id: 'shadow_realm', name: 'Kraina Cieni', monsters: ['ghost','djinn'], boss: { name: 'Władca Cieni', sprite: 'djinn', hpMult: 20, atkMult: 6, defMult: 5, xpMult: 30, goldMult: 40 }, floors: 5, biome: 'shadow' },
+        { id: 'demon_pit', name: 'Otchłań Demonów', monsters: ['demon','skeleton'], boss: { name: 'Arcydemon', sprite: 'demon', hpMult: 18, atkMult: 7, defMult: 5, xpMult: 35, goldMult: 45 }, floors: 5, biome: 'fire' },
+        { id: 'frozen_tomb', name: 'Lodowy Grobowiec', monsters: ['ice_golem','skeleton'], boss: { name: 'Mroźny Władca', sprite: 'ice_golem', hpMult: 16, atkMult: 5, defMult: 7, xpMult: 28, goldMult: 35 }, floors: 4, biome: 'cave' },
+        { id: 'wyrm_nest', name: 'Gniazdo Wyrmów', monsters: ['wyrm','fire_elemental'], boss: { name: 'Pradawny Wyrm', sprite: 'wyrm', hpMult: 22, atkMult: 8, defMult: 6, xpMult: 40, goldMult: 50 }, floors: 6, biome: 'fire' },
     ],
 
     activeDungeon: null,

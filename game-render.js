@@ -52,7 +52,12 @@ const GameRender = {
             case T.NPC_QUEST: return 'npc_quest';
             case T.NPC_QUEST2: return 'npc_quest2';
             case T.NPC_SHOPKEEPER: return 'npc_shopkeeper';
-            case T.HOUSE_DOOR: return 'door';
+            case T.HOUSE_DOOR: return 'house_door';
+            case T.TOWN_BUILDING: return 'town_building';
+            case T.TOWN_BUILDING_DOOR: return 'town_building_door';
+            case T.LAVA: return `lava_${animFrame % 4}`;
+            case T.SNOW: return `snow_${v}`;
+            case T.SNOW_PINE: return 'snow_pine';
             default: return `grass_0`;
         }
     },
@@ -108,7 +113,8 @@ const GameRender = {
         // Tiles that need a ground tile drawn underneath
         const overlayTiles = new Set([T.TREE, T.SWAMP_TREE, T.CACTUS, T.CHEST, T.SIGN, T.WELL, T.STATUE,
             T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC, T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC,
-            T.FENCE, T.INN, T.HOUSE, T.VILLAGE_HUT, T.ROCK, T.HOUSE_DOOR]);
+            T.FENCE, T.INN, T.HOUSE, T.VILLAGE_HUT, T.ROCK, T.HOUSE_DOOR,
+            T.TOWN_BUILDING, T.TOWN_BUILDING_DOOR, T.SNOW_PINE]);
 
         // First pass: ground tiles
         for (let wy = startY; wy < endY; wy++) {
@@ -127,6 +133,7 @@ const GameRender = {
                     else if (biome === 2) groundSprite = 'swamp_' + v;
                     else if (biome === 3) groundSprite = 'mountain_' + v;
                     else if (biome === 4) groundSprite = 'desert_' + v;
+                    else if (biome === 5) groundSprite = 'snow_' + v;
                     // Village tiles get stone floor
                     const cx = Math.floor(wx / World.CHUNK_SIZE);
                     const cy = Math.floor(wy / World.CHUNK_SIZE);
@@ -207,6 +214,38 @@ const GameRender = {
                 ctx.font = '6px "Press Start 2P"';
                 ctx.textAlign = 'center';
                 ctx.fillText(npc.name, sx + TILE / 2, sy - 3);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        // Draw animated quest markers (!) above quest NPC tiles
+        if (!World.activeDungeon) {
+            const questBob = Math.sin(Date.now() / 300) * 3;
+            for (const key in World.questNpcs) {
+                const [nx, ny] = key.split(',').map(Number);
+                const sx = Math.floor((nx - camX) * TILE);
+                const sy = Math.floor((ny - camY) * TILE);
+                if (sx < -TILE || sx > W + TILE || sy < -TILE || sy > H + TILE) continue;
+                const qInfo = World.questNpcs[key];
+                const quest = G.quests.find(q => q.id === qInfo.id);
+                let markerColor, markerChar;
+                if (quest && quest.completed && !quest.turned_in) {
+                    markerColor = '#2ecc71'; markerChar = '?';
+                } else if (quest && !quest.turned_in) {
+                    markerColor = '#e67e22'; markerChar = '!';
+                } else if (!quest) {
+                    markerColor = '#f1c40f'; markerChar = '!';
+                } else {
+                    continue;
+                }
+                // Animated bouncing marker
+                const my = sy - 12 + questBob;
+                ctx.fillStyle = markerColor;
+                ctx.font = 'bold 14px "Press Start 2P"';
+                ctx.textAlign = 'center';
+                ctx.globalAlpha = 0.8 + Math.sin(Date.now() / 200) * 0.2;
+                ctx.fillText(markerChar, sx + TILE / 2, my);
+                ctx.globalAlpha = 1;
                 ctx.textAlign = 'left';
             }
         }
@@ -338,11 +377,14 @@ const GameRender = {
                 else if (tile === T.DESERT) color = '#daa520';
                 else if ([T.SHOP_WEAPON_NPC, T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC, T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER].includes(tile)) color = '#e67e22';
                 else if (tile === T.WELL) color = '#3498db';
-                else if (tile === T.CAVE_ENTRY) color = '#333';
+                else if (tile === T.CAVE_ENTRY || tile === T.FOREST_ENTRY) color = '#ff4444';
                 else if (tile === T.CHEST) color = '#f1c40f';
                 else if (tile === T.CACTUS) color = '#2ecc71';
                 else if (tile === T.HOUSE_DOOR) color = '#8B4513';
                 else if (tile === T.DOOR) color = '#c4a663';
+                else if (tile === T.TOWN_BUILDING || tile === T.TOWN_BUILDING_DOOR) color = '#a89078';
+                else if (tile === T.LAVA) color = '#e74c3c';
+                else if (tile === T.SNOW || tile === T.SNOW_PINE) color = '#ecf0f1';
 
                 // Monster dot
                 const mob = World.getMonsterAt(wx, wy);
@@ -355,16 +397,34 @@ const GameRender = {
             }
         }
 
-        // Quest NPC markers (question marks on minimap)
+        // Quest target areas on minimap (? markers for discovered areas)
         Game.quests.forEach(q => {
             if (q.turned_in) return;
-            // Show collect quest target area
-            if (q.type === 'collect' && !q.completed && q.targetX) {
+            if (!q.completed && q.targetX !== undefined && q.targetY !== undefined) {
                 const qdx = q.targetX - p.x;
                 const qdy = q.targetY - p.y;
                 if (Math.abs(qdx) <= hw && Math.abs(qdy) <= hh) {
-                    mctx.fillStyle = '#e67e22';
-                    mctx.fillRect((qdx + hw) * scale, (qdy + hh) * scale, scale, scale);
+                    // Pulsing quest area indicator
+                    const pulse = 0.4 + Math.sin(Date.now() / 400) * 0.3;
+                    mctx.globalAlpha = pulse;
+                    mctx.fillStyle = '#f39c12';
+                    // Draw a small area around the target
+                    for (let r = -2; r <= 2; r++) {
+                        for (let c = -2; c <= 2; c++) {
+                            const mx = (qdx + c + hw) * scale;
+                            const my = (qdy + r + hh) * scale;
+                            if (mx >= 0 && mx < mw && my >= 0 && my < mh) {
+                                mctx.fillRect(mx, my, scale, scale);
+                            }
+                        }
+                    }
+                    mctx.globalAlpha = 1;
+                    // Question mark in center
+                    mctx.fillStyle = '#fff';
+                    mctx.font = '6px "Press Start 2P"';
+                    mctx.textAlign = 'center';
+                    mctx.fillText('?', (qdx + hw) * scale + 1, (qdy + hh) * scale + 5);
+                    mctx.textAlign = 'left';
                 }
             }
         });
@@ -384,6 +444,24 @@ const GameRender = {
                     continue; // turned in, skip
                 }
                 mctx.fillRect((qdx + hw) * scale, (qdy + hh) * scale, scale, scale);
+            }
+        }
+
+        // Dungeon/cave entry markers - larger blinking icons
+        for (let dy = -hh; dy <= hh; dy++) {
+            for (let dx = -hw; dx <= hw; dx++) {
+                const wx = p.x + dx;
+                const wy = p.y + dy;
+                const tile = World.getTile(wx, wy);
+                if (tile === World.T.CAVE_ENTRY || tile === World.T.FOREST_ENTRY) {
+                    const blink = Math.sin(Date.now() / 500 + dx + dy) > -0.3;
+                    if (blink) {
+                        mctx.fillStyle = '#ff4444';
+                        mctx.fillRect((dx + hw) * scale - 1, (dy + hh) * scale - 1, scale + 2, scale + 2);
+                        mctx.fillStyle = '#ff8888';
+                        mctx.fillRect((dx + hw) * scale, (dy + hh) * scale, scale, scale);
+                    }
+                }
             }
         }
 
