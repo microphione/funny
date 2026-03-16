@@ -29,6 +29,7 @@ GameInput.handleQuestBoard = function() {
         if (q.completed && !q.turned_in && MAIN_QUESTS.find(m => m.id === q.id)) {
             q.turned_in = true;
             p.gold += q.gold;
+            Game.syncGold();
             Game.addXp(q.xp);
             Game.log(`Quest "${q.title}" oddany! +${q.gold}zł, +${q.xp} XP`, 'loot');
             GameRender.updateHUD();
@@ -78,6 +79,7 @@ GameInput.handleDailyQuestBoard = function() {
         if (activeDaily.completed) {
             activeDaily.turned_in = true;
             p.gold += activeDaily.gold;
+            Game.syncGold();
             Game.addXp(activeDaily.xp);
             Game.log(`Dzienny quest oddany! +${activeDaily.gold}zł, +${activeDaily.xp} XP`, 'loot');
             GameRender.updateHUD();
@@ -93,64 +95,99 @@ GameInput.handleDailyQuestBoard = function() {
     Game.log(`Nowy dzienny quest: ${daily.title} - ${daily.desc}`, 'info');
 };
 
-// ========== STARTER ISLAND QUEST SYSTEM ==========
-GameInput.handleStarterIslandQuestNpc = function() {
+// ========== STARTER ISLAND QUEST SYSTEM (Per-NPC) ==========
+GameInput.handleStarterIslandQuestNpc = function(npcName) {
     const p = Game.player;
     if (!Game.starterIslandQuests) Game.starterIslandQuests = {};
     const siQuests = STARTER_ISLAND.quests;
 
-    // Find next available quest
-    let activeQuest = null;
-    let nextQuest = null;
-    for (const q of siQuests) {
-        const state = Game.starterIslandQuests[q.id];
-        if (state === 'turned_in') continue;
-        if (state === 'active') { activeQuest = q; break; }
-        if (!state && p.level >= q.minLevel) { nextQuest = q; break; }
+    // Find quests assigned to this NPC
+    const npcQuests = siQuests.filter(q => q.npc === npcName);
+    if (npcQuests.length === 0) {
+        // NPC has no quests - generic dialogue
+        const greetings = [
+            `${npcName}: Witaj, podróżniku!`,
+            `${npcName}: Miło cię widzieć!`,
+            `${npcName}: Powodzenia w przygodach!`,
+        ];
+        Game.log(greetings[Math.floor(Math.random() * greetings.length)], 'info');
+        return;
     }
 
-    if (activeQuest) {
-        const state = Game.starterIslandQuests[activeQuest.id];
-        const progress = Game.starterIslandQuests[activeQuest.id + '_progress'] || 0;
-        const needed = activeQuest.count;
+    // Check for active quest from this NPC that can be turned in
+    for (const q of npcQuests) {
+        const state = Game.starterIslandQuests[q.id];
+        if (state !== 'active') continue;
+
+        const progress = Game.starterIslandQuests[q.id + '_progress'] || 0;
+        const needed = q.count;
         let completed = false;
 
-        if (activeQuest.type === 'kill') {
-            completed = progress >= needed;
-        } else if (activeQuest.type === 'level') {
-            completed = p.level >= needed;
-        }
+        if (q.type === 'kill') completed = progress >= needed;
+        else if (q.type === 'level') completed = p.level >= needed;
+        else if (q.type === 'collect') completed = progress >= needed;
+        else if (q.type === 'dungeon') completed = Game.dungeonBossesKilled && Game.dungeonBossesKilled.has(q.target);
 
         if (completed) {
-            Game.starterIslandQuests[activeQuest.id] = 'turned_in';
-            p.gold += activeQuest.gold;
-            if (activeQuest.xp > 0) Game.addXp(activeQuest.xp);
-            Game.log(`Stary Rybak: Świetna robota! Quest "${activeQuest.title}" ukończony!`, 'loot');
-            Game.log(`+${activeQuest.gold}zł${activeQuest.xp ? ', +' + activeQuest.xp + ' XP' : ''}`, 'loot');
+            Game.starterIslandQuests[q.id] = 'turned_in';
+            p.gold += q.gold;
+            Game.syncGold();
+            if (q.xp > 0) Game.addXp(q.xp);
+            Game.log(`${npcName}: Świetna robota! Quest "${q.title}" ukończony!`, 'loot');
+            Game.log(`+${q.gold}zł${q.xp ? ', +' + q.xp + ' XP' : ''}`, 'loot');
             GameRender.updateHUD();
+            return;
         } else {
-            if (activeQuest.type === 'kill') {
-                Game.log(`Stary Rybak: Quest "${activeQuest.title}" - ${progress}/${needed}`, 'info');
-            } else {
-                Game.log(`Stary Rybak: ${activeQuest.desc} (Lv.${p.level}/${needed})`, 'info');
+            if (q.type === 'kill') {
+                Game.log(`${npcName}: Quest "${q.title}" - ${progress}/${needed}`, 'info');
+            } else if (q.type === 'level') {
+                Game.log(`${npcName}: ${q.desc} (Lv.${p.level}/${needed})`, 'info');
+            } else if (q.type === 'collect') {
+                Game.log(`${npcName}: Quest "${q.title}" - ${progress}/${needed}`, 'info');
+            } else if (q.type === 'dungeon') {
+                Game.log(`${npcName}: ${q.desc} (w toku)`, 'info');
             }
+            return;
         }
-    } else if (nextQuest) {
+    }
+
+    // Find next available quest from this NPC
+    const nextQuest = npcQuests.find(q => {
+        const state = Game.starterIslandQuests[q.id];
+        return !state && p.level >= q.minLevel;
+    });
+
+    if (nextQuest) {
         Game.starterIslandQuests[nextQuest.id] = 'active';
         Game.starterIslandQuests[nextQuest.id + '_progress'] = 0;
-        Game.log(`Stary Rybak: Mam dla ciebie zadanie!`, 'info');
+
+        // For dungeon quests, check if already completed
+        if (nextQuest.type === 'dungeon' && Game.dungeonBossesKilled && Game.dungeonBossesKilled.has(nextQuest.target)) {
+            Game.starterIslandQuests[nextQuest.id + '_progress'] = 1;
+        }
+
+        Game.log(`${npcName}: Mam dla ciebie zadanie!`, 'info');
         Game.log(`Nowy quest: ${nextQuest.title} - ${nextQuest.desc}`, 'info');
+
+        // Spawn collect items if needed
+        if (nextQuest.type === 'collect') {
+            const q = { ...nextQuest, progress: 0, required: nextQuest.count, completed: false, turned_in: false, reward: { gold: nextQuest.gold, xp: nextQuest.xp } };
+            Game.quests.push(q);
+            World.spawnQuestItems(q);
+        }
+        return;
+    }
+
+    // All quests from this NPC done or locked
+    const allDone = npcQuests.every(q => Game.starterIslandQuests[q.id] === 'turned_in');
+    if (allDone) {
+        Game.log(`${npcName}: Dziękuję za pomoc! Nie mam więcej zadań.`, 'info');
     } else {
-        const allDone = siQuests.every(q => Game.starterIslandQuests[q.id] === 'turned_in');
-        if (allDone) {
-            Game.log('Stary Rybak: Ukończyłeś wszystkie zadania! Porozmawiaj z Kapitanem.', 'info');
+        const locked = npcQuests.find(q => !Game.starterIslandQuests[q.id] && p.level < q.minLevel);
+        if (locked) {
+            Game.log(`${npcName}: Wróć na poziomie ${locked.minLevel}, będę mieć zadanie!`, 'info');
         } else {
-            const next = siQuests.find(q => !Game.starterIslandQuests[q.id] && p.level < q.minLevel);
-            if (next) {
-                Game.log(`Stary Rybak: Wróć na poziomie ${next.minLevel}, mam więcej zadań!`, 'info');
-            } else {
-                Game.log('Stary Rybak: Trenuj dalej, podróżniku!', 'info');
-            }
+            Game.log(`${npcName}: Witaj, podróżniku!`, 'info');
         }
     }
 };

@@ -55,6 +55,20 @@ GameInput.interact = function() {
         if (curTile === World.T.STAIRS_DOWN) { World.goDownFloor(); GameRender.updateHUD(); return; }
     }
 
+    // Check if standing on stairs_up on overworld (e.g. starter island -> town)
+    if (!World.activeBuildingFloor && !World.activeDungeon) {
+        const curTile = World.getTile(p.x, p.y);
+        if (curTile === World.T.STAIRS_UP) {
+            // Check if this is the starter island town entrance
+            const ic = World.getIslandCenter();
+            if (Math.abs(p.x - ic.x) < 3 && Math.abs(p.y - ic.y) < 3) {
+                World.enterStarterTown();
+                GameRender.updateHUD();
+                return;
+            }
+        }
+    }
+
     // Pickup flow: first under player, then surrounding tiles (one item at a time)
     if (this.tryPickupOneItem()) return;
 
@@ -76,6 +90,7 @@ GameInput.interact = function() {
             const dc = World.activeDungeon.chests && World.activeDungeon.chests[key];
             if (!dc) { Game.log('Ta skrzynia jest już pusta.', 'info'); return; }
             p.gold += dc.gold;
+            Game.syncGold();
             Game.log(`Skrzynia: +${dc.gold} złota!`, 'loot');
             Music.playGoldDrop();
             delete World.activeDungeon.chests[key];
@@ -91,6 +106,7 @@ GameInput.interact = function() {
         const chest = World.chests[key];
         if (chest) {
             p.gold += chest.gold;
+            Game.syncGold();
             Game.log(`Skrzynia: +${chest.gold} złota!`, 'loot');
             Music.playGoldDrop();
             if (Math.random() < 0.5) {
@@ -131,9 +147,9 @@ GameInput.interact = function() {
         const quest = World.questNpcs[`${tx},${ty}`];
         if (!quest) return;
 
-        // Starter island special NPCs
-        if (quest.type === 'starter_island') {
-            this.handleStarterIslandQuestNpc();
+        // Starter island special NPCs (per-NPC quest system)
+        if (quest.type === 'starter_island' || quest.type === 'starter_island_npc') {
+            this.handleStarterIslandQuestNpc(quest.name || 'Mieszkaniec');
             return;
         }
         if (quest.type === 'starter_mentor') {
@@ -179,6 +195,7 @@ GameInput.interact = function() {
                     GameUI.confirmAction(`Kupić wierzchowca za ${mountPrice} złota?`, () => {
                         if (p.gold >= mountPrice) {
                             p.gold -= mountPrice;
+                            Game.syncGold();
                             p.ownedMounts = p.ownedMounts || [];
                             p.ownedMounts.push('horse');
                             Game.log(`Kupiono wierzchowca! Naciśnij R.`, 'loot');
@@ -205,6 +222,7 @@ GameInput.interact = function() {
             if (existing.completed && !existing.turned_in) {
                 existing.turned_in = true;
                 p.gold += existing.reward.gold;
+                Game.syncGold();
                 Game.addXp(existing.reward.xp);
                 Game.log(`Quest oddany! +${existing.reward.gold}zł, +${existing.reward.xp} XP`, 'loot');
                 GameRender.updateHUD();
@@ -247,6 +265,7 @@ GameInput.interact = function() {
                 GameUI.confirmAction(`Kupić wierzchowca za ${mountPrice} złota? (+40% szybkości ruchu)`, () => {
                     if (p.gold >= mountPrice) {
                         p.gold -= mountPrice;
+                        Game.syncGold();
                         p.ownedMounts = p.ownedMounts || [];
                         p.ownedMounts.push('horse');
                         Game.log(`Kupiono wierzchowca! Naciśnij R by wsiadać/zsiadać.`, 'loot');
@@ -331,6 +350,7 @@ GameInput.interact = function() {
         const cost = 5 + p.level * 2;
         if (p.gold >= cost) {
             p.gold -= cost;
+            Game.syncGold();
             p.hp = p.maxHp;
             p.mp = p.maxMp;
             Game.log(`Odpoczynek w karczmie. Pełne HP i MP! (-${cost}zł)`, 'heal');

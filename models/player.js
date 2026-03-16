@@ -14,7 +14,7 @@ Game.createPlayer = function(classId) {
         level: 1,
         xp: 0,
         xpToNext: xpToNextLevel(1),
-        gold: 20,
+        gold: 0,
         hp: cls.baseStats.hp,
         maxHp: cls.baseStats.hp,
         mp: cls.baseStats.mp,
@@ -50,9 +50,24 @@ Game.createPlayer = function(classId) {
         this.player.inventory.push(startWeapon);
         this.player.equipment.weapon = startWeapon;
     }
+    // Starting gold (as inventory item)
+    this.player.inventory.push({ id: 'gold_coins', name: 'Złote Monety', type: 'currency', count: 20, stackable: true, maxStack: 999999, price: 0, desc: 'Złote monety - waluta świata' });
+    this.player.gold = 20;
     // Starting potions (stackable)
     this.player.inventory.push({ id: 'hp_potion', name: 'Mikstura HP', type: 'consumable', subtype: 'hp', heal: 25, count: 5, stackable: true, maxStack: 100, price: 10, desc: 'Leczy 25 HP' });
     this.player.inventory.push({ id: 'mp_potion', name: 'Mikstura Many', type: 'consumable', subtype: 'mp', mana: 20, count: 3, stackable: true, maxStack: 100, price: 12, desc: '+20 MP' });
+};
+
+// Sync gold between p.gold number and inventory gold_coins item
+Game.syncGold = function() {
+    const p = this.player;
+    if (!p) return;
+    let goldItem = p.inventory.find(i => i.id === 'gold_coins');
+    if (!goldItem) {
+        goldItem = { id: 'gold_coins', name: 'Złote Monety', type: 'currency', count: 0, stackable: true, maxStack: 999999, price: 0, desc: 'Złote monety - waluta świata' };
+        p.inventory.push(goldItem);
+    }
+    goldItem.count = Math.max(0, p.gold);
 };
 
 Game.getStats = function() {
@@ -236,6 +251,7 @@ Game.refreshStats = function() {
     p.maxMp = s.maxMp;
     if (p.hp > p.maxHp) p.hp = p.maxHp;
     if (p.mp > p.maxMp) p.mp = p.maxMp;
+    this.syncGold();
 };
 
 Game.addXp = function(amount) {

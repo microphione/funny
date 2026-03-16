@@ -174,6 +174,7 @@ const GameCombat = {
         const goldDrop = Math.floor((m.gold[0] + Math.floor(Math.random() * (m.gold[1] - m.gold[0]))) * 0.6);
 
         Game.player.gold += goldDrop;
+        Game.syncGold();
         Game.addXp(m.xp);
         Game.killCount++;
 
@@ -255,7 +256,7 @@ const GameCombat = {
                     const key = q.id + '_progress';
                     Game.starterIslandQuests[key] = (Game.starterIslandQuests[key] || 0) + 1;
                     if (Game.starterIslandQuests[key] >= q.count) {
-                        Game.log(`Quest "${q.title}" ukończony! Wróć do Starego Rybaka.`, 'info');
+                        Game.log(`Quest "${q.title}" ukończony! Wróć do ${q.npc || 'zleceniodawcy'}.`, 'info');
                     } else {
                         Game.log(`${q.target}: ${Game.starterIslandQuests[key]}/${q.count}`, 'info');
                     }

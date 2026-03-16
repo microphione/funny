@@ -19,8 +19,24 @@ World.getDungeonType = function(wx, wy) {
 };
 
 World.enterDungeon = function(wx, wy) {
-    const diff = this.getDifficulty(wx, wy);
-    const dtype = this.getDungeonType(wx, wy);
+    // Check for island-specific dungeon at this location
+    const islandKey = `${wx},${wy}`;
+    const islandDungeon = this.islandDungeons && this.islandDungeons[islandKey];
+
+    let dtype, diff;
+    if (islandDungeon) {
+        dtype = islandDungeon;
+        diff = islandDungeon.minLevel || 1;
+        // Check level requirement
+        if (Game.player.level < diff) {
+            Game.log(`Wymagany poziom ${diff} aby wejść do ${dtype.name}! (Twój: ${Game.player.level})`, 'info');
+            return;
+        }
+    } else {
+        diff = this.getDifficulty(wx, wy);
+        dtype = this.getDungeonType(wx, wy);
+    }
+
     this.dungeonReturnPos = { x: Game.player.x, y: Game.player.y };
     this.activeDungeon = {
         type: dtype,

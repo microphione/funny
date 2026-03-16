@@ -24,9 +24,9 @@ const Game = {
     // Canvas
     canvas: null,
     ctx: null,
-    TILE: 32,
-    VIEW_W: 20,
-    VIEW_H: 15,
+    TILE: 64,
+    VIEW_W: 17,
+    VIEW_H: 11,
 
     // Camera & smooth movement
     cameraX: 0,
@@ -113,6 +113,7 @@ const Game = {
         // Gold loss
         const goldLoss = Math.floor(p.gold * 0.15);
         p.gold = Math.max(0, p.gold - goldLoss);
+        this.syncGold();
 
         Music.stopMelody();
         GameUI.showDeathScreen(goldLoss, droppedItems.length);
@@ -135,9 +136,8 @@ const Game = {
             p.x = this.lastVillageWell.x;
             p.y = this.lastVillageWell.y;
         } else if (p.onStarterIsland) {
-            const islandX = STARTER_ISLAND.cx * World.CHUNK_SIZE + Math.floor(World.CHUNK_SIZE / 2);
-            const islandY = STARTER_ISLAND.cy * World.CHUNK_SIZE + Math.floor(World.CHUNK_SIZE / 2);
-            p.x = islandX; p.y = islandY;
+            const ic = World.getIslandCenter();
+            p.x = ic.x; p.y = ic.y + 2;
         } else {
             p.x = 0; p.y = 0;
         }
@@ -177,6 +177,7 @@ const Game = {
                 this.log(`[Główny Quest] ${stage.title} - Ukończono!`, 'loot');
                 this.log(`[Główny Quest] Nowy cel: ${next.title}`, 'info');
                 this.player.gold += 50 + this.mainQuestStage * 30;
+                this.syncGold();
                 this.addXp(30 + this.mainQuestStage * 20);
             }
         }

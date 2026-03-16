@@ -4,29 +4,78 @@
 // ============================================================
 
 // ========== STARTER ISLAND ==========
-// Starter island config: small island for levels 1-20, no class choice
+// Starter island config: large island for levels 1-20
 const STARTER_ISLAND = {
-    // Island center in world coords (chunk 8,8 = tile 160,160)
-    cx: 8, cy: 8,
-    radius: 25, // island radius in tiles
+    // Island center in world coords (chunk 20,20 = tile 400,400)
+    cx: 20, cy: 20,
+    radius: 400, // island radius in tiles (800x800)
+
+    // Zone definitions for different areas of the island
+    zones: {
+        town_stairs: { x: 0, y: 0, radius: 3 },        // Center - stairs to town on +1
+        beach_south: { x: 0, y: 250, radius: 120 },     // Southern beach
+        forest_east: { x: 200, y: -50, radius: 150 },   // Eastern forest
+        swamp_nw: { x: -200, y: -150, radius: 120 },    // Northwest swamp
+        ruins_north: { x: 0, y: -250, radius: 100 },    // Northern ruins
+        pirate_bay: { x: -200, y: 200, radius: 100 },   // Southwest pirate bay
+        druid_clearing: { x: 150, y: 150, radius: 40 }, // Southeast druid area
+        lighthouse: { x: -300, y: 0, radius: 30 },      // Western lighthouse
+        port: { x: 0, y: 300, radius: 40 },             // Southern port
+        mine_entrance: { x: 250, y: -200, radius: 20 }, // Mine dungeon entrance
+        crab_cave: { x: 100, y: 280, radius: 15 },      // Mini dungeon under beach
+        pirate_tunnel: { x: -250, y: 250, radius: 15 }, // Pirate mini dungeon
+        crypt_entrance: { x: 50, y: -280, radius: 15 }, // Crypt dungeon entrance
+    },
+
     monsters: [
-        { name: 'Szczur',         sprite: 'slime',    hp: 12, atk: 2,  armor: 0,  xp: 5,  gold: [1,3],  minDiff: 1, maxDiff: 5 },
-        { name: 'Krab',           sprite: 'beetle',   hp: 18, atk: 3,  armor: 2,  xp: 8,  gold: [1,4],  minDiff: 1, maxDiff: 8 },
-        { name: 'Meduza',         sprite: 'ghost',    hp: 15, atk: 5,  armor: 0,  xp: 10, gold: [2,5],  minDiff: 2, maxDiff: 10 },
-        { name: 'Dziki Królik',   sprite: 'wolf',     hp: 22, atk: 4,  armor: 1,  xp: 12, gold: [2,6],  minDiff: 2, maxDiff: 12 },
-        { name: 'Bies Plażowy',   sprite: 'goblin',   hp: 30, atk: 6,  armor: 3,  xp: 18, gold: [3,8],  minDiff: 4, maxDiff: 14 },
-        { name: 'Pirat',          sprite: 'bandit',   hp: 40, atk: 8,  armor: 4,  xp: 25, gold: [5,12], minDiff: 6, maxDiff: 18 },
-        { name: 'Kapitan Piratów',sprite: 'dark_knight', hp: 65, atk: 12, armor: 6, xp: 45, gold: [10,20], minDiff: 10, maxDiff: 20 },
+        // Beach (lv 1-4)
+        { name: 'Krab',           sprite: 'beetle',     hp: 15, atk: 2,  armor: 2,  xp: 6,  gold: [1,3],  minDiff: 1, maxDiff: 5,  zone: 'beach' },
+        { name: 'Meduza',         sprite: 'ghost',      hp: 12, atk: 4,  armor: 0,  xp: 8,  gold: [1,4],  minDiff: 1, maxDiff: 6,  zone: 'beach' },
+        { name: 'Szczur',         sprite: 'slime',      hp: 10, atk: 2,  armor: 0,  xp: 4,  gold: [1,2],  minDiff: 1, maxDiff: 4,  zone: 'any' },
+        // Forest (lv 4-10)
+        { name: 'Wilk',           sprite: 'wolf',       hp: 28, atk: 6,  armor: 2,  xp: 15, gold: [2,6],  minDiff: 3, maxDiff: 10, zone: 'forest' },
+        { name: 'Pająk',          sprite: 'spider',     hp: 22, atk: 8,  armor: 1,  xp: 12, gold: [2,5],  minDiff: 3, maxDiff: 9,  zone: 'forest' },
+        { name: 'Bandyta',        sprite: 'bandit',     hp: 35, atk: 7,  armor: 3,  xp: 18, gold: [4,10], minDiff: 4, maxDiff: 12, zone: 'forest' },
+        // Swamp (lv 6-12)
+        { name: 'Żaba Trująca',   sprite: 'slime',      hp: 25, atk: 5,  armor: 1,  xp: 14, gold: [2,6],  minDiff: 4, maxDiff: 10, zone: 'swamp' },
+        { name: 'Wąż Jadowity',   sprite: 'spider',     hp: 30, atk: 9,  armor: 2,  xp: 20, gold: [3,8],  minDiff: 5, maxDiff: 12, zone: 'swamp' },
+        { name: 'Duch Bagna',     sprite: 'ghost',      hp: 35, atk: 11, armor: 0,  xp: 25, gold: [4,10], minDiff: 6, maxDiff: 14, zone: 'swamp' },
+        // Pirates (lv 6-12)
+        { name: 'Pirat',          sprite: 'bandit',     hp: 38, atk: 8,  armor: 4,  xp: 22, gold: [5,12], minDiff: 5, maxDiff: 14, zone: 'pirate' },
+        { name: 'Pirat Kapitan',  sprite: 'dark_knight',hp: 60, atk: 12, armor: 6,  xp: 40, gold: [8,18], minDiff: 8, maxDiff: 18, zone: 'pirate' },
+        // Ruins (lv 10-18)
+        { name: 'Szkielet',       sprite: 'skeleton',   hp: 40, atk: 10, armor: 5,  xp: 28, gold: [4,12], minDiff: 7, maxDiff: 16, zone: 'ruins' },
+        { name: 'Golem Kamienny', sprite: 'golem',      hp: 65, atk: 14, armor: 10, xp: 45, gold: [8,18], minDiff: 10, maxDiff: 20, zone: 'ruins' },
+        { name: 'Ożywiona Zbroja',sprite: 'dark_knight',hp: 55, atk: 16, armor: 8,  xp: 50, gold: [10,22],minDiff: 12, maxDiff: 20, zone: 'ruins' },
+        // General (scaling)
+        { name: 'Dziki Królik',   sprite: 'wolf',       hp: 18, atk: 3,  armor: 1,  xp: 8,  gold: [1,4],  minDiff: 1, maxDiff: 8,  zone: 'any' },
+        { name: 'Nietoperz',      sprite: 'ghost',      hp: 14, atk: 5,  armor: 0,  xp: 10, gold: [1,3],  minDiff: 2, maxDiff: 8,  zone: 'cave' },
     ],
+
+    // Starter island dungeon definitions
+    dungeons: [
+        { id: 'si_crab_cave', name: 'Grota Krabów', monsters: ['beetle','slime'], boss: { name: 'Krabowy Patriarcha', sprite: 'beetle', hpMult: 6, atkMult: 2, defMult: 2, xpMult: 8, goldMult: 10 }, floors: 2, biome: 'cave', minLevel: 3 },
+        { id: 'si_pirate_tunnel', name: 'Tunele Piratów', monsters: ['bandit','skeleton'], boss: { name: 'Piracki Skarbnik', sprite: 'bandit', hpMult: 7, atkMult: 3, defMult: 2, xpMult: 10, goldMult: 15 }, floors: 2, biome: 'cave', minLevel: 8 },
+        { id: 'si_crypt', name: 'Krypta pod Ruinami', monsters: ['skeleton','ghost'], boss: { name: 'Strażnik Krypty', sprite: 'dark_knight', hpMult: 10, atkMult: 4, defMult: 3, xpMult: 15, goldMult: 20 }, floors: 3, biome: 'crypt', minLevel: 12 },
+        { id: 'si_mine', name: 'Kopalnia Krasnoludów', monsters: ['golem','skeleton'], boss: { name: 'Kamienny Król', sprite: 'golem', hpMult: 12, atkMult: 4, defMult: 5, xpMult: 18, goldMult: 25 }, floors: 4, biome: 'cave', minLevel: 15 },
+    ],
+
     quests: [
-        { id: 'si_q1', title: 'Pierwsze Kroki', desc: 'Zabij 3 Szczury.', type: 'kill', target: 'Szczur', count: 3, xp: 20, gold: 10, minLevel: 1 },
-        { id: 'si_q2', title: 'Obrona Plaży', desc: 'Zabij 5 Krabów.', type: 'kill', target: 'Krab', count: 5, xp: 35, gold: 15, minLevel: 3 },
-        { id: 'si_q3', title: 'Morski Koszmar', desc: 'Zabij 5 Meduz.', type: 'kill', target: 'Meduza', count: 5, xp: 50, gold: 20, minLevel: 5 },
-        { id: 'si_q4', title: 'Polowanie', desc: 'Zabij 8 Dzikich Królików.', type: 'kill', target: 'Dziki Królik', count: 8, xp: 70, gold: 30, minLevel: 7 },
-        { id: 'si_q5', title: 'Zagrożenie Wyspy', desc: 'Zabij 6 Biesów Plażowych.', type: 'kill', target: 'Bies Plażowy', count: 6, xp: 100, gold: 45, minLevel: 9 },
-        { id: 'si_q6', title: 'Piraci!', desc: 'Zabij 8 Piratów.', type: 'kill', target: 'Pirat', count: 8, xp: 150, gold: 60, minLevel: 12 },
-        { id: 'si_q7', title: 'Kapitan', desc: 'Pokonaj Kapitana Piratów.', type: 'kill', target: 'Kapitan Piratów', count: 1, xp: 250, gold: 100, minLevel: 16 },
-        { id: 'si_q8', title: 'Gotowy na Świat', desc: 'Osiągnij poziom 20.', type: 'level', count: 20, xp: 0, gold: 200, minLevel: 18 },
+        // Quest NPC quests - assigned to specific NPCs in the town
+        { id: 'si_rybak', title: 'Pierwsza Przysługa', desc: 'Zabij 8 Krabów na plaży dla Rybaka.', type: 'kill', target: 'Krab', count: 8, xp: 30, gold: 15, minLevel: 1, npc: 'Rybak' },
+        { id: 'si_straznik', title: 'Obrona Dróg', desc: 'Zabij 10 Wilków zagrażających leśnej drodze.', type: 'kill', target: 'Wilk', count: 10, xp: 60, gold: 30, minLevel: 4, npc: 'Strażnik' },
+        { id: 'si_zielarka', title: 'Zioła z Bagna', desc: 'Zbierz 5 Ziół Bagiennych w bagnie na północnym zachodzie.', type: 'collect', target: 'Zioło Bagienne', count: 5, xp: 50, gold: 25, minLevel: 3, npc: 'Zielarka' },
+        { id: 'si_zona_ziel', title: 'Rzadki Kwiat', desc: 'Znajdź Kwiat Polany w Lesie Szeptów.', type: 'collect', target: 'Kwiat Polany', count: 1, xp: 45, gold: 20, minLevel: 5, npc: 'Żona Zielarki' },
+        { id: 'si_kowal', title: 'Ruda z Kopalni', desc: 'Przynieś 10 Rud Żelaza z Kopalni Krasnoludów.', type: 'collect', target: 'Ruda Żelaza', count: 10, xp: 100, gold: 60, minLevel: 8, npc: 'Kowal' },
+        { id: 'si_burmistrz1', title: 'Zagrożenie Pirackie', desc: 'Zabij 8 Piratów w Pirackiej Zatoce.', type: 'kill', target: 'Pirat', count: 8, xp: 80, gold: 40, minLevel: 6, npc: 'Burmistrz' },
+        { id: 'si_burmistrz2', title: 'Kapitan Piratów', desc: 'Pokonaj Kapitana Piratów.', type: 'kill', target: 'Pirat Kapitan', count: 1, xp: 150, gold: 80, minLevel: 10, npc: 'Burmistrz' },
+        { id: 'si_kaplan', title: 'Oczyść Kryptę', desc: 'Pokonaj bossa Krypty pod Ruinami.', type: 'dungeon', target: 'si_crypt', count: 1, xp: 200, gold: 100, minLevel: 12, npc: 'Kapłan' },
+        { id: 'si_kupiec', title: 'Odzyskaj Towary', desc: 'Zabij 6 Bandytów i odzyskaj skradziony towar.', type: 'kill', target: 'Bandyta', count: 6, xp: 70, gold: 35, minLevel: 5, npc: 'Kupiec' },
+        { id: 'si_uczony', title: 'Tajemnice Ruin', desc: 'Zbadaj Ruiny na północy i przynieś Artefakt Starożytnych.', type: 'collect', target: 'Artefakt Starożytnych', count: 1, xp: 120, gold: 60, minLevel: 10, npc: 'Uczony' },
+        { id: 'si_druid', title: 'Oczyść Bagno', desc: 'Zabij 8 Duchów Bagna.', type: 'kill', target: 'Duch Bagna', count: 8, xp: 100, gold: 50, minLevel: 8, npc: 'Druid' },
+        { id: 'si_zeglarz', title: 'Piracki Skarb', desc: 'Znajdź Mapę Skarbów w Tunelach Piratów.', type: 'collect', target: 'Mapa Skarbów', count: 1, xp: 90, gold: 45, minLevel: 9, npc: 'Stary Żeglarz' },
+        { id: 'si_karczmarka', title: 'Prowiant', desc: 'Przynieś 5 Mięs z polowania na zwierzęta.', type: 'collect', target: 'Mięso', count: 5, xp: 40, gold: 20, minLevel: 2, npc: 'Karczmarka' },
+        { id: 'si_kapitan', title: 'Gotowy na Świat', desc: 'Osiągnij poziom 20 aby opuścić wyspę.', type: 'level', count: 20, xp: 0, gold: 200, minLevel: 18, npc: 'Kapitan Statku' },
     ],
 };
 
