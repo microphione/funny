@@ -77,11 +77,22 @@ const GameCombat = {
         const p = Game.player;
         const m = World.getMonsterAt(tx, ty);
         if (!m || !m.alive) return false;
-        // Dismount on attack
         if (p.mounted) { p.mounted = false; Game.log('Zsiadasz z wierzchowca do walki!', 'info'); }
 
         const stats = Game.getStats();
-        let dmg = Math.max(1, stats.atk - m.def + Math.floor(Math.random() * 3));
+
+        // Hit chance: accuracy vs target armor
+        // Armor reduces hit chance by 0.1% per point
+        const hitChance = Math.max(0.25, 1 - (m.armor || m.def || 0) * 0.001 + stats.accuracy * 0.002);
+        if (Math.random() > hitChance) {
+            Game.log(`Pudło! ${m.name} unika ataku.`, 'combat');
+            this.floatText('PUDŁO', m.x, m.y, '#888');
+            Game.autoAttackTarget = m;
+            return true;
+        }
+
+        // Damage = player damage - monster armor * 0.1
+        let dmg = Math.max(1, stats.damage - (m.armor || m.def || 0) * 0.1 + Math.floor(Math.random() * 3));
 
         // Stealth bonus
         if (p.stealth) {
@@ -91,12 +102,16 @@ const GameCombat = {
             Game.log('Atak z ukrycia! x2.5 obrażeń!', 'combat');
         }
 
-        // Critical hit
-        const critChance = Math.min(0.50, 0.05 + stats.agi * 0.015);
-        const critMult = 1.5 + stats.agi * 0.02;
-        if (Math.random() < critChance) {
-            dmg = Math.floor(dmg * critMult);
+        // Critical hit (critChance is percentage, critMult is percentage like 150 = 1.5x)
+        if (Math.random() * 100 < stats.critChance) {
+            dmg = Math.floor(dmg * stats.critMult / 100);
             Game.log('Trafienie krytyczne!', 'combat');
+        }
+
+        // Stun chance
+        if (stats.stunChance > 0 && Math.random() * 100 < stats.stunChance) {
+            m.stunDuration = (m.stunDuration || 0) + 1;
+            Game.log(`${m.name} ogłuszony!`, 'combat');
         }
 
         // Mark of Death bonus
@@ -110,14 +125,12 @@ const GameCombat = {
         Game.log(`Zadajesz ${dmg} obrażeń ${m.name}.`, 'combat');
         this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
 
-        // Tibia-style skill training: each hit trains appropriate skill
         if (dmg > 0) {
             const skillName = p.classId === 'mage' ? 'magic' :
                               p.classId === 'archer' ? 'distance' : 'melee';
             Game.advanceCombatSkill(skillName);
         }
 
-        // Set auto-attack target
         Game.autoAttackTarget = m;
 
         if (m.hp <= 0) {
@@ -163,7 +176,7 @@ const GameCombat = {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                 m.hp -= dmg;
                 m.stunDuration = 1.5 + sLv * 0.5;
                 Game.log(`Uderzenie Tarczą! ${dmg} dmg, ogłuszenie!`, 'combat');
@@ -175,7 +188,7 @@ const GameCombat = {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                 m.hp -= dmg;
                 Game.log(`Potężne Uderzenie! ${dmg} dmg!`, 'combat');
                 this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
@@ -186,7 +199,7 @@ const GameCombat = {
                 const mult = this.getSkillMult(skill, p);
                 const nearby = World.getMonstersNear(p.x, p.y, 1);
                 nearby.forEach(m => {
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
                     if (m.hp <= 0) this.killMonster(m);
@@ -195,15 +208,15 @@ const GameCombat = {
                 return true;
             }
             case 'iron_skin':
-                p.buffs.push({ id: 'iron_skin', duration: 5 + sLv, def: Math.floor(stats.def * 0.5) });
-                Game.log(`Żelazna Skóra! +50% DEF na ${5 + sLv}s.`, 'combat');
+                p.buffs.push({ id: 'iron_skin', duration: 5 + sLv, armorBonus: Math.floor(stats.armor * 0.5) });
+                Game.log(`Żelazna Skóra! +50% Pancerz na ${5 + sLv}s.`, 'combat');
                 return true;
             case 'execute': {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const baseMult = this.getSkillMult(skill, p);
                 const mult = m.hp / m.maxHp < 0.3 ? baseMult : baseMult * 0.5;
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                 m.hp -= dmg;
                 Game.log(`Egzekucja! ${dmg} dmg!`, 'combat');
                 this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
@@ -230,7 +243,7 @@ const GameCombat = {
                 const mult = this.getSkillMult(skill, p);
                 const nearby = World.getMonstersNear(p.x, p.y, 2);
                 nearby.forEach(m => {
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                     m.hp -= dmg;
                     m.stunDuration = 2;
                     this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
@@ -256,7 +269,7 @@ const GameCombat = {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                 m.hp -= dmg;
                 Game.log(`Cios w Plecy! ${dmg} dmg!`, 'combat');
                 this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
@@ -267,7 +280,7 @@ const GameCombat = {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                 m.hp -= dmg;
                 m.poisonDuration = 4 + sLv;
                 Game.log(`Zatrute Ostrze! ${dmg} dmg + trucizna ${4+sLv}s!`, 'combat');
@@ -287,7 +300,7 @@ const GameCombat = {
                     }
                 }
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                 m.hp -= dmg;
                 Game.log(`Krok Cienia! ${dmg} dmg!`, 'combat');
                 this.floatText(`-${dmg}`, m.x, m.y, '#9b59b6');
@@ -307,7 +320,7 @@ const GameCombat = {
                 const mult = p.stealth ? baseMult : baseMult * 0.5;
                 p.stealth = false;
                 p.stealthDuration = 0;
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                 m.hp -= dmg;
                 Game.log(`Zamach! ${dmg} dmg!`, 'combat');
                 this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
@@ -321,7 +334,7 @@ const GameCombat = {
                 for (let i = 0; i < hitCount && nearby.length > 0; i++) {
                     const m = nearby[Math.floor(Math.random() * nearby.length)];
                     if (!m.alive) continue;
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
                     if (m.hp <= 0) this.killMonster(m);
@@ -349,7 +362,7 @@ const GameCombat = {
                 const mult = this.getSkillMult(skill, p);
                 const nearby = World.getMonstersNear(p.x, p.y, 3);
                 nearby.forEach(m => {
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
                     if (m.hp <= 0) this.killMonster(m);
@@ -363,7 +376,7 @@ const GameCombat = {
                 const mult = this.getSkillMult(skill, p);
                 const targets = World.getMonstersNear(tx, ty, 1);
                 targets.forEach(m => {
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.5));
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - Math.floor((m.armor || m.def || 0) * 0.5));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
                     if (m.hp <= 0) this.killMonster(m);
@@ -375,7 +388,7 @@ const GameCombat = {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.5));
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - Math.floor((m.armor || m.def || 0) * 0.5));
                 m.hp -= dmg;
                 m.frozenDuration = 2 + sLv;
                 Game.log(`Lodowy Pocisk! ${dmg} dmg + zamrożenie!`, 'combat');
@@ -391,7 +404,7 @@ const GameCombat = {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.3));
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - Math.floor((m.armor || m.def || 0) * 0.3));
                 m.hp -= dmg;
                 Game.log(`Błyskawica! ${dmg} dmg!`, 'combat');
                 this.floatText(`-${dmg}`, m.x, m.y, '#f1c40f');
@@ -402,7 +415,7 @@ const GameCombat = {
                 const mult = this.getSkillMult(skill, p);
                 const nearby = World.getMonstersNear(p.x, p.y, 2);
                 nearby.forEach(m => {
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#9b59b6');
                     if (m.hp <= 0) this.killMonster(m);
@@ -414,7 +427,7 @@ const GameCombat = {
                 const nearby = World.getMonstersNear(p.x, p.y, 2);
                 nearby.forEach(m => {
                     m.frozenDuration = 3 + sLv;
-                    const dmg = Math.max(1, Math.floor(stats.atk) - m.def);
+                    const dmg = Math.max(1, Math.floor(stats.damage) - (m.armor || m.def || 0));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#3498db');
                     if (m.hp <= 0) this.killMonster(m);
@@ -428,7 +441,7 @@ const GameCombat = {
                 const nearby = World.getMonstersNear(p.x, p.y, 5);
                 const hit = nearby.slice(0, hitCount);
                 hit.forEach(m => {
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.3));
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - Math.floor((m.armor || m.def || 0) * 0.3));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#f1c40f');
                     if (m.hp <= 0) this.killMonster(m);
@@ -454,7 +467,7 @@ const GameCombat = {
                 const mult = this.getSkillMult(skill, p);
                 const targets = World.getMonstersNear(tx, ty, 2);
                 targets.forEach(m => {
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.3));
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - Math.floor((m.armor || m.def || 0) * 0.3));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
                     if (m.hp <= 0) this.killMonster(m);
@@ -474,7 +487,7 @@ const GameCombat = {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.5));
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - Math.floor((m.armor || m.def || 0) * 0.5));
                 m.hp -= dmg;
                 Game.log(`Celny Strzał! ${dmg} dmg!`, 'combat');
                 this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
@@ -486,7 +499,7 @@ const GameCombat = {
                 const mult = this.getSkillMult(skill, p);
                 const targets = World.getMonstersNear(tx, ty, 2).slice(0, 3 + Math.floor(sLv / 2));
                 targets.forEach(m => {
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.5));
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - Math.floor((m.armor || m.def || 0) * 0.5));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
                     if (m.hp <= 0) this.killMonster(m);
@@ -505,7 +518,7 @@ const GameCombat = {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult)); // ignores DEF
+                const dmg = Math.max(1, Math.floor(stats.damage * mult)); // ignores DEF
                 m.hp -= dmg;
                 Game.log(`Przebijający Strzał! ${dmg} dmg (ignoruje pancerz)!`, 'combat');
                 this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
@@ -517,7 +530,7 @@ const GameCombat = {
                 const mult = this.getSkillMult(skill, p);
                 const targets = World.getMonstersNear(tx, ty, 2);
                 targets.forEach(m => {
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.3));
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - Math.floor((m.armor || m.def || 0) * 0.3));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
                     if (m.hp <= 0) this.killMonster(m);
@@ -530,7 +543,7 @@ const GameCombat = {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - (m.armor || m.def || 0));
                 m.hp -= dmg;
                 m.stunDuration = 2 + sLv * 0.5;
                 Game.log(`Rzut Włócznią! ${dmg} dmg + ogłuszenie!`, 'combat');
@@ -555,7 +568,7 @@ const GameCombat = {
                 const m = World.getMonsterAt(tx, ty);
                 if (!m) return false;
                 const mult = this.getSkillMult(skill, p);
-                const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.3));
+                const dmg = Math.max(1, Math.floor(stats.damage * mult) - Math.floor((m.armor || m.def || 0) * 0.3));
                 m.hp -= dmg;
                 Game.log(`Snajperski Strzał! ${dmg} dmg!`, 'combat');
                 this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
@@ -567,7 +580,7 @@ const GameCombat = {
                 const mult = this.getSkillMult(skill, p);
                 const nearby = World.getMonstersNear(p.x, p.y, 5);
                 nearby.forEach(m => {
-                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.3));
+                    const dmg = Math.max(1, Math.floor(stats.damage * mult) - Math.floor((m.armor || m.def || 0) * 0.3));
                     m.hp -= dmg;
                     this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
                     if (m.hp <= 0) this.killMonster(m);
@@ -586,47 +599,50 @@ const GameCombat = {
         m.hp = 0;
         const goldDrop = Math.floor((m.gold[0] + Math.floor(Math.random() * (m.gold[1] - m.gold[0]))) * 0.6);
 
-        // Gold goes to player directly
         Game.player.gold += goldDrop;
         Game.addXp(m.xp);
         Game.killCount++;
-        Game.log(`${m.name} pokonany! +${m.xp} XP, +${goldDrop} złota.`, 'loot');
+        Game.log(`${m.name} pokonany! +${m.xp} XP, +${formatCurrency(goldDrop)}.`, 'loot');
         this.floatText(`+${goldDrop}g`, m.x, m.y, '#f1c40f');
 
-        // Play gold drop sound
         Music.playGoldDrop();
 
-        // Loot drop → ground (Tibia-style: items drop on tile, not to inventory)
+        // Predetermined loot from monster loot tables
         const droppedItems = [];
-        if (Math.random() < (m.isElite ? 0.25 : 0.10)) {
-            const loot = generateLootForClass(Game.player.classId, m.level);
+        const dropChance = m.isElite ? 0.25 : 0.10;
+        if (Math.random() < dropChance) {
+            const loot = generateMonsterLoot(m.baseName || m.name, m.level, Game.player.level);
             if (loot) {
                 droppedItems.push(loot);
                 Game.log(`${m.name} upuścił: ${loot.name}!`, 'loot');
             }
+        }
+        // Potion drops from loot table
+        const table = MONSTER_LOOT_TABLES[m.baseName || m.name];
+        if (table && Math.random() < (table.potionChance || 0)) {
+            const pot = generatePotion(m.level);
+            droppedItems.push(pot);
         }
 
         // Boss loot
         if (m.isBoss && World.activeDungeon) {
             Game.dungeonBossesKilled.add(World.activeDungeon.type.id);
             Game.log(`Boss pokonany: ${m.name}! Dungeon ukończony!`, 'loot');
-            const loot = generateItemForClass(Game.player.classId, m.level + 2, 'weapon');
+            const maxTier = getMaxTierForLevel(Game.player.level);
+            const loot = generateItemForClass(Game.player.classId, m.level + 2, 'weapon', maxTier);
             if (loot) {
                 loot.tier = 'legendary';
-                const stat = loot.atk ? 'atk' : loot.def ? 'def' : 'agi';
-                loot[stat] = Math.floor(loot[stat] * 1.5);
+                if (loot.stats && loot.stats.damage) loot.stats.damage = Math.floor(loot.stats.damage * 1.5);
                 loot.name = 'Legendarn' + (loot.name.endsWith('a') ? 'a' : 'y') + ' ' + loot.name;
                 droppedItems.push(loot);
                 Game.log(`Zdobyto legendę: ${loot.name}!`, 'loot');
             }
         }
 
-        // Drop items on ground
         if (droppedItems.length > 0) {
             World.dropGroundLoot(m.x, m.y, droppedItems);
         }
 
-        // Quest progress
         Game.quests.forEach(q => {
             if (q.type === 'kill' && !q.completed && q.target === m.baseName) {
                 q.progress++;
@@ -737,15 +753,24 @@ const GameCombat = {
         const p = Game.player;
         const stats = Game.getStats();
 
-        // AGI-based dodge chance
-        const dodgeChance = Math.min(0.40, stats.agi * 0.01);
+        // Dodge chance (from dodge stat, each point ~0.5%)
+        const dodgeChance = Math.min(0.60, stats.dodge * 0.005);
         if (Math.random() < dodgeChance) {
             Game.log(`Unikasz ataku ${m.name}!`, 'combat');
             this.floatText('UNIK!', p.x, p.y, '#2ecc71');
             return;
         }
 
-        let dmg = Math.max(1, m.atk - stats.def + Math.floor(Math.random() * 2));
+        // Armor reduces hit chance by 0.1% per point AND reduces damage by 0.1 per point
+        const armorHitReduction = stats.armor * 0.001;
+        if (Math.random() < armorHitReduction) {
+            Game.log(`Pancerz blokuje atak ${m.name}!`, 'combat');
+            this.floatText('BLOK', p.x, p.y, '#3498db');
+            Game.advanceCombatSkill('shielding');
+            return;
+        }
+
+        let dmg = Math.max(1, m.atk - stats.armor * 0.1 + Math.floor(Math.random() * 2));
 
         // Iron skin buff
         const ironSkin = p.buffs.find(b => b.id === 'iron_skin');
@@ -768,7 +793,6 @@ const GameCombat = {
         Game.log(`${m.name} zadaje ci ${dmg} obrażeń!`, 'combat');
         this.floatText(`-${dmg}`, p.x, p.y, '#e74c3c');
 
-        // Tibia-style: getting hit trains shielding
         Game.advanceCombatSkill('shielding');
 
         if (p.hp <= 0) {

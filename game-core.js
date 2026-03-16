@@ -65,10 +65,9 @@ const Game = {
         if (!p) return 1.0;
         const cls = CLASSES[p.classId];
         const stats = this.getStats();
-        // Base attack speed from class, AGI reduces cooldown
         let speed = cls.baseAttackSpeed || 1.5;
-        speed *= Math.max(0.3, 1 - stats.agi * 0.01); // AGI reduces cooldown, min 30%
-        // Rogue is faster
+        // attackSpeed stat reduces cooldown (each point = 0.5% reduction)
+        speed *= Math.max(0.3, 1 - stats.attackSpeed * 0.005);
         if (p.classId === 'rogue') speed *= 0.7;
         return speed;
     },
@@ -77,10 +76,9 @@ const Game = {
         const p = this.player;
         if (!p) return 0.15;
         const stats = this.getStats();
-        // Base walk speed, AGI makes movement faster
         let speed = 0.18;
-        speed *= Math.max(0.08, 1 - stats.agi * 0.008);
-        // Mount bonus (40% faster)
+        // moveSpeed stat reduces walk time
+        speed *= Math.max(0.08, 1 - stats.moveSpeed * 0.004);
         if (p.mounted) speed *= 0.6;
         return speed;
     },
@@ -95,15 +93,15 @@ const Game = {
             dir: 'down',
             level: 1,
             xp: 0,
-            xpToNext: 30,
+            xpToNext: xpToNextLevel(1),
             gold: 20,
             hp: cls.baseStats.hp,
             maxHp: cls.baseStats.hp,
             mp: cls.baseStats.mp,
             maxMp: cls.baseStats.mp,
-            baseAtk: cls.baseStats.atk,
-            baseDef: cls.baseStats.def,
-            baseAgi: cls.baseStats.agi,
+            // Base attributes (STR, DEX, AGI, VIT, INT)
+            attributes: { ...cls.baseAttributes },
+            statPoints: 0,  // points to allocate to attributes (1 per level)
             equipment: { weapon: null, head: null, chest: null, legs: null, feet: null, offhand: null },
             inventory: [],
             skillPoints: 0,
@@ -111,19 +109,19 @@ const Game = {
             unlockedSkills: [],
             skillLevels: {},
             activeSkills: [null, null, null],
-            buffs: [], // { id, duration (seconds), ... }
+            buffs: [],
             stealth: false,
             stealthDuration: 0,
-            // Tibia-style combat skills
             combatSkills: {
                 melee: { level: 10, tries: 0, triesNeeded: 50 },
                 shielding: { level: 10, tries: 0, triesNeeded: 50 },
                 magic: { level: 0, tries: 0, triesNeeded: 30 },
                 distance: { level: 10, tries: 0, triesNeeded: 45 },
             },
-            ownedHouses: [], // house door keys "x,y"
-            mounted: false,   // mount active
-            ownedMounts: [],  // mount types owned
+            ownedHouses: [],
+            mounted: false,
+            ownedMounts: [],
+            bankGold: 0, // gold stored in bank
         };
         // Starting weapon
         const startWeapon = generateItemForClass(classId, 1, 'weapon');
@@ -132,29 +130,69 @@ const Game = {
             this.player.inventory.push(startWeapon);
             this.player.equipment.weapon = startWeapon;
         }
-        // Starting potions
-        this.player.inventory.push({ id: 'hp_potion', name: 'Mikstura HP', type: 'consumable', subtype: 'hp', heal: 25, count: 5, price: 10, desc: 'Leczy 25 HP' });
-        this.player.inventory.push({ id: 'mp_potion', name: 'Mikstura Many', type: 'consumable', subtype: 'mp', mana: 20, count: 3, price: 12, desc: '+20 MP' });
+        // Starting potions (stackable)
+        this.player.inventory.push({ id: 'hp_potion', name: 'Mikstura HP', type: 'consumable', subtype: 'hp', heal: 25, count: 5, stackable: true, maxStack: 100, price: 10, desc: 'Leczy 25 HP' });
+        this.player.inventory.push({ id: 'mp_potion', name: 'Mikstura Many', type: 'consumable', subtype: 'mp', mana: 20, count: 3, stackable: true, maxStack: 100, price: 12, desc: '+20 MP' });
     },
 
     getStats() {
         const p = this.player;
-        if (!p) return { atk: 0, def: 0, agi: 0, maxHp: 0, maxMp: 0 };
+        if (!p) return { damage: 0, armor: 0, accuracy: 10, maxHp: 100, maxMp: 30, attackSpeed: 0, moveSpeed: 0, critChance: 5, critMult: 150, cdr: 0, dodge: 0, stunChance: 0 };
         const cls = CLASSES[p.classId];
+        const attr = p.attributes || cls.baseAttributes;
 
-        let atk = p.baseAtk + (p.level - 1) * cls.atkPerLevel;
-        let def = p.baseDef + (p.level - 1) * cls.defPerLevel;
-        let agi = p.baseAgi + (p.level - 1) * cls.agiPerLevel;
+        // Base stats from class + level
         let maxHp = cls.baseStats.hp + (p.level - 1) * cls.hpPerLevel;
         let maxMp = cls.baseStats.mp + (p.level - 1) * cls.mpPerLevel;
+        let damage = cls.baseStats.damage || 5;
+        let armor = cls.baseStats.armor || 0;
+        let accuracy = cls.baseStats.accuracy || 10;
+        let dodge = cls.baseStats.dodge || 0;
+        let attackSpeed = 0;
+        let moveSpeed = 0;
+        let critChance = 5; // base 5%
+        let critMult = 150; // base 150% (1.5x)
+        let cdr = 0;
+        let stunChance = 0;
 
-        // Equipment bonuses
+        // Attribute bonuses: STR, DEX, AGI, VIT, INT
+        const str = attr.str || 0;
+        const dex = attr.dex || 0;
+        const agi = attr.agi || 0;
+        const vit = attr.vit || 0;
+        const int = attr.int || 0;
+
+        damage += str * 2;       // STR: +2 phys damage per point
+        critMult += str * 3;     // STR: +3% crit damage per point
+        accuracy += dex * 3;     // DEX: +3 accuracy per point
+        critChance += dex * 1;   // DEX: +1% crit chance per point
+        moveSpeed += agi * 2;    // AGI: +2 move speed per point
+        dodge += agi * 2;        // AGI: +2 dodge per point
+        maxHp += vit * 8;        // VIT: +8 HP per point
+        armor += vit * 1;        // VIT: +1 armor per point
+        cdr += int * 2;          // INT: +2% CDR per point
+        maxMp += int * 5;        // INT: +5 mana per point
+
+        // Equipment bonuses (multi-stat items)
         for (const slot in p.equipment) {
             const item = p.equipment[slot];
             if (!item) continue;
-            if (item.atk) atk += item.atk;
-            if (item.def) def += item.def;
-            if (item.agi) agi += item.agi;
+            const stats = item.stats || item; // support both old and new format
+            if (stats.damage) damage += stats.damage;
+            if (stats.armor) armor += stats.armor;
+            if (stats.maxHp) maxHp += stats.maxHp;
+            if (stats.maxMp) maxMp += stats.maxMp;
+            if (stats.accuracy) accuracy += stats.accuracy;
+            if (stats.attackSpeed) attackSpeed += stats.attackSpeed;
+            if (stats.moveSpeed) moveSpeed += stats.moveSpeed;
+            if (stats.critChance) critChance += stats.critChance;
+            if (stats.critMult) critMult += stats.critMult;
+            if (stats.cdr) cdr += stats.cdr;
+            if (stats.dodge) dodge += stats.dodge;
+            if (stats.stunChance) stunChance += stats.stunChance;
+            // Backward compat for old atk/def/agi items
+            if (stats.atk) damage += stats.atk;
+            if (stats.def) armor += stats.def;
         }
 
         // Skill tree bonuses
@@ -162,11 +200,15 @@ const Game = {
             const branch = cls.tree[branchKey];
             for (const node of branch.nodes) {
                 if (p.treeProgress[node.id]) {
-                    if (node.stat === 'atk') atk += node.val;
-                    if (node.stat === 'def') def += node.val;
-                    if (node.stat === 'agi') agi += node.val;
+                    if (node.stat === 'damage') damage += node.val;
+                    if (node.stat === 'armor') armor += node.val;
+                    if (node.stat === 'dodge') dodge += node.val;
                     if (node.stat === 'maxHp') maxHp += node.val;
                     if (node.stat === 'maxMp') maxMp += node.val;
+                    // Backward compat
+                    if (node.stat === 'atk') damage += node.val;
+                    if (node.stat === 'def') armor += node.val;
+                    if (node.stat === 'agi') dodge += node.val;
                 }
             }
         }
@@ -178,27 +220,40 @@ const Game = {
             const magicBonus = p.combatSkills.magic.level;
             const distBonus = p.combatSkills.distance ? Math.max(0, p.combatSkills.distance.level - 10) : 0;
             if (p.classId === 'mage') {
-                atk += magicBonus * 2; // Magic level heavily affects mage damage
-                atk += Math.floor(meleeBonus * 0.3);
+                damage += magicBonus * 2;
+                damage += Math.floor(meleeBonus * 0.3);
             } else if (p.classId === 'archer') {
-                atk += distBonus * 1.5; // Distance skill main stat for archer
-                atk += Math.floor(meleeBonus * 0.3);
+                damage += Math.floor(distBonus * 1.5);
+                damage += Math.floor(meleeBonus * 0.3);
             } else {
-                atk += meleeBonus; // Melee skill adds to ATK
-                atk += Math.floor(magicBonus * 0.3);
+                damage += meleeBonus;
+                damage += Math.floor(magicBonus * 0.3);
             }
-            def += Math.floor(shieldBonus * 0.7); // Shielding adds to DEF
-
-            // Buff bonuses
-            if (p.buffs) {
-                const dodgeRoll = p.buffs.find(b => b.id === 'dodge_roll');
-                if (dodgeRoll) agi += dodgeRoll.agiBonus || 0;
-                const hawkEye = p.buffs.find(b => b.id === 'hawk_eye');
-                if (hawkEye) agi += Math.floor(agi * 0.2); // hawk eye adds extra crit via agi
-            }
+            armor += Math.floor(shieldBonus * 0.7);
         }
 
-        return { atk: Math.floor(atk), def: Math.floor(def), agi: Math.floor(agi), maxHp: Math.floor(maxHp), maxMp: Math.floor(maxMp) };
+        // Buff bonuses
+        if (p.buffs) {
+            const dodgeRollBuff = p.buffs.find(b => b.id === 'dodge_roll');
+            if (dodgeRollBuff) dodge += dodgeRollBuff.agiBonus || 5;
+            const hawkEye = p.buffs.find(b => b.id === 'hawk_eye');
+            if (hawkEye) critChance += 15;
+        }
+
+        return {
+            damage: Math.floor(damage),
+            armor: Math.floor(armor),
+            accuracy: Math.floor(accuracy),
+            maxHp: Math.floor(maxHp),
+            maxMp: Math.floor(maxMp),
+            attackSpeed: Math.floor(attackSpeed),
+            moveSpeed: Math.floor(moveSpeed),
+            critChance: Math.min(75, Math.floor(critChance)),  // cap at 75%
+            critMult: Math.floor(critMult),
+            cdr: Math.min(50, Math.floor(cdr)),                // cap at 50%
+            dodge: Math.min(60, Math.floor(dodge)),            // cap at 60%
+            stunChance: Math.min(30, Math.floor(stunChance)),  // cap at 30%
+        };
     },
 
     // Tibia-style skill advancement
@@ -246,22 +301,40 @@ const Game = {
         while (p.xp >= p.xpToNext) {
             p.xp -= p.xpToNext;
             p.level++;
-            p.skillPoints += 1;
-            p.xpToNext = Math.floor(50 * Math.pow(1.6, p.level - 1));
+            // Stat points every level (allocate to attributes)
+            p.statPoints = (p.statPoints || 0) + 1;
+            // Skill points every 2 levels
+            if (p.level % 2 === 0) {
+                p.skillPoints += 1;
+                this.log(`Poziom ${p.level}! +1 Punkt Statystyk, +1 Punkt Umiejętności`, 'info');
+            } else {
+                this.log(`Poziom ${p.level}! +1 Punkt Statystyk`, 'info');
+            }
+            p.xpToNext = xpToNextLevel(p.level);
             this.refreshStats();
             p.hp = p.maxHp;
             p.mp = p.maxMp;
-            this.log(`Poziom ${p.level}! +1 Punkt Umiejętności`, 'info');
+
+            // Gradual complexity messages
+            if (p.level === 20) this.log('Odblokowano: Niezwykłe przedmioty mogą teraz padać!', 'loot');
+            if (p.level === 25) this.log('Odblokowano: Drzewko umiejętności! (K)', 'info');
+            if (p.level === 40) this.log('Odblokowano: Rzadkie przedmioty mogą teraz padać!', 'loot');
+            if (p.level === 60) this.log('Odblokowano: Epickie przedmioty mogą teraz padać!', 'loot');
+            if (p.level === 80) this.log('Odblokowano: Legendarne przedmioty mogą teraz padać!', 'loot');
+            if (p.level === 100) this.log('Odblokowano: Mityczne przedmioty mogą teraz padać!', 'loot');
+
             const cls = CLASSES[p.classId];
-            cls.skills.forEach(sk => {
-                if (sk.level <= p.level && !p.unlockedSkills.includes(sk.id)) {
-                    p.unlockedSkills.push(sk.id);
-                    p.skillLevels[sk.id] = 1;
-                    const emptySlot = p.activeSkills.indexOf(null);
-                    if (emptySlot !== -1) p.activeSkills[emptySlot] = sk.id;
-                    this.log(`Nowa umiejętność: ${sk.name}!`, 'info');
-                }
-            });
+            if (cls) {
+                cls.skills.forEach(sk => {
+                    if (sk.level <= p.level && !p.unlockedSkills.includes(sk.id)) {
+                        p.unlockedSkills.push(sk.id);
+                        p.skillLevels[sk.id] = 1;
+                        const emptySlot = p.activeSkills.indexOf(null);
+                        if (emptySlot !== -1) p.activeSkills[emptySlot] = sk.id;
+                        this.log(`Nowa umiejętność: ${sk.name}!`, 'info');
+                    }
+                });
+            }
         }
     },
 
@@ -289,13 +362,14 @@ const Game = {
         const p = this.player;
         if (!p) return;
         const data = {
-            version: 'pq_save_v7',
+            version: 'pq_save_v8',
             classId: p.classId,
             x: p.x, y: p.y, dir: p.dir,
             level: p.level, xp: p.xp, xpToNext: p.xpToNext,
             gold: p.gold, hp: p.hp, mp: p.mp,
             maxHp: p.maxHp, maxMp: p.maxMp,
-            baseAtk: p.baseAtk, baseDef: p.baseDef, baseAgi: p.baseAgi,
+            attributes: p.attributes,
+            statPoints: p.statPoints || 0,
             equipment: p.equipment,
             inventory: p.inventory,
             skillPoints: p.skillPoints,
@@ -319,26 +393,27 @@ const Game = {
             ownedHouses: p.ownedHouses || [],
             ownedMounts: p.ownedMounts || [],
             mounted: p.mounted || false,
+            bankGold: p.bankGold || 0,
         };
-        localStorage.setItem('pq_save_v7', JSON.stringify(data));
+        localStorage.setItem('pq_save_v8', JSON.stringify(data));
         this.log('Gra zapisana!', 'info');
     },
 
     load() {
-        const raw = localStorage.getItem('pq_save_v7') || localStorage.getItem('pq_save_v6') || localStorage.getItem('pq_save_v5');
+        const raw = localStorage.getItem('pq_save_v8') || localStorage.getItem('pq_save_v7') || localStorage.getItem('pq_save_v6') || localStorage.getItem('pq_save_v5');
         if (!raw) return false;
         try {
             const d = JSON.parse(raw);
-            if (!['pq_save_v7','pq_save_v6','pq_save_v5'].includes(d.version)) return false;
+            if (!['pq_save_v8','pq_save_v7','pq_save_v6','pq_save_v5'].includes(d.version)) return false;
 
             this.createPlayer(d.classId);
             const p = this.player;
             Object.assign(p, {
                 x: d.x, y: d.y, dir: d.dir || 'down',
-                level: d.level, xp: d.xp, xpToNext: d.xpToNext,
+                level: d.level, xp: d.xp,
+                xpToNext: d.xpToNext || xpToNextLevel(d.level),
                 gold: d.gold, hp: d.hp, mp: d.mp,
                 maxHp: d.maxHp, maxMp: d.maxMp,
-                baseAtk: d.baseAtk, baseDef: d.baseDef, baseAgi: d.baseAgi,
                 equipment: d.equipment || {},
                 inventory: d.inventory || [],
                 skillPoints: d.skillPoints || 0,
@@ -348,6 +423,18 @@ const Game = {
                 activeSkills: d.activeSkills || [null, null, null],
                 visualX: d.x, visualY: d.y,
             });
+            // New attribute system - migrate from old saves
+            if (d.attributes) {
+                p.attributes = d.attributes;
+            } else {
+                const cls = CLASSES[d.classId];
+                p.attributes = { ...cls.baseAttributes };
+                // Give retroactive stat points for levels gained in old system
+                p.statPoints = Math.max(0, d.level - 1);
+            }
+            p.statPoints = d.statPoints || p.statPoints || 0;
+            p.bankGold = d.bankGold || 0;
+
             this.quests = d.quests || [];
             this.gameTime = d.gameTime || 0;
             this.deathCount = d.deathCount || 0;
@@ -365,10 +452,8 @@ const Game = {
             if (d.combatSkills) p.combatSkills = d.combatSkills;
             if (d.ownedMounts) p.ownedMounts = d.ownedMounts;
             if (d.mounted) p.mounted = d.mounted;
-            // Ensure distance skill exists for old saves
             if (!p.combatSkills.distance) p.combatSkills.distance = { level: 10, tries: 0, triesNeeded: 45 };
             if (d.ownedHouses) p.ownedHouses = d.ownedHouses;
-            // Restore owned houses in World
             if (p.ownedHouses) {
                 p.ownedHouses.forEach(key => {
                     if (World.houses[key]) World.houses[key].owned = true;

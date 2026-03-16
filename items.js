@@ -4,14 +4,108 @@
 
 // ========== TIERS ==========
 const TIERS = {
-    normal:    { name: 'Zwykły',      color: '#999',    mult: 1.0, dropWeight: 65 },
-    uncommon:  { name: 'Niezwykły',   color: '#2ecc71', mult: 1.3, dropWeight: 22 },
-    rare:      { name: 'Rzadki',      color: '#3498db', mult: 1.7, dropWeight: 8 },
-    epic:      { name: 'Epicki',      color: '#9b59b6', mult: 2.2, dropWeight: 3.5 },
-    legendary: { name: 'Legendarny',  color: '#f39c12', mult: 3.0, dropWeight: 1.2 },
-    mythic:    { name: 'Mityczny',    color: '#ff4444', mult: 4.5, dropWeight: 0.3 },
+    normal:    { name: 'Zwykły',      color: '#999',    mult: 1.0, dropWeight: 65, statCount: 1 },
+    uncommon:  { name: 'Niezwykły',   color: '#2ecc71', mult: 1.3, dropWeight: 22, statCount: 2 },
+    rare:      { name: 'Rzadki',      color: '#3498db', mult: 1.7, dropWeight: 8,  statCount: 3 },
+    epic:      { name: 'Epicki',      color: '#9b59b6', mult: 2.2, dropWeight: 3.5, statCount: 4 },
+    legendary: { name: 'Legendarny',  color: '#f39c12', mult: 3.0, dropWeight: 1.2, statCount: 5 },
+    mythic:    { name: 'Mityczny',    color: '#ff4444', mult: 4.5, dropWeight: 0.3, statCount: 6 },
 };
 const TIER_ORDER = ['normal','uncommon','rare','epic','legendary','mythic'];
+
+// ========== BASE ATTRIBUTES ==========
+// STR: phys damage, crit damage
+// DEX: accuracy, crit chance
+// AGI: move speed, dodge
+// VIT: HP, armor
+// INT: CDR, mana
+const BASE_ATTRIBUTES = ['str', 'dex', 'agi', 'vit', 'int'];
+const ATTRIBUTE_NAMES = { str: 'Siła', dex: 'Zręczność', agi: 'Zwinność', vit: 'Wytrzymałość', int: 'Inteligencja' };
+const MAX_STAT_POINTS = 20; // max points per attribute
+
+// ========== ITEM STAT POOL ==========
+// Stats that can roll on items (derived stats)
+const ITEM_STAT_POOL = [
+    { id: 'damage', name: 'Obrażenia', weight: 10 },
+    { id: 'armor', name: 'Pancerz', weight: 10 },
+    { id: 'maxHp', name: 'HP', weight: 8 },
+    { id: 'maxMp', name: 'MP', weight: 6 },
+    { id: 'accuracy', name: 'Celność', weight: 7 },
+    { id: 'attackSpeed', name: 'Szybkość Ataku', weight: 5 },
+    { id: 'moveSpeed', name: 'Szybkość Ruchu', weight: 4 },
+    { id: 'critChance', name: 'Szansa Kryty', weight: 6 },
+    { id: 'critMult', name: 'Mnożnik Kryty', weight: 4 },
+    { id: 'cdr', name: 'Redukcja CD', weight: 5 },
+    { id: 'dodge', name: 'Unik', weight: 6 },
+    { id: 'stunChance', name: 'Szansa Ogłusz.', weight: 3 },
+];
+
+// Stat value ranges per level multiplier
+function getStatValue(statId, level, tierMult) {
+    const base = Math.max(1, Math.floor(level * 0.8));
+    switch (statId) {
+        case 'damage': return Math.max(1, Math.floor((2 + base * 1.2) * tierMult));
+        case 'armor': return Math.max(1, Math.floor((1 + base * 0.8) * tierMult));
+        case 'maxHp': return Math.max(3, Math.floor((5 + base * 2.5) * tierMult));
+        case 'maxMp': return Math.max(2, Math.floor((3 + base * 1.5) * tierMult));
+        case 'accuracy': return Math.max(1, Math.floor((2 + base * 0.6) * tierMult));
+        case 'attackSpeed': return Math.max(1, Math.floor((1 + base * 0.3) * tierMult));
+        case 'moveSpeed': return Math.max(1, Math.floor((1 + base * 0.2) * tierMult));
+        case 'critChance': return Math.max(1, Math.floor((1 + base * 0.4) * tierMult));
+        case 'critMult': return Math.max(1, Math.floor((2 + base * 0.3) * tierMult));
+        case 'cdr': return Math.max(1, Math.floor((1 + base * 0.3) * tierMult));
+        case 'dodge': return Math.max(1, Math.floor((1 + base * 0.4) * tierMult));
+        case 'stunChance': return Math.max(1, Math.floor((1 + base * 0.2) * tierMult));
+        default: return 1;
+    }
+}
+
+// ========== TIBIA XP FORMULA ==========
+// Total XP needed to reach level x: 50x³/3 - 100x² + 850x/3 - 200
+function xpForLevel(level) {
+    if (level <= 1) return 0;
+    return Math.floor(50 * level * level * level / 3 - 100 * level * level + 850 * level / 3 - 200);
+}
+function xpToNextLevel(level) {
+    return xpForLevel(level + 1) - xpForLevel(level);
+}
+
+// ========== PROGRESSIVE CONTENT UNLOCKING ==========
+function getMaxTierForLevel(playerLevel) {
+    if (playerLevel >= 100) return 'mythic';
+    if (playerLevel >= 80) return 'legendary';
+    if (playerLevel >= 60) return 'epic';
+    if (playerLevel >= 40) return 'rare';
+    if (playerLevel >= 20) return 'uncommon';
+    return 'normal';
+}
+
+// ========== 3-TIER CURRENCY ==========
+const CURRENCY = {
+    gold: { name: 'Złoto', color: '#f1c40f', value: 1 },
+    platinum: { name: 'Platyna', color: '#bdc3c7', value: 100 },
+    crystal: { name: 'Kryształ', color: '#9b59b6', value: 10000 },
+};
+
+function formatCurrency(goldAmount) {
+    if (goldAmount >= 10000) {
+        const crystals = Math.floor(goldAmount / 10000);
+        const remainder = goldAmount % 10000;
+        const plat = Math.floor(remainder / 100);
+        const gold = remainder % 100;
+        let parts = [];
+        if (crystals > 0) parts.push(`${crystals}cc`);
+        if (plat > 0) parts.push(`${plat}pp`);
+        if (gold > 0) parts.push(`${gold}gp`);
+        return parts.join(' ') || '0gp';
+    }
+    if (goldAmount >= 100) {
+        const plat = Math.floor(goldAmount / 100);
+        const gold = goldAmount % 100;
+        return plat > 0 && gold > 0 ? `${plat}pp ${gold}gp` : plat > 0 ? `${plat}pp` : `${gold}gp`;
+    }
+    return `${goldAmount}gp`;
+}
 
 function rollTier(luck, maxTier) {
     const maxIdx = maxTier ? TIER_ORDER.indexOf(maxTier) : TIER_ORDER.length - 1;
@@ -42,10 +136,11 @@ const CLASSES = {
         icon: '⚔️',
         desc: 'Silny w obronie i ataku z bliska.',
         color: '#e74c3c',
-        baseStats: { hp: 60, mp: 20, atk: 7, def: 5, agi: 2 },
-        hpPerLevel: 8, mpPerLevel: 2, atkPerLevel: 2, defPerLevel: 2, agiPerLevel: 0.3,
+        baseStats: { hp: 150, mp: 30, damage: 8, armor: 5, accuracy: 10, dodge: 2 },
+        baseAttributes: { str: 3, dex: 1, agi: 1, vit: 3, int: 0 },
+        hpPerLevel: 12, mpPerLevel: 3,
         attacksPerTurn: 1,
-        baseAttackSpeed: 1.5, // seconds between attacks
+        baseAttackSpeed: 1.5,
         allowedItems: ['sword','axe','mace','helmet','armor','pants','boots','shield'],
         skills: [
             { level: 1,  id: 'shield_bash', name: 'Uderzenie Tarczą', desc: 'Ogłusza wroga. Obrażenia 1.2x (+0.2x/lv)', cost: 8, type: 'melee', baseMult: 1.2, multPerLv: 0.2 },
@@ -61,18 +156,18 @@ const CLASSES = {
         ],
         tree: {
             defense: { name: 'Obrona', nodes: [
-                { id: 'thick_skin', name: 'Gruba Skóra', desc: '+3 DEF', stat: 'def', val: 3 },
+                { id: 'thick_skin', name: 'Gruba Skóra', desc: '+3 Pancerz', stat: 'armor', val: 3 },
                 { id: 'vitality', name: 'Witalność', desc: '+15 HP', stat: 'maxHp', val: 15 },
-                { id: 'block', name: 'Blok', desc: '+5 DEF', stat: 'def', val: 5 },
+                { id: 'block', name: 'Blok', desc: '+5 Pancerz', stat: 'armor', val: 5 },
                 { id: 'fortify', name: 'Fortyfikacja', desc: '+25 HP', stat: 'maxHp', val: 25 },
-                { id: 'unbreakable', name: 'Niezłomny', desc: '+8 DEF', stat: 'def', val: 8 },
+                { id: 'unbreakable', name: 'Niezłomny', desc: '+8 Pancerz', stat: 'armor', val: 8 },
             ]},
             offense: { name: 'Atak', nodes: [
-                { id: 'sharp_edge', name: 'Ostre Ostrze', desc: '+3 ATK', stat: 'atk', val: 3 },
-                { id: 'brutal', name: 'Brutalność', desc: '+5 ATK', stat: 'atk', val: 5 },
-                { id: 'rage', name: 'Furia', desc: '+8 ATK', stat: 'atk', val: 8 },
-                { id: 'berserk', name: 'Berserk', desc: '+12 ATK', stat: 'atk', val: 12 },
-                { id: 'warlord', name: 'Pan Wojny', desc: '+15 ATK', stat: 'atk', val: 15 },
+                { id: 'sharp_edge', name: 'Ostre Ostrze', desc: '+3 Obrażenia', stat: 'damage', val: 3 },
+                { id: 'brutal', name: 'Brutalność', desc: '+5 Obrażenia', stat: 'damage', val: 5 },
+                { id: 'rage', name: 'Furia', desc: '+8 Obrażenia', stat: 'damage', val: 8 },
+                { id: 'berserk', name: 'Berserk', desc: '+12 Obrażenia', stat: 'damage', val: 12 },
+                { id: 'warlord', name: 'Pan Wojny', desc: '+15 Obrażenia', stat: 'damage', val: 15 },
             ]},
         },
     },
@@ -81,10 +176,11 @@ const CLASSES = {
         icon: '🗡️',
         desc: 'Zwinny, 2 ataki na turę, niewidzialność.',
         color: '#2ecc71',
-        baseStats: { hp: 40, mp: 30, atk: 6, def: 2, agi: 5 },
-        hpPerLevel: 5, mpPerLevel: 3, atkPerLevel: 1.5, defPerLevel: 1, agiPerLevel: 1,
+        baseStats: { hp: 100, mp: 50, damage: 6, armor: 2, accuracy: 12, dodge: 8 },
+        baseAttributes: { str: 1, dex: 3, agi: 3, vit: 1, int: 0 },
+        hpPerLevel: 8, mpPerLevel: 4,
         attacksPerTurn: 2,
-        baseAttackSpeed: 1.0, // rogue attacks faster
+        baseAttackSpeed: 1.0,
         allowedItems: ['dagger','sword','hood','cape','leggings','boots','offhand_dagger'],
         skills: [
             { level: 1,  id: 'stealth', name: 'Niewidzialność', desc: 'Niewidzialny na 5 kratek (+2/lv)', cost: 10, type: 'buff' },
@@ -100,18 +196,18 @@ const CLASSES = {
         ],
         tree: {
             agility: { name: 'Zwinność', nodes: [
-                { id: 'quick_feet', name: 'Szybkie Nogi', desc: '+2 AGI', stat: 'agi', val: 2 },
-                { id: 'evasion', name: 'Uniki', desc: '+3 AGI', stat: 'agi', val: 3 },
-                { id: 'swift', name: 'Błyskawica', desc: '+5 AGI', stat: 'agi', val: 5 },
-                { id: 'ghost', name: 'Duch', desc: '+8 AGI', stat: 'agi', val: 8 },
-                { id: 'phantom', name: 'Fantom', desc: '+10 AGI', stat: 'agi', val: 10 },
+                { id: 'quick_feet', name: 'Szybkie Nogi', desc: '+2 Unik', stat: 'dodge', val: 2 },
+                { id: 'evasion', name: 'Uniki', desc: '+3 Unik', stat: 'dodge', val: 3 },
+                { id: 'swift', name: 'Błyskawica', desc: '+5 Unik', stat: 'dodge', val: 5 },
+                { id: 'ghost', name: 'Duch', desc: '+8 Unik', stat: 'dodge', val: 8 },
+                { id: 'phantom', name: 'Fantom', desc: '+10 Unik', stat: 'dodge', val: 10 },
             ]},
             lethality: { name: 'Morderczość', nodes: [
-                { id: 'keen_edge', name: 'Celny Cios', desc: '+3 ATK', stat: 'atk', val: 3 },
-                { id: 'exploit', name: 'Eksploatacja', desc: '+5 ATK', stat: 'atk', val: 5 },
-                { id: 'critical', name: 'Krytyczny', desc: '+8 ATK', stat: 'atk', val: 8 },
-                { id: 'deadly', name: 'Śmiercionośny', desc: '+10 ATK', stat: 'atk', val: 10 },
-                { id: 'master', name: 'Mistrz Cieni', desc: '+15 ATK', stat: 'atk', val: 15 },
+                { id: 'keen_edge', name: 'Celny Cios', desc: '+3 Obrażenia', stat: 'damage', val: 3 },
+                { id: 'exploit', name: 'Eksploatacja', desc: '+5 Obrażenia', stat: 'damage', val: 5 },
+                { id: 'critical', name: 'Krytyczny', desc: '+8 Obrażenia', stat: 'damage', val: 8 },
+                { id: 'deadly', name: 'Śmiercionośny', desc: '+10 Obrażenia', stat: 'damage', val: 10 },
+                { id: 'master', name: 'Mistrz Cieni', desc: '+15 Obrażenia', stat: 'damage', val: 15 },
             ]},
         },
     },
@@ -120,10 +216,11 @@ const CLASSES = {
         icon: '🪄',
         desc: 'Ataki dystansowe (3 kratki), kula ognia.',
         color: '#3498db',
-        baseStats: { hp: 35, mp: 60, atk: 3, def: 1, agi: 3 },
-        hpPerLevel: 4, mpPerLevel: 6, atkPerLevel: 1, defPerLevel: 0.5, agiPerLevel: 0.5,
+        baseStats: { hp: 80, mp: 120, damage: 5, armor: 1, accuracy: 8, dodge: 3 },
+        baseAttributes: { str: 0, dex: 1, agi: 1, vit: 1, int: 5 },
+        hpPerLevel: 6, mpPerLevel: 8,
         attacksPerTurn: 1,
-        baseAttackSpeed: 2.0, // mage attacks slower but ranged
+        baseAttackSpeed: 2.0,
         attackRange: 3,
         allowedItems: ['wand','staff','hat','robe','pants','shoes','tome'],
         skills: [
@@ -140,11 +237,11 @@ const CLASSES = {
         ],
         tree: {
             power: { name: 'Moc', nodes: [
-                { id: 'arcane_power', name: 'Moc Arkany', desc: '+4 ATK', stat: 'atk', val: 4 },
-                { id: 'empower', name: 'Wzmocnienie', desc: '+6 ATK', stat: 'atk', val: 6 },
-                { id: 'surge', name: 'Fala Mocy', desc: '+10 ATK', stat: 'atk', val: 10 },
-                { id: 'overcharge', name: 'Przeciążenie', desc: '+14 ATK', stat: 'atk', val: 14 },
-                { id: 'archmage', name: 'Arcymag', desc: '+20 ATK', stat: 'atk', val: 20 },
+                { id: 'arcane_power', name: 'Moc Arkany', desc: '+4 Obrażenia', stat: 'damage', val: 4 },
+                { id: 'empower', name: 'Wzmocnienie', desc: '+6 Obrażenia', stat: 'damage', val: 6 },
+                { id: 'surge', name: 'Fala Mocy', desc: '+10 Obrażenia', stat: 'damage', val: 10 },
+                { id: 'overcharge', name: 'Przeciążenie', desc: '+14 Obrażenia', stat: 'damage', val: 14 },
+                { id: 'archmage', name: 'Arcymag', desc: '+20 Obrażenia', stat: 'damage', val: 20 },
             ]},
             wisdom: { name: 'Mądrość', nodes: [
                 { id: 'meditation', name: 'Medytacja', desc: '+15 MP', stat: 'maxMp', val: 15 },
@@ -160,8 +257,9 @@ const CLASSES = {
         icon: '🏹',
         desc: 'Ataki dystansowe (4 kratki), włócznie, łuki.',
         color: '#e67e22',
-        baseStats: { hp: 45, mp: 30, atk: 5, def: 3, agi: 4 },
-        hpPerLevel: 5, mpPerLevel: 3, atkPerLevel: 1.5, defPerLevel: 1, agiPerLevel: 0.8,
+        baseStats: { hp: 110, mp: 50, damage: 6, armor: 3, accuracy: 14, dodge: 5 },
+        baseAttributes: { str: 2, dex: 3, agi: 2, vit: 1, int: 0 },
+        hpPerLevel: 8, mpPerLevel: 4,
         attacksPerTurn: 1,
         baseAttackSpeed: 1.3,
         attackRange: 4,
@@ -180,18 +278,18 @@ const CLASSES = {
         ],
         tree: {
             precision: { name: 'Precyzja', nodes: [
-                { id: 'steady_aim', name: 'Pewna Ręka', desc: '+3 ATK', stat: 'atk', val: 3 },
-                { id: 'focus', name: 'Skupienie', desc: '+5 ATK', stat: 'atk', val: 5 },
-                { id: 'marksman', name: 'Strzelec', desc: '+8 ATK', stat: 'atk', val: 8 },
-                { id: 'sharpshooter', name: 'Snajper', desc: '+12 ATK', stat: 'atk', val: 12 },
-                { id: 'deadeye', name: 'Śmiertelne Oko', desc: '+15 ATK', stat: 'atk', val: 15 },
+                { id: 'steady_aim', name: 'Pewna Ręka', desc: '+3 Obrażenia', stat: 'damage', val: 3 },
+                { id: 'focus', name: 'Skupienie', desc: '+5 Obrażenia', stat: 'damage', val: 5 },
+                { id: 'marksman', name: 'Strzelec', desc: '+8 Obrażenia', stat: 'damage', val: 8 },
+                { id: 'sharpshooter', name: 'Snajper', desc: '+12 Obrażenia', stat: 'damage', val: 12 },
+                { id: 'deadeye', name: 'Śmiertelne Oko', desc: '+15 Obrażenia', stat: 'damage', val: 15 },
             ]},
             survival: { name: 'Przetrwanie', nodes: [
                 { id: 'tough_skin', name: 'Twarda Skóra', desc: '+10 HP', stat: 'maxHp', val: 10 },
-                { id: 'nimble', name: 'Zwinność', desc: '+3 AGI', stat: 'agi', val: 3 },
+                { id: 'nimble', name: 'Zwinność', desc: '+3 Unik', stat: 'dodge', val: 3 },
                 { id: 'hardened', name: 'Zahartowany', desc: '+20 HP', stat: 'maxHp', val: 20 },
-                { id: 'wind_runner', name: 'Biegacz', desc: '+5 AGI', stat: 'agi', val: 5 },
-                { id: 'ranger', name: 'Strażnik', desc: '+30 HP +8 AGI', stat: 'maxHp', val: 30 },
+                { id: 'wind_runner', name: 'Biegacz', desc: '+5 Unik', stat: 'dodge', val: 5 },
+                { id: 'ranger', name: 'Strażnik', desc: '+30 HP', stat: 'maxHp', val: 30 },
             ]},
         },
     },
@@ -199,37 +297,37 @@ const CLASSES = {
 
 // ========== ITEM BASES ==========
 const ITEM_BASES = {
-    // Weapons
-    sword:   { slot: 'weapon', stat: 'atk', base: 4, name: 'Miecz',    classes: ['knight','rogue'] },
-    axe:     { slot: 'weapon', stat: 'atk', base: 5, name: 'Topór',     classes: ['knight'] },
-    mace:    { slot: 'weapon', stat: 'atk', base: 6, name: 'Młot',      classes: ['knight'] },
-    dagger:  { slot: 'weapon', stat: 'atk', base: 3, name: 'Sztylet',   classes: ['rogue'] },
-    wand:    { slot: 'weapon', stat: 'atk', base: 4, name: 'Różdżka',   classes: ['mage'] },
-    staff:   { slot: 'weapon', stat: 'atk', base: 5, name: 'Kostur',    classes: ['mage'] },
-    // Head
-    helmet:  { slot: 'head', stat: 'def', base: 3, name: 'Hełm',       classes: ['knight'] },
-    hood:    { slot: 'head', stat: 'agi', base: 2, name: 'Kaptur',      classes: ['rogue'] },
-    hat:     { slot: 'head', stat: 'atk', base: 2, name: 'Kapelusz',    classes: ['mage'] },
-    // Chest
-    armor:   { slot: 'chest', stat: 'def', base: 5, name: 'Zbroja',     classes: ['knight'] },
-    cape:    { slot: 'chest', stat: 'agi', base: 3, name: 'Peleryna',   classes: ['rogue'] },
-    robe:    { slot: 'chest', stat: 'def', base: 2, name: 'Szata',      classes: ['mage'] },
+    // Weapons - primary stat is damage
+    sword:   { slot: 'weapon', primaryStat: 'damage', base: 4, name: 'Miecz',    classes: ['knight','rogue'] },
+    axe:     { slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Topór',     classes: ['knight'] },
+    mace:    { slot: 'weapon', primaryStat: 'damage', base: 6, name: 'Młot',      classes: ['knight'] },
+    dagger:  { slot: 'weapon', primaryStat: 'damage', base: 3, name: 'Sztylet',   classes: ['rogue'] },
+    wand:    { slot: 'weapon', primaryStat: 'damage', base: 4, name: 'Różdżka',   classes: ['mage'] },
+    staff:   { slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Kostur',    classes: ['mage'] },
+    // Head - primary stat is armor
+    helmet:  { slot: 'head', primaryStat: 'armor', base: 3, name: 'Hełm',       classes: ['knight'] },
+    hood:    { slot: 'head', primaryStat: 'dodge', base: 2, name: 'Kaptur',      classes: ['rogue','archer'] },
+    hat:     { slot: 'head', primaryStat: 'maxMp', base: 5, name: 'Kapelusz',    classes: ['mage'] },
+    // Chest - primary stat is armor
+    armor:   { slot: 'chest', primaryStat: 'armor', base: 5, name: 'Zbroja',     classes: ['knight'] },
+    cape:    { slot: 'chest', primaryStat: 'dodge', base: 3, name: 'Peleryna',   classes: ['rogue'] },
+    robe:    { slot: 'chest', primaryStat: 'armor', base: 2, name: 'Szata',      classes: ['mage'] },
     // Legs
-    pants:   { slot: 'legs', stat: 'def', base: 2, name: 'Spodnie',     classes: ['knight','mage'] },
-    leggings:{ slot: 'legs', stat: 'agi', base: 2, name: 'Nogawice',    classes: ['rogue'] },
+    pants:   { slot: 'legs', primaryStat: 'armor', base: 2, name: 'Spodnie',     classes: ['knight','mage'] },
+    leggings:{ slot: 'legs', primaryStat: 'dodge', base: 2, name: 'Nogawice',    classes: ['rogue','archer'] },
     // Feet
-    boots:   { slot: 'feet', stat: 'def', base: 2, name: 'Buty',        classes: ['knight','rogue'] },
-    shoes:   { slot: 'feet', stat: 'agi', base: 1, name: 'Trzewiki',    classes: ['mage'] },
+    boots:   { slot: 'feet', primaryStat: 'moveSpeed', base: 2, name: 'Buty',    classes: ['knight','rogue','archer'] },
+    shoes:   { slot: 'feet', primaryStat: 'moveSpeed', base: 1, name: 'Trzewiki', classes: ['mage'] },
     // Offhand
-    shield:  { slot: 'offhand', stat: 'def', base: 4, name: 'Tarcza',   classes: ['knight'] },
-    tome:    { slot: 'offhand', stat: 'atk', base: 3, name: 'Grimuar',  classes: ['mage'] },
-    offhand_dagger: { slot: 'offhand', stat: 'atk', base: 2, name: 'Lewak',  classes: ['rogue'] },
+    shield:  { slot: 'offhand', primaryStat: 'armor', base: 4, name: 'Tarcza',   classes: ['knight'] },
+    tome:    { slot: 'offhand', primaryStat: 'damage', base: 3, name: 'Grimuar',  classes: ['mage'] },
+    offhand_dagger: { slot: 'offhand', primaryStat: 'damage', base: 2, name: 'Lewak',  classes: ['rogue'] },
     // Archer
-    bow:     { slot: 'weapon', stat: 'atk', base: 4, name: 'Łuk',       classes: ['archer'] },
-    crossbow:{ slot: 'weapon', stat: 'atk', base: 5, name: 'Kusza',     classes: ['archer'] },
-    spear:   { slot: 'weapon', stat: 'atk', base: 6, name: 'Włócznia',  classes: ['archer'] },
-    leather_armor: { slot: 'chest', stat: 'def', base: 3, name: 'Skórzana Zbroja', classes: ['archer','rogue'] },
-    quiver:  { slot: 'offhand', stat: 'atk', base: 2, name: 'Kołczan',  classes: ['archer'] },
+    bow:     { slot: 'weapon', primaryStat: 'damage', base: 4, name: 'Łuk',       classes: ['archer'] },
+    crossbow:{ slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Kusza',     classes: ['archer'] },
+    spear:   { slot: 'weapon', primaryStat: 'damage', base: 6, name: 'Włócznia',  classes: ['archer'] },
+    leather_armor: { slot: 'chest', primaryStat: 'armor', base: 3, name: 'Skórzana Zbroja', classes: ['archer','rogue'] },
+    quiver:  { slot: 'offhand', primaryStat: 'accuracy', base: 3, name: 'Kołczan',  classes: ['archer'] },
 };
 
 const TIER_PREFIXES = {
@@ -252,8 +350,9 @@ function generateItem(itemType, level, forceTier, playerClass) {
     const base = ITEM_BASES[itemType];
     if (!base) return null;
     const tier = forceTier || rollTier();
-    const mult = TIERS[tier].mult;
-    const statVal = Math.max(1, Math.floor((base.base + level * 1.2) * mult));
+    const tierData = TIERS[tier];
+    const mult = tierData.mult;
+    const statCount = tierData.statCount; // number of stats based on rarity
     const reqLevel = Math.max(1, level - 1);
 
     const prefix = genderSuffix(base.name, tier);
@@ -267,9 +366,43 @@ function generateItem(itemType, level, forceTier, playerClass) {
         level: reqLevel,
         classes: base.classes,
         price: Math.floor(25 * mult * (1 + level * 0.8)),
+        stats: {}, // multi-stat object
     };
-    item[base.stat] = statVal;
-    item.desc = `${base.stat.toUpperCase()} +${statVal} (Lv.${reqLevel})`;
+
+    // Primary stat always present
+    const primaryVal = Math.max(1, Math.floor((base.base + level * 1.2) * mult));
+    item.stats[base.primaryStat] = primaryVal;
+
+    // Roll additional stats based on tier stat count
+    const availableStats = ITEM_STAT_POOL.filter(s => s.id !== base.primaryStat);
+    for (let i = 1; i < statCount && availableStats.length > 0; i++) {
+        // Weighted random pick
+        const totalWeight = availableStats.reduce((s, st) => s + st.weight, 0);
+        let roll = Math.random() * totalWeight;
+        let picked = null;
+        for (let j = 0; j < availableStats.length; j++) {
+            roll -= availableStats[j].weight;
+            if (roll <= 0) { picked = j; break; }
+        }
+        if (picked === null) picked = 0;
+        const stat = availableStats.splice(picked, 1)[0];
+        item.stats[stat.id] = getStatValue(stat.id, level, mult * 0.6); // secondary stats lower
+    }
+
+    // Build description from stats
+    const descParts = [];
+    for (const [k, v] of Object.entries(item.stats)) {
+        const statInfo = ITEM_STAT_POOL.find(s => s.id === k);
+        const name = statInfo ? statInfo.name : k.toUpperCase();
+        descParts.push(`${name} +${v}`);
+    }
+    item.desc = descParts.join(', ') + ` (Lv.${reqLevel})`;
+
+    // Backward compat: set flat stat properties too
+    for (const [k, v] of Object.entries(item.stats)) {
+        item[k] = v;
+    }
+
     return item;
 }
 
@@ -286,27 +419,90 @@ function generateItemForClass(playerClass, level, slot, maxTier) {
     return generateItem(type, level, tier);
 }
 
-function generateLootForClass(playerClass, level, luck) {
-    const tier = rollTier(luck);
-    // Random variation in level: -2 to +2
+function generateLootForClass(playerClass, level, luck, playerLevel) {
+    const maxTier = getMaxTierForLevel(playerLevel || level);
+    const tier = rollTier(luck, maxTier);
     const itemLevel = Math.max(1, level + Math.floor(Math.random() * 5) - 2);
-    return generateItemForClass(playerClass, itemLevel);
+    return generateItemForClass(playerClass, itemLevel, undefined, maxTier);
 }
 
 function generatePotion(level) {
     const heal = 20 + level * 8;
     const r = Math.random();
-    if (r < 0.5) return { id: 'hp_potion', name: 'Mikstura HP', type: 'consumable', subtype: 'hp', heal, count: 1, price: 15 + level * 4, desc: `Leczy ${heal} HP` };
-    if (r < 0.75) return { id: 'big_hp_potion', name: 'Duża Mikstura HP', type: 'consumable', subtype: 'hp', heal: heal * 3, count: 1, price: 50 + level * 10, desc: `Leczy ${heal*3} HP` };
-    if (r < 0.9) return { id: 'mp_potion', name: 'Mikstura Many', type: 'consumable', subtype: 'mp', mana: 20 + level * 5, count: 1, price: 20 + level * 5, desc: `+${20+level*5} MP` };
-    return { id: 'big_mp_potion', name: 'Duża Mikstura Many', type: 'consumable', subtype: 'mp', mana: 50 + level * 10, count: 1, price: 60 + level * 12, desc: `+${50+level*10} MP` };
+    if (r < 0.5) return { id: 'hp_potion', name: 'Mikstura HP', type: 'consumable', subtype: 'hp', heal, count: 1, stackable: true, maxStack: 100, price: 15 + level * 4, desc: `Leczy ${heal} HP` };
+    if (r < 0.75) return { id: 'big_hp_potion', name: 'Duża Mikstura HP', type: 'consumable', subtype: 'hp', heal: heal * 3, count: 1, stackable: true, maxStack: 100, price: 50 + level * 10, desc: `Leczy ${heal*3} HP` };
+    if (r < 0.9) return { id: 'mp_potion', name: 'Mikstura Many', type: 'consumable', subtype: 'mp', mana: 20 + level * 5, count: 1, stackable: true, maxStack: 100, price: 20 + level * 5, desc: `+${20+level*5} MP` };
+    return { id: 'big_mp_potion', name: 'Duża Mikstura Many', type: 'consumable', subtype: 'mp', mana: 50 + level * 10, count: 1, stackable: true, maxStack: 100, price: 60 + level * 12, desc: `+${50+level*10} MP` };
 }
 
 function canEquip(item, playerClass, playerLevel) {
     if (!item || item.type !== 'equipment') return false;
     if (item.level > playerLevel) return false;
     if (item.classes && !item.classes.includes(playerClass)) return false;
-    // Rogue can't equip shields
     if (playerClass === 'rogue' && item.itemType === 'shield') return false;
     return true;
+}
+
+// ========== PREDETERMINED MONSTER LOOT TABLES ==========
+// Each monster type has specific drops to encourage exploration
+const MONSTER_LOOT_TABLES = {
+    'Slime':          { items: ['dagger','sword'], potionChance: 0.3 },
+    'Goblin':         { items: ['dagger','hood','cape'], potionChance: 0.2 },
+    'Wilk':           { items: ['leather_armor','leggings'], potionChance: 0.15 },
+    'Szkielet':       { items: ['sword','helmet','shield','pants'], potionChance: 0.2 },
+    'Dziki Koń':      { items: ['boots','leggings','leather_armor'], potionChance: 0.1 },
+    'Centaur':        { items: ['bow','spear','armor'], potionChance: 0.15 },
+    'Pająk':          { items: ['cape','hood','offhand_dagger'], potionChance: 0.25 },
+    'Ork':            { items: ['axe','mace','armor','helmet'], potionChance: 0.15 },
+    'Bandyta':        { items: ['dagger','sword','offhand_dagger','cape'], potionChance: 0.3 },
+    'Drzewiec':       { items: ['staff','wand','robe'], potionChance: 0.2 },
+    'Leśny Mag':      { items: ['staff','wand','hat','tome','robe'], potionChance: 0.25 },
+    'Wyrm Leśny':     { items: ['crossbow','spear','armor','shield'], potionChance: 0.1 },
+    'Żuk':            { items: ['helmet','boots','pants'], potionChance: 0.2 },
+    'Widmo':          { items: ['wand','tome','hat','robe'], potionChance: 0.2 },
+    'Troll':          { items: ['mace','axe','armor','pants'], potionChance: 0.15 },
+    'Bagiennik':      { items: ['staff','leather_armor','leggings'], potionChance: 0.15 },
+    'Demon Bagien':   { items: ['staff','tome','robe','hat'], potionChance: 0.1 },
+    'Golem':          { items: ['mace','shield','armor','helmet'], potionChance: 0.1 },
+    'Gryf':           { items: ['bow','crossbow','quiver','leather_armor'], potionChance: 0.15 },
+    'Rycerz Cieni':   { items: ['sword','shield','armor','helmet','pants','boots'], potionChance: 0.15 },
+    'Lodowy Golem':   { items: ['mace','shield','armor'], potionChance: 0.1 },
+    'Smok Młody':     { items: ['sword','axe','armor','shield','tome'], potionChance: 0.1 },
+    'Skorpion':       { items: ['dagger','offhand_dagger','leggings'], potionChance: 0.2 },
+    'Mumia':          { items: ['staff','wand','robe','hat'], potionChance: 0.15 },
+    'Dżinn':          { items: ['wand','staff','tome','hat','robe'], potionChance: 0.2 },
+    'Ognisty Elem':   { items: ['staff','wand','tome'], potionChance: 0.15 },
+    'Sfinks':         { items: ['tome','staff','hat','robe'], potionChance: 0.1 },
+    'Demon Piasków':  { items: ['axe','mace','armor','shield'], potionChance: 0.1 },
+    'Wilk Śnieżny':   { items: ['leather_armor','boots','leggings'], potionChance: 0.2 },
+    'Szkielet Mróz':  { items: ['sword','helmet','shield'], potionChance: 0.2 },
+    'Widmo Zimy':     { items: ['wand','tome','hat'], potionChance: 0.2 },
+    'Mroźny Wyrm':    { items: ['crossbow','spear','armor','shield','helmet'], potionChance: 0.1 },
+};
+
+function generateMonsterLoot(monsterName, monsterLevel, playerLevel) {
+    const table = MONSTER_LOOT_TABLES[monsterName];
+    if (!table) return null;
+    const maxTier = getMaxTierForLevel(playerLevel || monsterLevel);
+    const itemType = table.items[Math.floor(Math.random() * table.items.length)];
+    return generateItem(itemType, monsterLevel, rollTier(0, maxTier));
+}
+
+// ========== STACKABLE ITEMS ==========
+function isStackable(item) {
+    return item && (item.stackable || item.type === 'consumable');
+}
+
+function tryStackItem(inventory, newItem) {
+    if (!isStackable(newItem)) return false;
+    const existing = inventory.find(i => i.id === newItem.id && isStackable(i));
+    if (existing) {
+        const maxStack = existing.maxStack || 100;
+        const canAdd = Math.min(newItem.count || 1, maxStack - (existing.count || 1));
+        if (canAdd > 0) {
+            existing.count = (existing.count || 1) + canAdd;
+            return true;
+        }
+    }
+    return false;
 }

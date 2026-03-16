@@ -54,6 +54,8 @@ const GameInput = {
         else if (e.code === 'KeyJ') { GameUI.openQuests(); e.preventDefault(); }
         // World map
         else if (e.code === 'KeyN') { GameUI.openWorldMap(); e.preventDefault(); }
+        // Stat allocation (T)
+        else if (e.code === 'KeyT') { GameUI.openStatAllocation(); e.preventDefault(); }
         // Quick save
         else if (e.code === 'KeyP') { Game.save(); e.preventDefault(); }
         // Music toggle
@@ -337,6 +339,10 @@ const GameInput = {
             const bldg = World.townBuildings && World.townBuildings[bKey];
             const npcName = bldg ? bldg.npcName : 'Mieszkaniec';
             // Special NPCs
+            if (npcName === 'Bankier') {
+                GameUI.openBank();
+                return;
+            }
             if (npcName === 'Stajennik') {
                 const mountPrice = 500;
                 if (p.ownedMounts && p.ownedMounts.length > 0) {

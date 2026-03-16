@@ -76,24 +76,12 @@ const GameUI = {
                         GameRender.updateHUD();
                     }
                 };
-                // Right-click to drop
+                // Right-click for action menu
                 slot.oncontextmenu = (e) => {
                     e.preventDefault();
                     const idx = p.inventory.indexOf(item);
                     if (idx === -1) return;
-                    if (item.count > 1) {
-                        const dropped = { ...item, count: 1 };
-                        item.count--;
-                        World.dropGroundLoot(p.x, p.y, [dropped]);
-                    } else {
-                        p.inventory.splice(idx, 1);
-                        // Unequip if equipped
-                        for (const s in p.equipment) { if (p.equipment[s]?.id === item.id) p.equipment[s] = null; }
-                        World.dropGroundLoot(p.x, p.y, [item]);
-                    }
-                    Game.refreshStats();
-                    this.updateSidePanel();
-                    Game.log(`Upuszczono: ${item.name}`, 'info');
+                    this.showItemActionMenu(item, idx, e.clientX, e.clientY);
                 };
             }
             grid.appendChild(slot);
@@ -132,20 +120,223 @@ const GameUI = {
         const p = Game.player;
         if (!p.combatSkills) return;
         const skills = p.combatSkills;
-        const names = { melee: 'Walka', shielding: 'Obrona', magic: 'Magia' };
+        const names = { melee: 'Walka', shielding: 'Obrona', magic: 'Magia', distance: 'Dystans' };
         el.innerHTML = '';
         for (const [key, sk] of Object.entries(skills)) {
             const needed = Game.getTriesNeeded(key, sk.level);
             const pct = Math.min(100, (sk.tries / needed) * 100);
             const row = document.createElement('div');
             row.style.cssText = 'display:flex;align-items:center;gap:3px;margin:1px 0;font-size:6px';
-            row.innerHTML = `<span style="color:#888;width:36px">${names[key]}</span>
+            row.innerHTML = `<span style="color:#888;width:36px">${names[key] || key}</span>
                 <span style="color:#e67e22;width:16px">${sk.level}</span>
                 <div style="flex:1;height:4px;background:#222;border:1px solid #333;border-radius:1px;overflow:hidden">
                     <div style="width:${pct}%;height:100%;background:#e67e22"></div>
                 </div>`;
             el.appendChild(row);
         }
+    },
+
+    // ========== STAT ALLOCATION PANEL ==========
+    openStatAllocation() {
+        const content = document.getElementById('dialog-content');
+        const title = document.getElementById('dialog-title');
+        if (!content || !title) return;
+        const p = Game.player;
+
+        title.textContent = `Atrybuty (${p.statPoints || 0} pkt)`;
+        content.innerHTML = '';
+
+        const stats = Game.getStats();
+
+        // Current derived stats display
+        const derivedDiv = document.createElement('div');
+        derivedDiv.style.cssText = 'margin-bottom:10px;font-size:7px;color:#888;line-height:2;border-bottom:1px solid #333;padding-bottom:6px';
+        derivedDiv.innerHTML = `<div style="color:#f1c40f;font-size:8px;margin-bottom:4px">Statystyki Pochodne</div>
+            HP: <span style="color:#e74c3c">${stats.maxHp}</span> | MP: <span style="color:#9b59b6">${stats.maxMp}</span> |
+            DMG: <span style="color:#e67e22">${stats.damage}</span> | Pancerz: <span style="color:#3498db">${stats.armor}</span><br>
+            Celność: ${stats.accuracy} | Unik: ${stats.dodge}% | Kryty: ${stats.critChance}% (x${(stats.critMult/100).toFixed(1)})<br>
+            Sz.Ataku: +${stats.attackSpeed} | Sz.Ruchu: +${stats.moveSpeed} | CDR: ${stats.cdr}% | Ogłusz: ${stats.stunChance}%`;
+        content.appendChild(derivedDiv);
+
+        // Attribute allocation
+        const attrDiv = document.createElement('div');
+        attrDiv.innerHTML = '<div style="font-size:8px;color:#e67e22;margin-bottom:6px">Przydziel Punkty Atrybutów</div>';
+
+        const attrDescs = {
+            str: 'Siła: +2 Obrażenia, +3% Kryty Dmg',
+            dex: 'Zręczność: +3 Celność, +1% Kryty',
+            agi: 'Zwinność: +2 Ruch, +2 Unik',
+            vit: 'Wytrzymałość: +8 HP, +1 Pancerz',
+            int: 'Inteligencja: +2% CDR, +5 MP',
+        };
+
+        for (const attr of BASE_ATTRIBUTES) {
+            const val = (p.attributes || {})[attr] || 0;
+            const row = document.createElement('div');
+            row.className = 'shop-item';
+            row.style.borderColor = 'transparent';
+            const canAdd = (p.statPoints || 0) > 0 && val < MAX_STAT_POINTS;
+            row.innerHTML = `<div style="flex:1">
+                <span style="color:#e67e22">${ATTRIBUTE_NAMES[attr]}</span>
+                <span style="color:#f1c40f;margin-left:6px">${val}/${MAX_STAT_POINTS}</span>
+                <div style="font-size:6px;color:#666">${attrDescs[attr]}</div>
+            </div>`;
+            if (canAdd) {
+                const btn = document.createElement('button');
+                btn.className = 'use-btn';
+                btn.style.background = '#2ecc71';
+                btn.textContent = '+1';
+                btn.onclick = () => {
+                    p.attributes[attr] = (p.attributes[attr] || 0) + 1;
+                    p.statPoints--;
+                    Game.refreshStats();
+                    this.openStatAllocation();
+                    GameRender.updateHUD();
+                };
+                row.appendChild(btn);
+            }
+            attrDiv.appendChild(row);
+        }
+        content.appendChild(attrDiv);
+        this.showOverlay('dialog-overlay');
+    },
+
+    // ========== BANK NPC ==========
+    openBank() {
+        const content = document.getElementById('dialog-content');
+        const title = document.getElementById('dialog-title');
+        if (!content || !title) return;
+        const p = Game.player;
+
+        title.textContent = 'Bank';
+        content.innerHTML = '';
+
+        const info = document.createElement('div');
+        info.style.cssText = 'text-align:center;font-size:8px;color:#aaa;line-height:2.5;margin-bottom:10px';
+        info.innerHTML = `<div>Złoto w portfelu: <span style="color:#f1c40f">${formatCurrency(p.gold)}</span></div>
+            <div>Złoto w banku: <span style="color:#2ecc71">${formatCurrency(p.bankGold || 0)}</span></div>`;
+        content.appendChild(info);
+
+        // Deposit buttons
+        const amounts = [10, 100, 1000, 'all'];
+        const depositDiv = document.createElement('div');
+        depositDiv.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-bottom:8px';
+        depositDiv.innerHTML = '<div style="width:100%;text-align:center;font-size:7px;color:#2ecc71;margin-bottom:4px">Wpłać</div>';
+        amounts.forEach(amt => {
+            const btn = document.createElement('button');
+            btn.className = 'use-btn';
+            btn.style.background = '#2ecc71';
+            const label = amt === 'all' ? 'Wszystko' : formatCurrency(amt);
+            btn.textContent = label;
+            btn.onclick = () => {
+                const real = amt === 'all' ? p.gold : Math.min(amt, p.gold);
+                if (real <= 0) return;
+                p.gold -= real;
+                p.bankGold = (p.bankGold || 0) + real;
+                Game.log(`Wpłacono ${formatCurrency(real)} do banku.`, 'shop');
+                this.openBank();
+                GameRender.updateHUD();
+            };
+            depositDiv.appendChild(btn);
+        });
+        content.appendChild(depositDiv);
+
+        // Withdraw buttons
+        const withdrawDiv = document.createElement('div');
+        withdrawDiv.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;justify-content:center';
+        withdrawDiv.innerHTML = '<div style="width:100%;text-align:center;font-size:7px;color:#f1c40f;margin-bottom:4px">Wypłać</div>';
+        amounts.forEach(amt => {
+            const btn = document.createElement('button');
+            btn.className = 'use-btn';
+            btn.style.background = '#f1c40f';
+            btn.style.color = '#000';
+            const label = amt === 'all' ? 'Wszystko' : formatCurrency(amt);
+            btn.textContent = label;
+            btn.onclick = () => {
+                const bank = p.bankGold || 0;
+                const real = amt === 'all' ? bank : Math.min(amt, bank);
+                if (real <= 0) return;
+                p.bankGold -= real;
+                p.gold += real;
+                Game.log(`Wypłacono ${formatCurrency(real)} z banku.`, 'shop');
+                this.openBank();
+                GameRender.updateHUD();
+            };
+            withdrawDiv.appendChild(btn);
+        });
+        content.appendChild(withdrawDiv);
+
+        this.showOverlay('dialog-overlay');
+    },
+
+    // ========== ITEM ACTION MENU (right-click context menu) ==========
+    showItemActionMenu(item, idx, x, y) {
+        // Remove existing menu
+        const existing = document.getElementById('item-action-menu');
+        if (existing) existing.remove();
+
+        const p = Game.player;
+        const menu = document.createElement('div');
+        menu.id = 'item-action-menu';
+        menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;background:#1a1a2e;border:2px solid #f1c40f;z-index:10000;font-family:"Press Start 2P";font-size:7px;min-width:100px;box-shadow:0 0 10px rgba(0,0,0,0.8)`;
+
+        const actions = [];
+
+        if (item.type === 'equipment' && canEquip(item, p.classId, p.level)) {
+            actions.push({ label: 'Załóż', color: '#2ecc71', fn: () => {
+                p.equipment[item.slot] = item;
+                Game.refreshStats();
+                this.updateSidePanel();
+                GameRender.updateHUD();
+            }});
+        }
+        if (item.type === 'consumable') {
+            actions.push({ label: 'Użyj', color: '#3498db', fn: () => {
+                this.useConsumable(idx);
+                this.updateSidePanel();
+            }});
+        }
+        if (isStackable(item) && (item.count || 1) > 1) {
+            actions.push({ label: 'Podziel', color: '#9b59b6', fn: () => {
+                const half = Math.floor((item.count || 1) / 2);
+                if (half <= 0) return;
+                const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
+                const bpCount = p.inventory.filter(i => !equippedIds.has(i.id) || i.type === 'consumable').length;
+                if (bpCount >= 20) { Game.log('Plecak pełny!', 'info'); return; }
+                item.count -= half;
+                p.inventory.push({ ...item, count: half });
+                this.updateSidePanel();
+            }});
+        }
+        actions.push({ label: 'Wyrzuć', color: '#e74c3c', fn: () => {
+            if (item.count > 1) {
+                const dropped = { ...item, count: 1 };
+                item.count--;
+                World.dropGroundLoot(p.x, p.y, [dropped]);
+            } else {
+                p.inventory.splice(idx, 1);
+                for (const s in p.equipment) { if (p.equipment[s]?.id === item.id) p.equipment[s] = null; }
+                World.dropGroundLoot(p.x, p.y, [item]);
+            }
+            Game.refreshStats();
+            this.updateSidePanel();
+            Game.log(`Wyrzucono: ${item.name}`, 'info');
+        }});
+
+        actions.forEach(act => {
+            const btn = document.createElement('div');
+            btn.style.cssText = `padding:6px 10px;cursor:pointer;color:${act.color};border-bottom:1px solid #333`;
+            btn.textContent = act.label;
+            btn.onmouseover = () => btn.style.background = '#222';
+            btn.onmouseout = () => btn.style.background = 'transparent';
+            btn.onclick = () => { menu.remove(); act.fn(); };
+            menu.appendChild(btn);
+        });
+
+        document.body.appendChild(menu);
+        // Close on click outside
+        const closeMenu = (e) => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', closeMenu); } };
+        setTimeout(() => document.addEventListener('click', closeMenu), 10);
     },
 
     // ========== HOUSE BUY DIALOG ==========
@@ -321,7 +512,8 @@ const GameUI = {
             const statsDiv = document.createElement('div');
             statsDiv.style.cssText = "font-size:7px;color:#888;font-family:'Press Start 2P',monospace;line-height:2";
             const bs = cls.baseStats;
-            statsDiv.innerHTML = `HP:${bs.hp} MP:${bs.mp}<br>ATK:${bs.atk} DEF:${bs.def} AGI:${bs.agi}`;
+            const ba = cls.baseAttributes;
+            statsDiv.innerHTML = `HP:${bs.hp} MP:${bs.mp}<br>DMG:${bs.damage} PNC:${bs.armor}<br>STR:${ba.str} DEX:${ba.dex} AGI:${ba.agi} VIT:${ba.vit} INT:${ba.int}`;
 
             card.append(icon, name, desc, statsDiv);
             container.appendChild(card);
@@ -405,14 +597,15 @@ const GameUI = {
             let compare = '';
             if (item.slot) {
                 const eq = p.equipment[item.slot];
-                const stats = ['atk','def','agi'];
+                const compareStats = ['damage','armor','maxHp','maxMp','accuracy','dodge','critChance','attackSpeed','moveSpeed'];
                 let parts = [];
-                for (const stat of stats) {
-                    const cur = eq ? (eq[stat] || 0) : 0;
-                    const nw = item[stat] || 0;
+                for (const stat of compareStats) {
+                    const cur = eq ? (eq.stats ? eq.stats[stat] || 0 : eq[stat] || 0) : 0;
+                    const nw = item.stats ? (item.stats[stat] || 0) : (item[stat] || 0);
                     const diff = nw - cur;
-                    if (diff > 0) parts.push(`<span class="stat-up">+${diff} ${stat.toUpperCase()}</span>`);
-                    else if (diff < 0) parts.push(`<span class="stat-down">${diff} ${stat.toUpperCase()}</span>`);
+                    const name = (ITEM_STAT_POOL.find(s => s.id === stat) || {}).name || stat;
+                    if (diff > 0) parts.push(`<span class="stat-up">+${diff} ${name}</span>`);
+                    else if (diff < 0) parts.push(`<span class="stat-down">${diff} ${name}</span>`);
                 }
                 if (parts.length) compare = `<div class="item-compare">${parts.join(' ')}</div>`;
             }
@@ -552,14 +745,15 @@ const GameUI = {
             // Stat comparison for equipment
             if (item.type === 'equipment') {
                 const equipped = p.equipment[item.slot];
-                const stats = ['atk','def','agi'];
+                const compareStats = ['damage','armor','maxHp','maxMp','accuracy','dodge','critChance','attackSpeed','moveSpeed'];
                 let compareHtml = '';
-                for (const stat of stats) {
-                    const cur = equipped ? (equipped[stat] || 0) : 0;
-                    const nw = item[stat] || 0;
+                for (const stat of compareStats) {
+                    const cur = equipped ? (equipped.stats ? equipped.stats[stat] || 0 : equipped[stat] || 0) : 0;
+                    const nw = item.stats ? (item.stats[stat] || 0) : (item[stat] || 0);
                     const diff = nw - cur;
-                    if (diff > 0) compareHtml += `<span style="color:#2ecc71;font-size:7px;margin-left:4px">+${diff} ${stat.toUpperCase()}</span>`;
-                    else if (diff < 0) compareHtml += `<span style="color:#e74c3c;font-size:7px;margin-left:4px">${diff} ${stat.toUpperCase()}</span>`;
+                    const name = (ITEM_STAT_POOL.find(s => s.id === stat) || {}).name || stat;
+                    if (diff > 0) compareHtml += `<span style="color:#2ecc71;font-size:7px;margin-left:4px">+${diff} ${name}</span>`;
+                    else if (diff < 0) compareHtml += `<span style="color:#e74c3c;font-size:7px;margin-left:4px">${diff} ${name}</span>`;
                 }
                 if (compareHtml) {
                     const cmp = document.createElement('span');
@@ -644,13 +838,21 @@ const GameUI = {
         GameRender.updateHUD();
     },
 
-    // ========== SKILL TREE ==========
+    // ========== SKILL TREE (level 25+, 4 passives + 1 skill pattern) ==========
     openSkillTree() {
         const content = document.getElementById('dialog-content');
         const title = document.getElementById('dialog-title');
         if (!content || !title) return;
         const p = Game.player;
         const cls = CLASSES[p.classId];
+
+        // Skill tree only visible from level 25 (retroactive points)
+        if (p.level < 25) {
+            title.textContent = 'Umiejętności';
+            content.innerHTML = '<div style="text-align:center;font-size:8px;color:#888;padding:20px">Drzewko umiejętności odblokuje się na poziomie 25.<br>Obecny poziom: ' + p.level + '</div>';
+            this.showOverlay('dialog-overlay');
+            return;
+        }
 
         title.textContent = `Umiejętności (${p.skillPoints} pkt)`;
         content.innerHTML = '';
@@ -672,7 +874,7 @@ const GameUI = {
 
         // All skills list
         const skillsDiv = document.createElement('div');
-        skillsDiv.innerHTML = '<div style="font-size:8px;color:#9b59b6;margin-bottom:6px">Wszystkie Umiejętności</div>';
+        skillsDiv.innerHTML = '<div style="font-size:8px;color:#9b59b6;margin-bottom:6px">Umiejętności Aktywne</div>';
         cls.skills.forEach(sk => {
             const unlocked = p.unlockedSkills.includes(sk.id);
             const lv = p.skillLevels[sk.id] || 0;
@@ -746,10 +948,10 @@ const GameUI = {
         });
         content.appendChild(skillsDiv);
 
-        // Passive Tree
+        // Passive Tree - scrollable/zoomable canvas
         const treeContainer = document.createElement('div');
-        treeContainer.style.cssText = 'margin-top:10px';
-        treeContainer.innerHTML = '<div style="font-size:8px;color:#e67e22;margin-bottom:6px">Drzewko Pasywne</div>';
+        treeContainer.style.cssText = 'margin-top:10px;overflow:auto;max-height:300px;border:1px solid #333;border-radius:4px';
+        treeContainer.innerHTML = '<div style="font-size:8px;color:#e67e22;margin-bottom:6px;padding:4px">Drzewko Pasywne (przewijaj myszą)</div>';
 
         const treeCanvas = document.createElement('canvas');
         const branches = Object.entries(cls.tree);
@@ -761,7 +963,7 @@ const GameUI = {
         const treeH = maxNodes * vGap + 80;
         treeCanvas.width = treeW;
         treeCanvas.height = treeH;
-        treeCanvas.style.cssText = 'display:block;margin:0 auto;max-width:100%;image-rendering:auto';
+        treeCanvas.style.cssText = 'display:block;margin:0 auto;image-rendering:auto';
         const tctx = treeCanvas.getContext('2d');
         tctx.fillStyle = '#0a0a1a';
         tctx.fillRect(0, 0, treeW, treeH);

@@ -561,10 +561,10 @@ const GameRender = {
         setW('hp-bar', (p.hp / p.maxHp) * 100);
         setW('mp-bar', (p.mp / p.maxMp) * 100);
         setW('xp-bar', (p.xp / p.xpToNext) * 100);
-        set('stat-gold', p.gold);
-        set('stat-atk', s.atk);
-        set('stat-def', s.def);
-        set('stat-agi', s.agi);
+        set('stat-gold', formatCurrency(p.gold));
+        set('stat-atk', s.damage);
+        set('stat-def', s.armor);
+        set('stat-agi', `${s.dodge}`);
         set('stat-class', CLASSES[p.classId]?.name || '');
         set('stat-time', Game.getPlayTime());
         set('stat-deaths', Game.deathCount);

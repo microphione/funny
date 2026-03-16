@@ -34,53 +34,54 @@ const World = {
 
     BIOME: { PLAINS: 0, FOREST: 1, SWAMP: 2, MOUNTAIN: 3, DESERT: 4, SNOW: 5 },
 
-    // Monster definitions per biome with level tiers
+    // Monster definitions per biome with level tiers (Tibia-inspired)
+    // armor: reduces hit chance by 0.1% per point, reduces damage by 0.1 per point
     MONSTERS: {
         plains: [
-            { name: 'Slime',       sprite: 'slime',   hp: 10, atk: 2,  def: 0, xp: 5,  gold: [2,5],   minDiff: 1, maxDiff: 6 },
-            { name: 'Goblin',      sprite: 'goblin',  hp: 15, atk: 3,  def: 1, xp: 8,  gold: [3,8],   minDiff: 1, maxDiff: 10 },
-            { name: 'Wilk',        sprite: 'wolf',    hp: 18, atk: 5,  def: 1, xp: 10, gold: [2,6],   minDiff: 2, maxDiff: 12 },
-            { name: 'Szkielet',    sprite: 'skeleton', hp: 22, atk: 7, def: 2, xp: 15, gold: [4,10],  minDiff: 4, maxDiff: 14 },
-            { name: 'Dziki Koń',   sprite: 'wolf',    hp: 30, atk: 8,  def: 3, xp: 20, gold: [5,12],  minDiff: 6, maxDiff: 20 },
-            { name: 'Centaur',     sprite: 'bandit',  hp: 50, atk: 14, def: 5, xp: 35, gold: [10,20], minDiff: 12, maxDiff: 99 },
+            { name: 'Slime',       sprite: 'slime',   hp: 20, atk: 3,  armor: 0,  xp: 8,  gold: [2,6],   minDiff: 1, maxDiff: 6 },
+            { name: 'Goblin',      sprite: 'goblin',  hp: 30, atk: 5,  armor: 2,  xp: 15, gold: [3,10],  minDiff: 1, maxDiff: 10 },
+            { name: 'Wilk',        sprite: 'wolf',    hp: 35, atk: 8,  armor: 3,  xp: 20, gold: [3,8],   minDiff: 2, maxDiff: 12 },
+            { name: 'Szkielet',    sprite: 'skeleton', hp: 50, atk: 12, armor: 5,  xp: 30, gold: [5,14],  minDiff: 4, maxDiff: 14 },
+            { name: 'Dziki Koń',   sprite: 'wolf',    hp: 65, atk: 14, armor: 6,  xp: 45, gold: [8,18],  minDiff: 6, maxDiff: 20 },
+            { name: 'Centaur',     sprite: 'bandit',  hp: 120, atk: 22, armor: 10, xp: 80, gold: [15,30], minDiff: 12, maxDiff: 99 },
         ],
         forest: [
-            { name: 'Pająk',       sprite: 'spider',  hp: 12, atk: 6,  def: 0, xp: 10, gold: [2,5],   minDiff: 1, maxDiff: 8 },
-            { name: 'Ork',         sprite: 'orc',     hp: 25, atk: 7,  def: 2, xp: 18, gold: [5,12],  minDiff: 3, maxDiff: 14 },
-            { name: 'Bandyta',     sprite: 'bandit',  hp: 22, atk: 6,  def: 3, xp: 15, gold: [8,15],  minDiff: 2, maxDiff: 10 },
-            { name: 'Drzewiec',    sprite: 'treant',  hp: 35, atk: 5,  def: 5, xp: 20, gold: [4,10],  minDiff: 5, maxDiff: 16 },
-            { name: 'Leśny Mag',   sprite: 'djinn',   hp: 45, atk: 15, def: 4, xp: 40, gold: [12,25], minDiff: 10, maxDiff: 99 },
-            { name: 'Wyrm Leśny',  sprite: 'wyrm',    hp: 70, atk: 18, def: 6, xp: 55, gold: [18,35], minDiff: 14, maxDiff: 99 },
+            { name: 'Pająk',       sprite: 'spider',  hp: 25, atk: 10, armor: 1,  xp: 18, gold: [3,7],   minDiff: 1, maxDiff: 8 },
+            { name: 'Ork',         sprite: 'orc',     hp: 55, atk: 12, armor: 5,  xp: 35, gold: [6,16],  minDiff: 3, maxDiff: 14 },
+            { name: 'Bandyta',     sprite: 'bandit',  hp: 45, atk: 10, armor: 6,  xp: 28, gold: [10,20], minDiff: 2, maxDiff: 10 },
+            { name: 'Drzewiec',    sprite: 'treant',  hp: 80, atk: 8,  armor: 12, xp: 45, gold: [6,14],  minDiff: 5, maxDiff: 16 },
+            { name: 'Leśny Mag',   sprite: 'djinn',   hp: 100, atk: 25, armor: 8,  xp: 85, gold: [16,35], minDiff: 10, maxDiff: 99 },
+            { name: 'Wyrm Leśny',  sprite: 'wyrm',    hp: 160, atk: 30, armor: 14, xp: 120, gold: [25,50], minDiff: 14, maxDiff: 99 },
         ],
         swamp: [
-            { name: 'Żuk',         sprite: 'beetle',  hp: 14, atk: 8,  def: 1, xp: 12, gold: [3,7],   minDiff: 2, maxDiff: 10 },
-            { name: 'Szkielet',    sprite: 'skeleton', hp: 20, atk: 9, def: 1, xp: 15, gold: [5,10],  minDiff: 3, maxDiff: 12 },
-            { name: 'Widmo',       sprite: 'ghost',   hp: 20, atk: 10, def: 0, xp: 18, gold: [5,12],  minDiff: 4, maxDiff: 14 },
-            { name: 'Troll',       sprite: 'troll',   hp: 40, atk: 7,  def: 4, xp: 25, gold: [8,18],  minDiff: 6, maxDiff: 18 },
-            { name: 'Bagiennik',   sprite: 'troll',   hp: 55, atk: 12, def: 6, xp: 35, gold: [10,22], minDiff: 10, maxDiff: 99 },
-            { name: 'Demon Bagien',sprite: 'demon',   hp: 75, atk: 16, def: 5, xp: 50, gold: [15,30], minDiff: 14, maxDiff: 99 },
+            { name: 'Żuk',         sprite: 'beetle',  hp: 30, atk: 12, armor: 3,  xp: 22, gold: [4,10],  minDiff: 2, maxDiff: 10 },
+            { name: 'Szkielet',    sprite: 'skeleton', hp: 45, atk: 14, armor: 3,  xp: 30, gold: [6,14],  minDiff: 3, maxDiff: 12 },
+            { name: 'Widmo',       sprite: 'ghost',   hp: 40, atk: 16, armor: 0,  xp: 35, gold: [6,16],  minDiff: 4, maxDiff: 14 },
+            { name: 'Troll',       sprite: 'troll',   hp: 90, atk: 12, armor: 10, xp: 55, gold: [10,24], minDiff: 6, maxDiff: 18 },
+            { name: 'Bagiennik',   sprite: 'troll',   hp: 120, atk: 20, armor: 14, xp: 80, gold: [14,30], minDiff: 10, maxDiff: 99 },
+            { name: 'Demon Bagien',sprite: 'demon',   hp: 170, atk: 28, armor: 12, xp: 110, gold: [20,45], minDiff: 14, maxDiff: 99 },
         ],
         mountain: [
-            { name: 'Golem',       sprite: 'golem',   hp: 45, atk: 8,  def: 6, xp: 30, gold: [10,20], minDiff: 5, maxDiff: 18 },
-            { name: 'Gryf',        sprite: 'griffin',  hp: 30, atk: 12, def: 3, xp: 25, gold: [8,16],  minDiff: 6, maxDiff: 20 },
-            { name: 'Rycerz Cieni',sprite: 'dark_knight', hp: 35, atk: 14, def: 5, xp: 35, gold: [12,25], minDiff: 8, maxDiff: 99 },
-            { name: 'Lodowy Golem',sprite: 'ice_golem', hp: 55, atk: 11, def: 8, xp: 40, gold: [14,28], minDiff: 10, maxDiff: 99 },
-            { name: 'Smok Młody',  sprite: 'wyrm',    hp: 80, atk: 20, def: 8, xp: 60, gold: [20,40], minDiff: 14, maxDiff: 99 },
+            { name: 'Golem',       sprite: 'golem',   hp: 100, atk: 14, armor: 15, xp: 65, gold: [12,28], minDiff: 5, maxDiff: 18 },
+            { name: 'Gryf',        sprite: 'griffin',  hp: 70, atk: 20, armor: 7,  xp: 55, gold: [10,22], minDiff: 6, maxDiff: 20 },
+            { name: 'Rycerz Cieni',sprite: 'dark_knight', hp: 80, atk: 24, armor: 12, xp: 75, gold: [16,35], minDiff: 8, maxDiff: 99 },
+            { name: 'Lodowy Golem',sprite: 'ice_golem', hp: 130, atk: 18, armor: 20, xp: 90, gold: [18,38], minDiff: 10, maxDiff: 99 },
+            { name: 'Smok Młody',  sprite: 'wyrm',    hp: 200, atk: 35, armor: 18, xp: 140, gold: [28,55], minDiff: 14, maxDiff: 99 },
         ],
         desert: [
-            { name: 'Skorpion',    sprite: 'scorpion', hp: 18, atk: 9,  def: 2, xp: 14, gold: [4,10],  minDiff: 3, maxDiff: 12 },
-            { name: 'Mumia',       sprite: 'mummy',    hp: 30, atk: 8,  def: 3, xp: 20, gold: [6,14],  minDiff: 5, maxDiff: 16 },
-            { name: 'Dżinn',       sprite: 'djinn',    hp: 25, atk: 15, def: 2, xp: 30, gold: [10,22], minDiff: 7, maxDiff: 20 },
-            { name: 'Ognisty Elem',sprite: 'fire_elemental', hp: 40, atk: 16, def: 3, xp: 38, gold: [12,24], minDiff: 9, maxDiff: 22 },
-            { name: 'Sfinks',      sprite: 'djinn',    hp: 60, atk: 18, def: 6, xp: 50, gold: [15,35], minDiff: 12, maxDiff: 99 },
-            { name: 'Demon Piasków',sprite: 'demon',   hp: 85, atk: 22, def: 7, xp: 65, gold: [22,45], minDiff: 16, maxDiff: 99 },
+            { name: 'Skorpion',    sprite: 'scorpion', hp: 35, atk: 14, armor: 5,  xp: 28, gold: [5,14],  minDiff: 3, maxDiff: 12 },
+            { name: 'Mumia',       sprite: 'mummy',    hp: 65, atk: 14, armor: 8,  xp: 42, gold: [8,20],  minDiff: 5, maxDiff: 16 },
+            { name: 'Dżinn',       sprite: 'djinn',    hp: 55, atk: 25, armor: 5,  xp: 65, gold: [14,30], minDiff: 7, maxDiff: 20 },
+            { name: 'Ognisty Elem',sprite: 'fire_elemental', hp: 90, atk: 28, armor: 7,  xp: 85, gold: [16,35], minDiff: 9, maxDiff: 22 },
+            { name: 'Sfinks',      sprite: 'djinn',    hp: 140, atk: 30, armor: 14, xp: 110, gold: [20,45], minDiff: 12, maxDiff: 99 },
+            { name: 'Demon Piasków',sprite: 'demon',   hp: 200, atk: 38, armor: 16, xp: 150, gold: [30,60], minDiff: 16, maxDiff: 99 },
         ],
         snow: [
-            { name: 'Wilk Śnieżny',sprite: 'wolf',     hp: 24, atk: 8,  def: 2, xp: 16, gold: [4,10],  minDiff: 3, maxDiff: 14 },
-            { name: 'Lodowy Golem', sprite: 'ice_golem', hp: 50, atk: 10, def: 7, xp: 32, gold: [10,20], minDiff: 6, maxDiff: 20 },
-            { name: 'Szkielet Mróz',sprite: 'skeleton',  hp: 28, atk: 10, def: 3, xp: 20, gold: [6,14],  minDiff: 4, maxDiff: 16 },
-            { name: 'Widmo Zimy',   sprite: 'ghost',     hp: 35, atk: 14, def: 2, xp: 28, gold: [8,18],  minDiff: 8, maxDiff: 22 },
-            { name: 'Mroźny Wyrm',  sprite: 'wyrm',      hp: 90, atk: 22, def: 9, xp: 70, gold: [25,50], minDiff: 15, maxDiff: 99 },
+            { name: 'Wilk Śnieżny',sprite: 'wolf',     hp: 50, atk: 14, armor: 5,  xp: 32, gold: [5,14],  minDiff: 3, maxDiff: 14 },
+            { name: 'Lodowy Golem', sprite: 'ice_golem', hp: 110, atk: 16, armor: 18, xp: 70, gold: [14,28], minDiff: 6, maxDiff: 20 },
+            { name: 'Szkielet Mróz',sprite: 'skeleton',  hp: 60, atk: 16, armor: 7,  xp: 42, gold: [8,18],  minDiff: 4, maxDiff: 16 },
+            { name: 'Widmo Zimy',   sprite: 'ghost',     hp: 75, atk: 24, armor: 5,  xp: 60, gold: [10,25], minDiff: 8, maxDiff: 22 },
+            { name: 'Mroźny Wyrm',  sprite: 'wyrm',      hp: 220, atk: 38, armor: 20, xp: 160, gold: [35,70], minDiff: 15, maxDiff: 99 },
         ],
     },
 
@@ -478,6 +479,7 @@ const World = {
         this.placeTownBuilding(tiles, ox, oy, CS-5, 2, 3, 3, 'Kartograf');
         this.placeTownBuilding(tiles, ox, oy, 2, CS-5, 3, 3, 'Alchemik');
         this.placeTownBuilding(tiles, ox, oy, CS-5, CS-5, 3, 3, 'Jubiler');
+        this.placeTownBuilding(tiles, ox, oy, 8, CS-5, 3, 3, 'Bankier');
     },
 
     // West (-1,0): Market, weapon shop, food stalls
@@ -766,6 +768,7 @@ const World = {
         // Town buildings with NPCs
         this.placeTownBuilding(tiles, ox, oy, CS - 7, 5, 4, 3, 'Bibliotekarz');
         this.placeTownBuilding(tiles, ox, oy, CS - 7, 10, 4, 3, 'Kupiec');
+        this.placeTownBuilding(tiles, ox, oy, 3, 12, 3, 3, 'Bankier');
 
         // Buyable houses
         this.placeBuyableHouse(tiles, ox, oy, 3, CS - 7, 4, 3, 200 * city.difficulty, `Dom w ${city.name} #1`);
@@ -903,7 +906,8 @@ const World = {
                 hp: Math.floor(base.hp * scale * eMult),
                 maxHp: Math.floor(base.hp * scale * eMult),
                 atk: Math.floor(base.atk * scale * eMult),
-                def: Math.floor(base.def * scale),
+                armor: Math.floor((base.armor || base.def || 0) * scale),
+                def: Math.floor((base.armor || base.def || 0) * scale),
                 xp: Math.floor(base.xp * scale * eMult),
                 gold: [Math.floor(base.gold[0] * scale * eMult), Math.floor(base.gold[1] * scale * eMult)],
                 level: diff,
@@ -1313,7 +1317,8 @@ const World = {
                 hp: Math.floor(base.hp * scale * eMult),
                 maxHp: Math.floor(base.hp * scale * eMult),
                 atk: Math.floor(base.atk * scale * eMult),
-                def: Math.floor(base.def * scale),
+                armor: Math.floor((base.armor || base.def || 0) * scale),
+                def: Math.floor((base.armor || base.def || 0) * scale),
                 xp: Math.floor(base.xp * scale * eMult * 1.5),
                 gold: [Math.floor(base.gold[0] * scale * eMult), Math.floor(base.gold[1] * scale * eMult * 1.5)],
                 level: d.difficulty + d.floor,
