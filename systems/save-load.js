@@ -1,5 +1,6 @@
 // ============================================================
 // SAVE / LOAD SYSTEM - Persistence and version compatibility
+// Adds save() and load() methods to the global Game object (defined in config/game-init.js)
 // ============================================================
 
 Game.save = function() {
