@@ -102,6 +102,7 @@ GameUI.renderShopItems = function() {
                     const idx = p.inventory.indexOf(item);
                     if (idx === -1) return;
                     p.gold += sellPrice;
+                    Game.syncGold();
                     if (Object.values(p.equipment).some(e => e && e.id === item.id)) {
                         for (const s in p.equipment) { if (p.equipment[s]?.id === item.id) p.equipment[s] = null; }
                     }
@@ -145,6 +146,7 @@ GameUI.buyItem = function(idx) {
     }
 
     p.gold -= item.price;
+    Game.syncGold();
     Game.log(`Kupiono: ${item.name} za ${item.price} z\u0142`, 'shop');
     Game.shopItems.splice(idx, 1);
     this.renderShopItems();

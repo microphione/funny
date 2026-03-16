@@ -19,10 +19,11 @@ const Sprites = {
         return c;
     },
 
-    draw(gameCtx, key, x, y, scale = 1) {
+    draw(gameCtx, key, x, y) {
         const sprite = this.cache[key];
         if (!sprite) return;
-        gameCtx.drawImage(sprite, x, y, this.SPRITE_SIZE * scale, this.SPRITE_SIZE * scale);
+        const drawSize = (typeof Game !== 'undefined') ? Game.TILE : this.SPRITE_SIZE;
+        gameCtx.drawImage(sprite, x, y, drawSize, drawSize);
     },
 
     px(ctx, x, y, color, w = 1, h = 1) {

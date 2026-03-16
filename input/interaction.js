@@ -55,6 +55,20 @@ GameInput.interact = function() {
         if (curTile === World.T.STAIRS_DOWN) { World.goDownFloor(); GameRender.updateHUD(); return; }
     }
 
+    // Check if standing on stairs_up on overworld (e.g. starter island -> town)
+    if (!World.activeBuildingFloor && !World.activeDungeon) {
+        const curTile = World.getTile(p.x, p.y);
+        if (curTile === World.T.STAIRS_UP) {
+            // Check if this is the starter island town entrance
+            const ic = World.getIslandCenter();
+            if (Math.abs(p.x - ic.x) < 3 && Math.abs(p.y - ic.y) < 3) {
+                World.enterStarterTown();
+                GameRender.updateHUD();
+                return;
+            }
+        }
+    }
+
     // Pickup flow: first under player, then surrounding tiles (one item at a time)
     if (this.tryPickupOneItem()) return;
 
@@ -76,6 +90,7 @@ GameInput.interact = function() {
             const dc = World.activeDungeon.chests && World.activeDungeon.chests[key];
             if (!dc) { Game.log('Ta skrzynia jest już pusta.', 'info'); return; }
             p.gold += dc.gold;
+            Game.syncGold();
             Game.log(`Skrzynia: +${dc.gold} złota!`, 'loot');
             Music.playGoldDrop();
             delete World.activeDungeon.chests[key];
@@ -91,6 +106,7 @@ GameInput.interact = function() {
         const chest = World.chests[key];
         if (chest) {
             p.gold += chest.gold;
+            Game.syncGold();
             Game.log(`Skrzynia: +${chest.gold} złota!`, 'loot');
             Music.playGoldDrop();
             if (Math.random() < 0.5) {
@@ -131,9 +147,9 @@ GameInput.interact = function() {
         const quest = World.questNpcs[`${tx},${ty}`];
         if (!quest) return;
 
-        // Starter island special NPCs
-        if (quest.type === 'starter_island') {
-            this.handleStarterIslandQuestNpc();
+        // Starter island special NPCs (per-NPC quest system)
+        if (quest.type === 'starter_island' || quest.type === 'starter_island_npc') {
+            this.handleStarterIslandQuestNpc(quest.name || 'Mieszkaniec');
             return;
         }
         if (quest.type === 'starter_mentor') {
@@ -179,6 +195,7 @@ GameInput.interact = function() {
                     GameUI.confirmAction(`Kupić wierzchowca za ${mountPrice} złota?`, () => {
                         if (p.gold >= mountPrice) {
                             p.gold -= mountPrice;
+                            Game.syncGold();
                             p.ownedMounts = p.ownedMounts || [];
                             p.ownedMounts.push('horse');
                             Game.log(`Kupiono wierzchowca! Naciśnij R.`, 'loot');
@@ -205,6 +222,7 @@ GameInput.interact = function() {
             if (existing.completed && !existing.turned_in) {
                 existing.turned_in = true;
                 p.gold += existing.reward.gold;
+                Game.syncGold();
                 Game.addXp(existing.reward.xp);
                 Game.log(`Quest oddany! +${existing.reward.gold}zł, +${existing.reward.xp} XP`, 'loot');
                 GameRender.updateHUD();
@@ -247,6 +265,7 @@ GameInput.interact = function() {
                 GameUI.confirmAction(`Kupić wierzchowca za ${mountPrice} złota? (+40% szybkości ruchu)`, () => {
                     if (p.gold >= mountPrice) {
                         p.gold -= mountPrice;
+                        Game.syncGold();
                         p.ownedMounts = p.ownedMounts || [];
                         p.ownedMounts.push('horse');
                         Game.log(`Kupiono wierzchowca! Naciśnij R by wsiadać/zsiadać.`, 'loot');
@@ -331,6 +350,7 @@ GameInput.interact = function() {
         const cost = 5 + p.level * 2;
         if (p.gold >= cost) {
             p.gold -= cost;
+            Game.syncGold();
             p.hp = p.maxHp;
             p.mp = p.maxMp;
             Game.log(`Odpoczynek w karczmie. Pełne HP i MP! (-${cost}zł)`, 'heal');
@@ -471,18 +491,59 @@ GameInput.checkCollectQuest = function() {
     const p = Game.player;
     const key = `${p.x},${p.y}`;
     const qi = World.questItems[key];
-    if (qi) {
-        const q = Game.quests.find(q => q.id === qi.questId && !q.completed);
-        if (q) {
-            q.progress++;
-            delete World.questItems[key];
-            Game.log(`Zebrano ${qi.itemName} (${q.progress}/${q.required})`, 'loot');
-            if (q.progress >= q.required) {
-                q.completed = true;
-                Game.log(`Quest "${q.title}" ukończony! Wróć do zleceniodawcy.`, 'info');
-                for (const k in World.questItems) {
-                    if (World.questItems[k].questId === q.id) delete World.questItems[k];
+    if (!qi) return;
+
+    // Standard quest system (main quests, city quests)
+    const q = Game.quests.find(q => q.id === qi.questId && !q.completed);
+    if (q) {
+        q.progress++;
+        delete World.questItems[key];
+        Game.log(`Zebrano ${qi.itemName} (${q.progress}/${q.required})`, 'loot');
+        if (q.progress >= q.required) {
+            q.completed = true;
+            Game.log(`Quest "${q.title}" ukończony! Wróć do zleceniodawcy.`, 'info');
+            for (const k in World.questItems) {
+                if (World.questItems[k].questId === q.id) delete World.questItems[k];
+            }
+        }
+        return;
+    }
+
+    // Starter island quest system (simple collect + chain collect steps)
+    if (Game.starterIslandQuests) {
+        const siq = Game.starterIslandQuests;
+        for (const sq of STARTER_ISLAND.quests) {
+            if (siq[sq.id] !== 'active') continue;
+            if (sq.id !== qi.questId) continue;
+
+            if (sq.type === 'chain') {
+                const stepIdx = siq[sq.id + '_step'] || 0;
+                const step = sq.steps[stepIdx];
+                if (step && step.type === 'collect' && step.target === qi.itemName) {
+                    const pKey = sq.id + '_progress';
+                    siq[pKey] = (siq[pKey] || 0) + 1;
+                    delete World.questItems[key];
+                    Game.log(`Zebrano ${qi.itemName} (${siq[pKey]}/${step.count})`, 'loot');
+                    if (siq[pKey] >= step.count) {
+                        Game.log(`Etap ${stepIdx + 1} questu "${sq.title}" ukończony! Wróć do ${sq.npc}.`, 'info');
+                        for (const k in World.questItems) {
+                            if (World.questItems[k].questId === sq.id) delete World.questItems[k];
+                        }
+                    }
+                    return;
                 }
+            } else if (sq.type === 'collect' && sq.target === qi.itemName) {
+                const pKey = sq.id + '_progress';
+                siq[pKey] = (siq[pKey] || 0) + 1;
+                delete World.questItems[key];
+                Game.log(`Zebrano ${qi.itemName} (${siq[pKey]}/${sq.count})`, 'loot');
+                if (siq[pKey] >= sq.count) {
+                    Game.log(`Quest "${sq.title}" ukończony! Wróć do ${sq.npc}.`, 'info');
+                    for (const k in World.questItems) {
+                        if (World.questItems[k].questId === sq.id) delete World.questItems[k];
+                    }
+                }
+                return;
             }
         }
     }

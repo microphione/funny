@@ -191,12 +191,13 @@ const GameRender = {
                 if (!World.activeDungeon && World.questItems[`${wx},${wy}`]) {
                     ctx.fillStyle = '#f1c40f';
                     ctx.globalAlpha = 0.6 + Math.sin(Date.now() / 200 + wx + wy) * 0.3;
+                    const half = TILE / 2;
                     ctx.beginPath();
-                    ctx.arc(sx + 16, sy + 16, 5, 0, Math.PI * 2);
+                    ctx.arc(sx + half, sy + half, 5, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.fillStyle = '#fff';
                     ctx.beginPath();
-                    ctx.arc(sx + 16, sy + 16, 2, 0, Math.PI * 2);
+                    ctx.arc(sx + half, sy + half, 2, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.globalAlpha = 1;
                 }
@@ -346,10 +347,10 @@ const GameRender = {
             Sprites.draw(ctx, spriteKey, sx, sy);
 
             // HP bar above monster
-            const barW = 28;
-            const barH = 3;
+            const barW = TILE - 8;
+            const barH = 4;
             const barX = sx + (TILE - barW) / 2;
-            const barY = sy - 6;
+            const barY = sy - 8;
             ctx.fillStyle = '#000';
             ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
             ctx.fillStyle = '#e74c3c';
@@ -375,22 +376,22 @@ const GameRender = {
         ctx.globalAlpha = 1;
 
         // Player HP/MP bars on screen
-        const phpW = 28;
+        const phpW = TILE - 4;
         ctx.fillStyle = '#000';
-        ctx.fillRect(px - 1, py - 10, phpW + 2, 4);
+        ctx.fillRect(px + 1, py - 12, phpW + 2, 5);
         ctx.fillStyle = '#e74c3c';
-        ctx.fillRect(px, py - 9, phpW * p.hp / p.maxHp, 2);
+        ctx.fillRect(px + 2, py - 11, phpW * p.hp / p.maxHp, 2);
         ctx.fillStyle = '#3498db';
-        ctx.fillRect(px, py - 6, phpW * p.mp / p.maxMp, 2);
+        ctx.fillRect(px + 2, py - 8, phpW * p.mp / p.maxMp, 2);
 
         // Attack cooldown bar (below player)
         if (G.attackCooldown > 0) {
             const atkSpeed = G.getAttackSpeed();
             const atkPct = G.attackCooldown / atkSpeed;
             ctx.fillStyle = '#000';
-            ctx.fillRect(px - 1, py + TILE + 2, phpW + 2, 3);
+            ctx.fillRect(px + 1, py + TILE + 2, phpW + 2, 4);
             ctx.fillStyle = '#e67e22';
-            ctx.fillRect(px, py + TILE + 3, phpW * (1 - atkPct), 1);
+            ctx.fillRect(px + 2, py + TILE + 3, phpW * (1 - atkPct), 2);
         }
 
         // House roof overlay - draw roofs over everything, except player's current house
@@ -455,12 +456,13 @@ const GameRender = {
 
     drawDirectionIndicator(ctx, px, py, dir) {
         ctx.fillStyle = 'rgba(255,255,100,0.6)';
-        const cx = px + 16, cy = py + 16;
+        const TILE = Game.TILE;
+        const cx = px + TILE / 2, cy = py + TILE / 2;
         switch (dir) {
             case 'up': ctx.fillRect(cx - 2, py - 4, 4, 3); break;
-            case 'down': ctx.fillRect(cx - 2, py + 33, 4, 3); break;
+            case 'down': ctx.fillRect(cx - 2, py + TILE + 1, 4, 3); break;
             case 'left': ctx.fillRect(px - 4, cy - 2, 3, 4); break;
-            case 'right': ctx.fillRect(px + 33, cy - 2, 3, 4); break;
+            case 'right': ctx.fillRect(px + TILE + 1, cy - 2, 3, 4); break;
         }
     },
 };

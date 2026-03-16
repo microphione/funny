@@ -242,6 +242,7 @@ GameUI.showHouseBuyDialog = function(houseKey, house) {
         buyBtn.textContent = 'Kup dom!';
         buyBtn.onclick = () => {
             p.gold -= house.price;
+            Game.syncGold();
             house.owned = true;
             if (!p.ownedHouses) p.ownedHouses = [];
             p.ownedHouses.push(houseKey);
@@ -292,6 +293,7 @@ GameUI.openBank = function() {
             const real = amt === 'all' ? p.gold : Math.min(amt, p.gold);
             if (real <= 0) return;
             p.gold -= real;
+            Game.syncGold();
             p.bankGold = (p.bankGold || 0) + real;
             Game.log(`Wp\u0142acono ${formatCurrency(real)} do banku.`, 'shop');
             this.openBank();
@@ -318,6 +320,7 @@ GameUI.openBank = function() {
             if (real <= 0) return;
             p.bankGold -= real;
             p.gold += real;
+            Game.syncGold();
             Game.log(`Wyp\u0142acono ${formatCurrency(real)} z banku.`, 'shop');
             this.openBank();
             GameRender.updateHUD();

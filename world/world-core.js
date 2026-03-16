@@ -158,16 +158,15 @@ const World = {
 
     // Check if position is on the starter island
     isStarterIsland(wx, wy) {
-        const icx = STARTER_ISLAND.cx * this.CHUNK_SIZE + Math.floor(this.CHUNK_SIZE / 2);
-        const icy = STARTER_ISLAND.cy * this.CHUNK_SIZE + Math.floor(this.CHUNK_SIZE / 2);
-        const dist = Math.sqrt((wx - icx) ** 2 + (wy - icy) ** 2);
+        const ic = this.getIslandCenter ? this.getIslandCenter() : {
+            x: STARTER_ISLAND.cx * this.CHUNK_SIZE + Math.floor(this.CHUNK_SIZE / 2),
+            y: STARTER_ISLAND.cy * this.CHUNK_SIZE + Math.floor(this.CHUNK_SIZE / 2)
+        };
+        const dist = Math.sqrt((wx - ic.x) ** 2 + (wy - ic.y) ** 2);
         return dist <= STARTER_ISLAND.radius;
     },
 
-    isStarterIslandChunk(cx, cy) {
-        return cx >= STARTER_ISLAND.cx - 1 && cx <= STARTER_ISLAND.cx + 1 &&
-               cy >= STARTER_ISLAND.cy - 1 && cy <= STARTER_ISLAND.cy + 1;
-    },
+    // isStarterIslandChunk is defined in starter-island.js
 
     getBiome(wx, wy) {
         // Starter island is always plains biome

@@ -4,29 +4,243 @@
 // ============================================================
 
 // ========== STARTER ISLAND ==========
-// Starter island config: small island for levels 1-20, no class choice
+// Starter island config: large island for levels 1-20
 const STARTER_ISLAND = {
-    // Island center in world coords (chunk 8,8 = tile 160,160)
-    cx: 8, cy: 8,
-    radius: 25, // island radius in tiles
+    // Island center in world coords (chunk 20,20 = tile 400,400)
+    cx: 20, cy: 20,
+    radius: 400, // island radius in tiles (800x800)
+
+    // Zone definitions for different areas of the island
+    zones: {
+        town_stairs: { x: 0, y: 0, radius: 3 },        // Center - stairs to town on +1
+        beach_south: { x: 0, y: 250, radius: 120 },     // Southern beach
+        forest_east: { x: 200, y: -50, radius: 150 },   // Eastern forest
+        swamp_nw: { x: -200, y: -150, radius: 120 },    // Northwest swamp
+        ruins_north: { x: 0, y: -250, radius: 100 },    // Northern ruins
+        pirate_bay: { x: -200, y: 200, radius: 100 },   // Southwest pirate bay
+        druid_clearing: { x: 150, y: 150, radius: 40 }, // Southeast druid area
+        lighthouse: { x: -300, y: 0, radius: 30 },      // Western lighthouse
+        port: { x: 0, y: 300, radius: 40 },             // Southern port
+        mine_entrance: { x: 250, y: -200, radius: 20 }, // Mine dungeon entrance
+        crab_cave: { x: 100, y: 280, radius: 15 },      // Mini dungeon under beach
+        pirate_tunnel: { x: -250, y: 250, radius: 15 }, // Pirate mini dungeon
+        crypt_entrance: { x: 50, y: -280, radius: 15 }, // Crypt dungeon entrance
+    },
+
     monsters: [
-        { name: 'Szczur',         sprite: 'slime',    hp: 12, atk: 2,  armor: 0,  xp: 5,  gold: [1,3],  minDiff: 1, maxDiff: 5 },
-        { name: 'Krab',           sprite: 'beetle',   hp: 18, atk: 3,  armor: 2,  xp: 8,  gold: [1,4],  minDiff: 1, maxDiff: 8 },
-        { name: 'Meduza',         sprite: 'ghost',    hp: 15, atk: 5,  armor: 0,  xp: 10, gold: [2,5],  minDiff: 2, maxDiff: 10 },
-        { name: 'Dziki Królik',   sprite: 'wolf',     hp: 22, atk: 4,  armor: 1,  xp: 12, gold: [2,6],  minDiff: 2, maxDiff: 12 },
-        { name: 'Bies Plażowy',   sprite: 'goblin',   hp: 30, atk: 6,  armor: 3,  xp: 18, gold: [3,8],  minDiff: 4, maxDiff: 14 },
-        { name: 'Pirat',          sprite: 'bandit',   hp: 40, atk: 8,  armor: 4,  xp: 25, gold: [5,12], minDiff: 6, maxDiff: 18 },
-        { name: 'Kapitan Piratów',sprite: 'dark_knight', hp: 65, atk: 12, armor: 6, xp: 45, gold: [10,20], minDiff: 10, maxDiff: 20 },
+        // Beach (lv 1-4)
+        { name: 'Krab',           sprite: 'beetle',     hp: 15, atk: 2,  armor: 2,  xp: 6,  gold: [1,3],  minDiff: 1, maxDiff: 5,  zone: 'beach' },
+        { name: 'Meduza',         sprite: 'ghost',      hp: 12, atk: 4,  armor: 0,  xp: 8,  gold: [1,4],  minDiff: 1, maxDiff: 6,  zone: 'beach' },
+        { name: 'Szczur',         sprite: 'slime',      hp: 10, atk: 2,  armor: 0,  xp: 4,  gold: [1,2],  minDiff: 1, maxDiff: 4,  zone: 'any' },
+        // Forest (lv 4-10)
+        { name: 'Wilk',           sprite: 'wolf',       hp: 28, atk: 6,  armor: 2,  xp: 15, gold: [2,6],  minDiff: 3, maxDiff: 10, zone: 'forest' },
+        { name: 'Pająk',          sprite: 'spider',     hp: 22, atk: 8,  armor: 1,  xp: 12, gold: [2,5],  minDiff: 3, maxDiff: 9,  zone: 'forest' },
+        { name: 'Bandyta',        sprite: 'bandit',     hp: 35, atk: 7,  armor: 3,  xp: 18, gold: [4,10], minDiff: 4, maxDiff: 12, zone: 'forest' },
+        // Swamp (lv 6-12)
+        { name: 'Żaba Trująca',   sprite: 'slime',      hp: 25, atk: 5,  armor: 1,  xp: 14, gold: [2,6],  minDiff: 4, maxDiff: 10, zone: 'swamp' },
+        { name: 'Wąż Jadowity',   sprite: 'spider',     hp: 30, atk: 9,  armor: 2,  xp: 20, gold: [3,8],  minDiff: 5, maxDiff: 12, zone: 'swamp' },
+        { name: 'Duch Bagna',     sprite: 'ghost',      hp: 35, atk: 11, armor: 0,  xp: 25, gold: [4,10], minDiff: 6, maxDiff: 14, zone: 'swamp' },
+        // Pirates (lv 6-12)
+        { name: 'Pirat',          sprite: 'bandit',     hp: 38, atk: 8,  armor: 4,  xp: 22, gold: [5,12], minDiff: 5, maxDiff: 14, zone: 'pirate' },
+        { name: 'Pirat Kapitan',  sprite: 'dark_knight',hp: 60, atk: 12, armor: 6,  xp: 40, gold: [8,18], minDiff: 8, maxDiff: 18, zone: 'pirate' },
+        // Ruins (lv 10-18)
+        { name: 'Szkielet',       sprite: 'skeleton',   hp: 40, atk: 10, armor: 5,  xp: 28, gold: [4,12], minDiff: 7, maxDiff: 16, zone: 'ruins' },
+        { name: 'Golem Kamienny', sprite: 'golem',      hp: 65, atk: 14, armor: 10, xp: 45, gold: [8,18], minDiff: 10, maxDiff: 20, zone: 'ruins' },
+        { name: 'Ożywiona Zbroja',sprite: 'dark_knight',hp: 55, atk: 16, armor: 8,  xp: 50, gold: [10,22],minDiff: 12, maxDiff: 20, zone: 'ruins' },
+        // General (scaling)
+        { name: 'Dziki Królik',   sprite: 'wolf',       hp: 18, atk: 3,  armor: 1,  xp: 8,  gold: [1,4],  minDiff: 1, maxDiff: 8,  zone: 'any' },
+        { name: 'Nietoperz',      sprite: 'ghost',      hp: 14, atk: 5,  armor: 0,  xp: 10, gold: [1,3],  minDiff: 2, maxDiff: 8,  zone: 'cave' },
     ],
+
+    // Starter island dungeon definitions
+    dungeons: [
+        { id: 'si_crab_cave', name: 'Grota Krabów', monsters: ['beetle','slime'], boss: { name: 'Krabowy Patriarcha', sprite: 'beetle', hpMult: 6, atkMult: 2, defMult: 2, xpMult: 8, goldMult: 10 }, floors: 2, biome: 'cave', minLevel: 3 },
+        { id: 'si_pirate_tunnel', name: 'Tunele Piratów', monsters: ['bandit','skeleton'], boss: { name: 'Piracki Skarbnik', sprite: 'bandit', hpMult: 7, atkMult: 3, defMult: 2, xpMult: 10, goldMult: 15 }, floors: 2, biome: 'cave', minLevel: 8 },
+        { id: 'si_crypt', name: 'Krypta pod Ruinami', monsters: ['skeleton','ghost'], boss: { name: 'Strażnik Krypty', sprite: 'dark_knight', hpMult: 10, atkMult: 4, defMult: 3, xpMult: 15, goldMult: 20 }, floors: 3, biome: 'crypt', minLevel: 12 },
+        { id: 'si_mine', name: 'Kopalnia Krasnoludów', monsters: ['golem','skeleton'], boss: { name: 'Kamienny Król', sprite: 'golem', hpMult: 12, atkMult: 4, defMult: 5, xpMult: 18, goldMult: 25 }, floors: 4, biome: 'cave', minLevel: 15 },
+    ],
+
+    // Quest system supports:
+    //  type: 'kill'    - kill target monsters (count)
+    //  type: 'collect' - gather items (count, spawned near targetZone)
+    //  type: 'dungeon' - complete dungeon boss (target = dungeon id)
+    //  type: 'visit'   - visit a zone on the island (target = zone name)
+    //  type: 'level'   - reach a level (count)
+    //  type: 'chain'   - multi-step quest with steps[] array
+    //
+    //  requires: ['quest_id'] - prerequisite quests (must be turned_in)
+    //  steps[]: array of sub-objectives for chain quests, each step has its own type/target/count
+    //
+    // Chain quest step types: kill, collect, visit, dungeon
+    // Chain quests track: _step (current index), _progress (progress in current step)
+
     quests: [
-        { id: 'si_q1', title: 'Pierwsze Kroki', desc: 'Zabij 3 Szczury.', type: 'kill', target: 'Szczur', count: 3, xp: 20, gold: 10, minLevel: 1 },
-        { id: 'si_q2', title: 'Obrona Plaży', desc: 'Zabij 5 Krabów.', type: 'kill', target: 'Krab', count: 5, xp: 35, gold: 15, minLevel: 3 },
-        { id: 'si_q3', title: 'Morski Koszmar', desc: 'Zabij 5 Meduz.', type: 'kill', target: 'Meduza', count: 5, xp: 50, gold: 20, minLevel: 5 },
-        { id: 'si_q4', title: 'Polowanie', desc: 'Zabij 8 Dzikich Królików.', type: 'kill', target: 'Dziki Królik', count: 8, xp: 70, gold: 30, minLevel: 7 },
-        { id: 'si_q5', title: 'Zagrożenie Wyspy', desc: 'Zabij 6 Biesów Plażowych.', type: 'kill', target: 'Bies Plażowy', count: 6, xp: 100, gold: 45, minLevel: 9 },
-        { id: 'si_q6', title: 'Piraci!', desc: 'Zabij 8 Piratów.', type: 'kill', target: 'Pirat', count: 8, xp: 150, gold: 60, minLevel: 12 },
-        { id: 'si_q7', title: 'Kapitan', desc: 'Pokonaj Kapitana Piratów.', type: 'kill', target: 'Kapitan Piratów', count: 1, xp: 250, gold: 100, minLevel: 16 },
-        { id: 'si_q8', title: 'Gotowy na Świat', desc: 'Osiągnij poziom 20.', type: 'level', count: 20, xp: 0, gold: 200, minLevel: 18 },
+        // ===== PROSTE QUESTY (simple, early game) =====
+
+        // Rybak - prosty quest na start
+        { id: 'si_rybak1', title: 'Pierwszy Połów', desc: 'Zabij 5 Krabów na plaży.',
+          type: 'kill', target: 'Krab', count: 5, xp: 25, gold: 10, minLevel: 1, npc: 'Rybak' },
+
+        // Karczmarka - prosty collect
+        { id: 'si_karczmarka1', title: 'Prowiant na Wieczór', desc: 'Upoluj 5 sztuk Mięsa.',
+          type: 'collect', target: 'Mięso', count: 5, xp: 30, gold: 15, minLevel: 1, npc: 'Karczmarka',
+          targetZone: 'forest_east' },
+
+        // Strażnik - prosty quest, ale wymaga żeby rybak/karczmarka byli zrobieni
+        { id: 'si_straznik1', title: 'Patrole Leśne', desc: 'Zabij 6 Wilków w lesie na wschodzie.',
+          type: 'kill', target: 'Wilk', count: 6, xp: 50, gold: 25, minLevel: 3, npc: 'Strażnik',
+          requires: ['si_rybak1'] },
+
+        // ===== ŚREDNIE QUESTY (medium, multi-step or with requirements) =====
+
+        // Rybak chain: kraby -> meduzy -> odwiedź Grotę Krabów
+        { id: 'si_rybak2', title: 'Zagadka Plaży', desc: 'Rybak potrzebuje pomocy z narastającym zagrożeniem na plaży.',
+          type: 'chain', xp: 80, gold: 40, minLevel: 3, npc: 'Rybak',
+          requires: ['si_rybak1'],
+          steps: [
+            { desc: 'Zabij 5 Meduz zatruwających wody.', type: 'kill', target: 'Meduza', count: 5 },
+            { desc: 'Zbadaj Grotę Krabów - wejdź do środka.', type: 'visit', target: 'crab_cave' },
+          ]},
+
+        // Zielarka chain: zbierz zioła, potem zabij żaby co je strzegą
+        { id: 'si_zielarka1', title: 'Receptura Zielarki', desc: 'Zielarka potrzebuje składników na nową miksturę.',
+          type: 'chain', xp: 70, gold: 35, minLevel: 3, npc: 'Zielarka',
+          steps: [
+            { desc: 'Zbierz 5 Ziół Bagiennych na bagnach (NW).', type: 'collect', target: 'Zioło Bagienne', count: 5 },
+            { desc: 'Zabij 3 Żaby Trujące strzegące polany z ziołami.', type: 'kill', target: 'Żaba Trująca', count: 3 },
+          ],
+          targetZone: 'swamp_nw' },
+
+        // Żona Zielarki - szukaj kwiatu + odwiedź polanę druida
+        { id: 'si_zona_ziel1', title: 'Kwiat dla Ukochanej', desc: 'Żona Zielarki marzy o rzadkim kwiecie z Polany Druida.',
+          type: 'chain', xp: 60, gold: 30, minLevel: 4, npc: 'Żona Zielarki',
+          steps: [
+            { desc: 'Odwiedź Polanę Druida na południowym wschodzie.', type: 'visit', target: 'druid_clearing' },
+            { desc: 'Zbierz Kwiat Polany.', type: 'collect', target: 'Kwiat Polany', count: 1 },
+          ],
+          targetZone: 'druid_clearing' },
+
+        // Kupiec chain: najpierw zwiad, potem walka, potem odzyskaj
+        { id: 'si_kupiec1', title: 'Skradzione Towary', desc: 'Kupiec stracił towar przez bandytów. Pomóż go odzyskać.',
+          type: 'chain', xp: 90, gold: 45, minLevel: 5, npc: 'Kupiec',
+          steps: [
+            { desc: 'Idź na Piracką Zatokę i rozejrzyj się.', type: 'visit', target: 'pirate_bay' },
+            { desc: 'Zabij 6 Bandytów pilnujących towaru.', type: 'kill', target: 'Bandyta', count: 6 },
+            { desc: 'Odzyskaj 3 Skrzynie Kupca.', type: 'collect', target: 'Skrzynia Kupca', count: 3 },
+          ],
+          targetZone: 'pirate_bay' },
+
+        // Strażnik chain: wilki -> pająki -> bandyci (eskalacja zagrożeń)
+        { id: 'si_straznik2', title: 'Zagrożenie z Lasu', desc: 'Lasy stają się coraz bardziej niebezpieczne. Sprawdź co się dzieje.',
+          type: 'chain', xp: 120, gold: 60, minLevel: 6, npc: 'Strażnik',
+          requires: ['si_straznik1'],
+          steps: [
+            { desc: 'Zabij 5 Pająków w głębi lasu.', type: 'kill', target: 'Pająk', count: 5 },
+            { desc: 'Zbadaj głąb lasu szukając źródła zagrożenia.', type: 'visit', target: 'forest_east' },
+            { desc: 'Zabij 4 Bandytów ukrywających się w lesie.', type: 'kill', target: 'Bandyta', count: 4 },
+          ]},
+
+        // ===== ZAWIŁE QUESTY (complex, long chains, prerequisites) =====
+
+        // Burmistrz epicka linia questów: wywiad -> piraci -> kapitan -> tunel
+        { id: 'si_burmistrz1', title: 'Problem Piracki', desc: 'Burmistrz ma poważny problem z piratami najeżdżającymi południowe wybrzeże.',
+          type: 'chain', xp: 200, gold: 100, minLevel: 6, npc: 'Burmistrz',
+          steps: [
+            { desc: 'Zbadaj Piracką Zatokę na południu.', type: 'visit', target: 'pirate_bay' },
+            { desc: 'Zabij 8 Piratów stacjonujących w zatoce.', type: 'kill', target: 'Pirat', count: 8 },
+            { desc: 'Znajdź Rozkazy Piratów upuszczone przez piratów.', type: 'collect', target: 'Rozkazy Piratów', count: 1 },
+          ],
+          targetZone: 'pirate_bay' },
+
+        // Burmistrz 2: kontynuacja - kapitan i tunel
+        { id: 'si_burmistrz2', title: 'Zemsta Kapitana', desc: 'Rozkazy wskazują na Kapitana Piratów. Trzeba go powstrzymać!',
+          type: 'chain', xp: 300, gold: 150, minLevel: 10, npc: 'Burmistrz',
+          requires: ['si_burmistrz1'],
+          steps: [
+            { desc: 'Pokonaj Kapitana Piratów w Pirackiej Zatoce.', type: 'kill', target: 'Pirat Kapitan', count: 1 },
+            { desc: 'Przeszukaj Tunele Piratów - pokonaj bossa.', type: 'dungeon', target: 'si_pirate_tunnel', count: 1 },
+          ]},
+
+        // Uczony: wieloetapowa ekspedycja naukowa
+        { id: 'si_uczony1', title: 'Ekspedycja Archeologiczna', desc: 'Uczony potrzebuje pomocy w badaniu starożytnych ruin na północy.',
+          type: 'chain', xp: 250, gold: 120, minLevel: 10, npc: 'Uczony',
+          steps: [
+            { desc: 'Odwiedź Ruiny na północy wyspy.', type: 'visit', target: 'ruins_north' },
+            { desc: 'Zabij 6 Szkieletów strzegących wejścia do ruin.', type: 'kill', target: 'Szkielet', count: 6 },
+            { desc: 'Zbierz 3 Fragmenty Inskrypcji wśród ruin.', type: 'collect', target: 'Fragment Inskrypcji', count: 3 },
+            { desc: 'Zanurz się w Krypcie pod Ruinami i pokonaj Strażnika.', type: 'dungeon', target: 'si_crypt', count: 1 },
+          ],
+          targetZone: 'ruins_north' },
+
+        // Kapłan: linia oczyszczania wyspy z nieumarłych
+        { id: 'si_kaplan1', title: 'Klątwa Nieumarłych', desc: 'Kapłan wyczuwa mroczną energię z północy. Trzeba oczyścić wyspę.',
+          type: 'chain', xp: 280, gold: 140, minLevel: 11, npc: 'Kapłan',
+          steps: [
+            { desc: 'Zabij 8 Duchów Bagna na bagnach.', type: 'kill', target: 'Duch Bagna', count: 8 },
+            { desc: 'Odwiedź Ruiny i znajdź źródło klątwy.', type: 'visit', target: 'ruins_north' },
+            { desc: 'Oczyść Kryptę pod Ruinami - pokonaj bossa.', type: 'dungeon', target: 'si_crypt', count: 1 },
+          ]},
+
+        // Druid: poznanie wyspy + ochrona natury
+        { id: 'si_druid1', title: 'Harmonia Wyspy', desc: 'Druid prosi o przywrócenie równowagi na wyspie.',
+          type: 'chain', xp: 180, gold: 90, minLevel: 7, npc: 'Druid',
+          steps: [
+            { desc: 'Odwiedź Latarnię Morską na zachodzie.', type: 'visit', target: 'lighthouse' },
+            { desc: 'Odwiedź Bagno na północnym zachodzie.', type: 'visit', target: 'swamp_nw' },
+            { desc: 'Zabij 5 Węży Jadowitych zatruwających bagno.', type: 'kill', target: 'Wąż Jadowity', count: 5 },
+            { desc: 'Zbierz 3 Kryształy Natury z polany.', type: 'collect', target: 'Kryształ Natury', count: 3 },
+          ],
+          targetZone: 'druid_clearing' },
+
+        // Kowal: kopalnia - wymaga questów strażnika
+        { id: 'si_kowal1', title: 'Ruda i Ogień', desc: 'Kowal potrzebuje rudy z opuszczonej Kopalni Krasnoludów.',
+          type: 'chain', xp: 350, gold: 180, minLevel: 13, npc: 'Kowal',
+          requires: ['si_straznik2'],
+          steps: [
+            { desc: 'Zbadaj wejście do Kopalni na wschodzie.', type: 'visit', target: 'mine_entrance' },
+            { desc: 'Zabij 5 Golemów Kamiennych pilnujących kopalni.', type: 'kill', target: 'Golem Kamienny', count: 5 },
+            { desc: 'Zbierz 8 Rud Żelaza wewnątrz kopalni.', type: 'collect', target: 'Ruda Żelaza', count: 8 },
+            { desc: 'Pokonaj Kamiennego Króla w Kopalni Krasnoludów.', type: 'dungeon', target: 'si_mine', count: 1 },
+          ],
+          targetZone: 'mine_entrance' },
+
+        // Żeglarz: piracki skarb - zagadka eksploracyjna
+        { id: 'si_zeglarz1', title: 'Legenda o Skarbie', desc: 'Stary Żeglarz zna legendę o pirackim skarbie ukrytym na wyspie.',
+          type: 'chain', xp: 200, gold: 100, minLevel: 8, npc: 'Stary Żeglarz',
+          steps: [
+            { desc: 'Odwiedź Piracką Zatokę i szukaj wskazówek.', type: 'visit', target: 'pirate_bay' },
+            { desc: 'Zabij 4 Piratów i znajdź fragment Mapy Skarbów.', type: 'kill', target: 'Pirat', count: 4 },
+            { desc: 'Zbierz Mapę Skarbów.', type: 'collect', target: 'Mapa Skarbów', count: 1 },
+            { desc: 'Odwiedź Latarnię Morską - tam wskazuje mapa.', type: 'visit', target: 'lighthouse' },
+          ],
+          targetZone: 'pirate_bay' },
+
+        // Karczmarka 2: wymaga karczmarki 1 i strażnika 1
+        { id: 'si_karczmarka2', title: 'Bankiet Bohaterów', desc: 'Karczmarka organizuje ucztę, ale potrzebuje egzotycznych składników.',
+          type: 'chain', xp: 100, gold: 50, minLevel: 6, npc: 'Karczmarka',
+          requires: ['si_karczmarka1', 'si_straznik1'],
+          steps: [
+            { desc: 'Zbierz 3 Grzyby Leśne w lesie na wschodzie.', type: 'collect', target: 'Grzyb Leśny', count: 3 },
+            { desc: 'Zabij 3 Kraby na plaży po Krabowe Mięso.', type: 'kill', target: 'Krab', count: 3 },
+            { desc: 'Odwiedź Polanę Druida po zioła.', type: 'visit', target: 'druid_clearing' },
+          ],
+          targetZone: 'forest_east' },
+
+        // Zielarka 2: zaawansowana alchemia - wymaga zielarki 1
+        { id: 'si_zielarka2', title: 'Eliksir Ochrony', desc: 'Zielarka opracowała przepis na potężny eliksir, ale brakuje składników.',
+          type: 'chain', xp: 150, gold: 75, minLevel: 8, npc: 'Zielarka',
+          requires: ['si_zielarka1'],
+          steps: [
+            { desc: 'Zabij 4 Węże Jadowite i zbierz ich jad.', type: 'kill', target: 'Wąż Jadowity', count: 4 },
+            { desc: 'Zbierz 3 Kwiaty Bagna w bagnie.', type: 'collect', target: 'Kwiat Bagna', count: 3 },
+            { desc: 'Odwiedź Ruiny po Starożytny Katalizator.', type: 'visit', target: 'ruins_north' },
+            { desc: 'Zbierz 1 Starożytny Katalizator wśród ruin.', type: 'collect', target: 'Starożytny Katalizator', count: 1 },
+          ],
+          targetZone: 'swamp_nw' },
+
+        // Kapitan statku - zawsze ostatni quest
+        { id: 'si_kapitan', title: 'Gotowy na Świat', desc: 'Osiągnij poziom 20 aby opuścić wyspę.',
+          type: 'level', count: 20, xp: 0, gold: 200, minLevel: 18, npc: 'Kapitan Statku' },
     ],
 };
 
