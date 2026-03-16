@@ -141,7 +141,7 @@ const CLASSES = {
         hpPerLevel: 12, mpPerLevel: 3,
         attacksPerTurn: 1,
         baseAttackSpeed: 1.5,
-        allowedItems: ['sword','axe','mace','helmet','armor','pants','boots','shield'],
+        allowedItems: ['sword','longsword','axe','battleaxe','mace','warhammer','helmet','great_helm','armor','plate_armor','pants','plate_legs','boots','plate_boots','shield','tower_shield'],
         skills: [
             { level: 1,  id: 'shield_bash', name: 'Uderzenie Tarczą', desc: 'Ogłusza wroga. Obrażenia 1.2x (+0.2x/lv)', cost: 8, type: 'melee', baseMult: 1.2, multPerLv: 0.2 },
             { level: 2,  id: 'power_strike', name: 'Potężne Uderzenie', desc: 'Obrażenia 2x ATK (+0.3x/lv)', cost: 12, type: 'melee', baseMult: 2.0, multPerLv: 0.3 },
@@ -199,7 +199,7 @@ const CLASSES = {
         hpPerLevel: 8, mpPerLevel: 4,
         attacksPerTurn: 2,
         baseAttackSpeed: 1.0,
-        allowedItems: ['dagger','sword','hood','cape','leggings','boots','offhand_dagger'],
+        allowedItems: ['dagger','kris','rapier','sword','hood','mask','cape','shadow_vest','leather_armor','leggings','shadow_legs','boots','swift_boots','offhand_dagger','buckler'],
         skills: [
             { level: 1,  id: 'stealth', name: 'Niewidzialność', desc: 'Niewidzialny na 5 kratek (+2/lv)', cost: 10, type: 'buff' },
             { level: 2,  id: 'backstab', name: 'Cios w Plecy', desc: '2x obrażenia (+0.3x/lv)', cost: 12, type: 'melee', baseMult: 2.0, multPerLv: 0.3 },
@@ -258,7 +258,7 @@ const CLASSES = {
         attacksPerTurn: 1,
         baseAttackSpeed: 2.0,
         attackRange: 3,
-        allowedItems: ['wand','staff','hat','robe','pants','shoes','tome'],
+        allowedItems: ['wand','staff','scepter','hat','circlet','robe','arcane_robe','pants','shoes','arcane_boots','tome','orb'],
         skills: [
             { level: 1,  id: 'fireball', name: 'Kula Ognia', desc: 'Obszarowe 1.5x w promieniu 1 (+0.2x/lv)', cost: 12, type: 'ranged_aoe', baseMult: 1.5, multPerLv: 0.2 },
             { level: 2,  id: 'ice_bolt', name: 'Lodowy Pocisk', desc: '2x ATK + zamrożenie (+0.3x/lv)', cost: 10, type: 'ranged', baseMult: 2.0, multPerLv: 0.3 },
@@ -317,7 +317,7 @@ const CLASSES = {
         attacksPerTurn: 1,
         baseAttackSpeed: 1.3,
         attackRange: 4,
-        allowedItems: ['bow','crossbow','spear','hood','leather_armor','leggings','boots','quiver'],
+        allowedItems: ['bow','longbow','crossbow','heavy_crossbow','spear','javelin','hood','ranger_hat','leather_armor','ranger_vest','leggings','ranger_legs','boots','swift_boots','quiver','enchanted_quiver'],
         skills: [
             { level: 1,  id: 'aimed_shot', name: 'Celny Strzał', desc: '2x ATK dystansowy (+0.3x/lv)', cost: 10, type: 'ranged', baseMult: 2.0, multPerLv: 0.3 },
             { level: 2,  id: 'multi_shot', name: 'Wielostrzał', desc: 'Strzela w 3 wrogów 1x (+0.15x/lv)', cost: 14, type: 'ranged_aoe', baseMult: 1.0, multPerLv: 0.15 },
@@ -404,42 +404,69 @@ const CLASSES = {
 
 // ========== ITEM BASES ==========
 const ITEM_BASES = {
-    // Weapons - primary stat is damage
-    sword:   { slot: 'weapon', primaryStat: 'damage', base: 4, name: 'Miecz',    classes: ['knight','rogue'] },
-    axe:     { slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Topór',     classes: ['knight'] },
-    mace:    { slot: 'weapon', primaryStat: 'damage', base: 6, name: 'Młot',      classes: ['knight'] },
-    dagger:  { slot: 'weapon', primaryStat: 'damage', base: 3, name: 'Sztylet',   classes: ['rogue'] },
-    wand:    { slot: 'weapon', primaryStat: 'damage', base: 4, name: 'Różdżka',   classes: ['mage'] },
-    staff:   { slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Kostur',    classes: ['mage'] },
-    // Head - primary stat is armor
-    helmet:  { slot: 'head', primaryStat: 'armor', base: 3, name: 'Hełm',       classes: ['knight'] },
-    hood:    { slot: 'head', primaryStat: 'dodge', base: 2, name: 'Kaptur',      classes: ['rogue','archer'] },
-    hat:     { slot: 'head', primaryStat: 'maxMp', base: 5, name: 'Kapelusz',    classes: ['mage'] },
-    // Chest - primary stat is armor
-    armor:   { slot: 'chest', primaryStat: 'armor', base: 5, name: 'Zbroja',     classes: ['knight'] },
-    cape:    { slot: 'chest', primaryStat: 'dodge', base: 3, name: 'Peleryna',   classes: ['rogue'] },
-    robe:    { slot: 'chest', primaryStat: 'armor', base: 2, name: 'Szata',      classes: ['mage'] },
-    // Legs
-    pants:   { slot: 'legs', primaryStat: 'armor', base: 2, name: 'Spodnie',     classes: ['knight','mage'] },
-    leggings:{ slot: 'legs', primaryStat: 'dodge', base: 2, name: 'Nogawice',    classes: ['rogue','archer'] },
-    // Feet
-    boots:   { slot: 'feet', primaryStat: 'moveSpeed', base: 2, name: 'Buty',    classes: ['knight','rogue','archer'] },
-    shoes:   { slot: 'feet', primaryStat: 'moveSpeed', base: 1, name: 'Trzewiki', classes: ['mage'] },
-    // Offhand
-    shield:  { slot: 'offhand', primaryStat: 'armor', base: 4, name: 'Tarcza',   classes: ['knight'] },
-    tome:    { slot: 'offhand', primaryStat: 'damage', base: 3, name: 'Grimuar',  classes: ['mage'] },
-    offhand_dagger: { slot: 'offhand', primaryStat: 'damage', base: 2, name: 'Lewak',  classes: ['rogue'] },
-    // Archer
-    bow:     { slot: 'weapon', primaryStat: 'damage', base: 4, name: 'Łuk',       classes: ['archer'] },
-    crossbow:{ slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Kusza',     classes: ['archer'] },
-    spear:   { slot: 'weapon', primaryStat: 'damage', base: 6, name: 'Włócznia',  classes: ['archer'] },
+    // ---- Weapons ----
+    sword:       { slot: 'weapon', primaryStat: 'damage', base: 4, name: 'Miecz',        classes: ['knight','rogue'] },
+    longsword:   { slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Długi Miecz',  classes: ['knight'] },
+    axe:         { slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Topór',         classes: ['knight'] },
+    battleaxe:   { slot: 'weapon', primaryStat: 'damage', base: 7, name: 'Topór Bojowy',  classes: ['knight'] },
+    mace:        { slot: 'weapon', primaryStat: 'damage', base: 6, name: 'Młot',          classes: ['knight'] },
+    warhammer:   { slot: 'weapon', primaryStat: 'damage', base: 8, name: 'Młot Wojenny',  classes: ['knight'] },
+    dagger:      { slot: 'weapon', primaryStat: 'damage', base: 3, name: 'Sztylet',       classes: ['rogue'] },
+    kris:        { slot: 'weapon', primaryStat: 'damage', base: 4, name: 'Kris',          classes: ['rogue'] },
+    rapier:      { slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Rapier',        classes: ['rogue'] },
+    wand:        { slot: 'weapon', primaryStat: 'damage', base: 4, name: 'Różdżka',       classes: ['mage'] },
+    staff:       { slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Kostur',        classes: ['mage'] },
+    scepter:     { slot: 'weapon', primaryStat: 'damage', base: 6, name: 'Berło',         classes: ['mage'] },
+    // ---- Head ----
+    helmet:      { slot: 'head', primaryStat: 'armor', base: 3, name: 'Hełm',         classes: ['knight'] },
+    great_helm:  { slot: 'head', primaryStat: 'armor', base: 5, name: 'Wielki Hełm',  classes: ['knight'] },
+    hood:        { slot: 'head', primaryStat: 'dodge', base: 2, name: 'Kaptur',        classes: ['rogue','archer'] },
+    mask:        { slot: 'head', primaryStat: 'dodge', base: 3, name: 'Maska',         classes: ['rogue'] },
+    hat:         { slot: 'head', primaryStat: 'maxMp', base: 5, name: 'Kapelusz',      classes: ['mage'] },
+    circlet:     { slot: 'head', primaryStat: 'maxMp', base: 7, name: 'Diadem',        classes: ['mage'] },
+    ranger_hat:  { slot: 'head', primaryStat: 'accuracy', base: 3, name: 'Kapelusz Łowcy', classes: ['archer'] },
+    // ---- Chest ----
+    armor:       { slot: 'chest', primaryStat: 'armor', base: 5, name: 'Zbroja',       classes: ['knight'] },
+    plate_armor: { slot: 'chest', primaryStat: 'armor', base: 7, name: 'Pełna Zbroja', classes: ['knight'] },
+    cape:        { slot: 'chest', primaryStat: 'dodge', base: 3, name: 'Peleryna',     classes: ['rogue'] },
+    shadow_vest: { slot: 'chest', primaryStat: 'dodge', base: 4, name: 'Kamizelka Cieni', classes: ['rogue'] },
+    robe:        { slot: 'chest', primaryStat: 'armor', base: 2, name: 'Szata',        classes: ['mage'] },
+    arcane_robe: { slot: 'chest', primaryStat: 'maxMp', base: 8, name: 'Szata Arkany', classes: ['mage'] },
     leather_armor: { slot: 'chest', primaryStat: 'armor', base: 3, name: 'Skórzana Zbroja', classes: ['archer','rogue'] },
-    quiver:  { slot: 'offhand', primaryStat: 'accuracy', base: 3, name: 'Kołczan',  classes: ['archer'] },
-    // Novice items
-    club:    { slot: 'weapon', primaryStat: 'damage', base: 3, name: 'Maczuga',   classes: ['novice'] },
-    tunic:   { slot: 'chest',  primaryStat: 'armor',  base: 2, name: 'Tunika',    classes: ['novice'] },
-    simple_pants: { slot: 'legs', primaryStat: 'armor', base: 1, name: 'Proste Spodnie', classes: ['novice'] },
-    sandals: { slot: 'feet', primaryStat: 'moveSpeed', base: 1, name: 'Sandały',  classes: ['novice'] },
+    ranger_vest: { slot: 'chest', primaryStat: 'armor', base: 4, name: 'Kamizelka Łowcy', classes: ['archer'] },
+    // ---- Legs ----
+    pants:       { slot: 'legs', primaryStat: 'armor', base: 2, name: 'Spodnie',       classes: ['knight','mage'] },
+    plate_legs:  { slot: 'legs', primaryStat: 'armor', base: 4, name: 'Nagolenniki',   classes: ['knight'] },
+    leggings:    { slot: 'legs', primaryStat: 'dodge', base: 2, name: 'Nogawice',      classes: ['rogue','archer'] },
+    shadow_legs: { slot: 'legs', primaryStat: 'dodge', base: 3, name: 'Spodnie Cieni', classes: ['rogue'] },
+    ranger_legs: { slot: 'legs', primaryStat: 'dodge', base: 3, name: 'Spodnie Łowcy', classes: ['archer'] },
+    // ---- Feet ----
+    boots:       { slot: 'feet', primaryStat: 'moveSpeed', base: 2, name: 'Buty',      classes: ['knight','rogue','archer'] },
+    plate_boots: { slot: 'feet', primaryStat: 'armor', base: 3, name: 'Ciężkie Buty',  classes: ['knight'] },
+    shoes:       { slot: 'feet', primaryStat: 'moveSpeed', base: 1, name: 'Trzewiki',  classes: ['mage'] },
+    arcane_boots:{ slot: 'feet', primaryStat: 'maxMp', base: 4, name: 'Buty Arkany',   classes: ['mage'] },
+    swift_boots: { slot: 'feet', primaryStat: 'moveSpeed', base: 3, name: 'Szybkie Buty', classes: ['rogue','archer'] },
+    // ---- Offhand ----
+    shield:      { slot: 'offhand', primaryStat: 'armor', base: 4, name: 'Tarcza',     classes: ['knight'] },
+    tower_shield:{ slot: 'offhand', primaryStat: 'armor', base: 6, name: 'Tarcza Wieżowa', classes: ['knight'] },
+    tome:        { slot: 'offhand', primaryStat: 'damage', base: 3, name: 'Grimuar',   classes: ['mage'] },
+    orb:         { slot: 'offhand', primaryStat: 'maxMp', base: 5, name: 'Kula Mocy',  classes: ['mage'] },
+    offhand_dagger: { slot: 'offhand', primaryStat: 'damage', base: 2, name: 'Lewak',  classes: ['rogue'] },
+    buckler:     { slot: 'offhand', primaryStat: 'dodge', base: 3, name: 'Puklerz',    classes: ['rogue'] },
+    // ---- Archer ----
+    bow:         { slot: 'weapon', primaryStat: 'damage', base: 4, name: 'Łuk',        classes: ['archer'] },
+    longbow:     { slot: 'weapon', primaryStat: 'damage', base: 6, name: 'Długi Łuk',  classes: ['archer'] },
+    crossbow:    { slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Kusza',      classes: ['archer'] },
+    heavy_crossbow: { slot: 'weapon', primaryStat: 'damage', base: 7, name: 'Ciężka Kusza', classes: ['archer'] },
+    spear:       { slot: 'weapon', primaryStat: 'damage', base: 6, name: 'Włócznia',   classes: ['archer'] },
+    javelin:     { slot: 'weapon', primaryStat: 'damage', base: 5, name: 'Oszczep',    classes: ['archer'] },
+    quiver:      { slot: 'offhand', primaryStat: 'accuracy', base: 3, name: 'Kołczan', classes: ['archer'] },
+    enchanted_quiver: { slot: 'offhand', primaryStat: 'accuracy', base: 5, name: 'Magiczny Kołczan', classes: ['archer'] },
+    // ---- Novice ----
+    club:        { slot: 'weapon', primaryStat: 'damage', base: 3, name: 'Maczuga',    classes: ['novice'] },
+    tunic:       { slot: 'chest',  primaryStat: 'armor',  base: 2, name: 'Tunika',     classes: ['novice'] },
+    simple_pants:{ slot: 'legs', primaryStat: 'armor', base: 1, name: 'Proste Spodnie',classes: ['novice'] },
+    sandals:     { slot: 'feet', primaryStat: 'moveSpeed', base: 1, name: 'Sandały',   classes: ['novice'] },
     wooden_shield: { slot: 'offhand', primaryStat: 'armor', base: 2, name: 'Drewniana Tarcza', classes: ['novice'] },
 };
 
@@ -451,10 +478,11 @@ function genderSuffix(name, tier) {
     if (tier === 'normal') return '';
     const prefix = TIER_PREFIXES[tier];
     // Polish gender - rough approximation
-    const feminine = ['Różdżka','Zbroja','Peleryna','Szata','Tarcza','Kusza','Włócznia','Skórzana Zbroja'];
-    const neuter = [];
+    const feminine = ['Różdżka','Zbroja','Peleryna','Szata','Tarcza','Kusza','Włócznia','Skórzana Zbroja','Maczuga','Tunika','Maska','Kamizelka','Kula'];
+    const neuter = ['Berło'];
     if (feminine.some(f => name.includes(f))) return prefix + 'a ';
-    const mascPlural = ['Buty','Spodnie','Nogawice','Trzewiki'];
+    if (neuter.some(n => name.includes(n))) return prefix + 'e ';
+    const mascPlural = ['Buty','Spodnie','Nogawice','Trzewiki','Nagolenniki'];
     if (mascPlural.some(m => name.includes(m))) return prefix + 'e ';
     return prefix + 'y ';
 }
@@ -596,6 +624,28 @@ const MONSTER_LOOT_TABLES = {
     'Szkielet Mróz':  { items: ['sword','helmet','shield'], potionChance: 0.2 },
     'Widmo Zimy':     { items: ['wand','tome','hat'], potionChance: 0.2 },
     'Mroźny Wyrm':    { items: ['crossbow','spear','armor','shield','helmet'], potionChance: 0.1 },
+    // New monsters
+    'Szczur Gigant':  { items: ['dagger','sandals','club'], potionChance: 0.3 },
+    'Rycerz Rozbójnik':{ items: ['sword','longsword','armor','helmet','shield'], potionChance: 0.2 },
+    'Centaur Weteran':{ items: ['spear','longbow','plate_armor','great_helm'], potionChance: 0.1 },
+    'Rycerz Zagłady': { items: ['warhammer','battleaxe','plate_armor','tower_shield','great_helm'], potionChance: 0.05 },
+    'Wielki Pająk':   { items: ['cape','shadow_vest','offhand_dagger','kris'], potionChance: 0.2 },
+    'Ork Szaman':     { items: ['staff','scepter','robe','hat'], potionChance: 0.2 },
+    'Starożytny Drzewiec': { items: ['staff','scepter','arcane_robe','circlet','orb'], potionChance: 0.05 },
+    'Trujący Żuk':    { items: ['dagger','kris','hood','mask','leggings'], potionChance: 0.2 },
+    'Troll Szaman':   { items: ['staff','wand','robe','hat','tome'], potionChance: 0.15 },
+    'Hydra Bagienna': { items: ['battleaxe','warhammer','plate_armor','tower_shield'], potionChance: 0.05 },
+    'Kamieniak':      { items: ['mace','helmet','shield','boots'], potionChance: 0.15 },
+    'Jaskiniowy Niedźwiedź':{ items: ['leather_armor','ranger_vest','boots','leggings'], potionChance: 0.15 },
+    'Gigant Górski':  { items: ['warhammer','battleaxe','plate_armor','great_helm'], potionChance: 0.1 },
+    'Prasmok':        { items: ['longsword','warhammer','plate_armor','tower_shield','circlet','scepter'], potionChance: 0.05 },
+    'Piaskowy Robak': { items: ['dagger','kris','leggings','boots'], potionChance: 0.2 },
+    'Faraon Nieumarły':{ items: ['scepter','circlet','arcane_robe','orb','tome'], potionChance: 0.1 },
+    'Wieczny Sfinks': { items: ['scepter','staff','arcane_robe','circlet','orb'], potionChance: 0.05 },
+    'Yeti':           { items: ['mace','leather_armor','boots','plate_legs'], potionChance: 0.15 },
+    'Lodowy Rycerz':  { items: ['longsword','armor','shield','helmet','plate_boots'], potionChance: 0.1 },
+    'Mroźny Smok':    { items: ['longbow','heavy_crossbow','plate_armor','great_helm','tower_shield'], potionChance: 0.05 },
+    'Król Zimy':      { items: ['warhammer','plate_armor','tower_shield','great_helm','circlet','scepter'], potionChance: 0.03 },
     // Starter island monsters
     'Szczur':          { items: ['club','sandals'], potionChance: 0.35 },
     'Krab':            { items: ['wooden_shield','sandals'], potionChance: 0.3 },
