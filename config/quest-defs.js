@@ -60,22 +60,187 @@ const STARTER_ISLAND = {
         { id: 'si_mine', name: 'Kopalnia Krasnoludów', monsters: ['golem','skeleton'], boss: { name: 'Kamienny Król', sprite: 'golem', hpMult: 12, atkMult: 4, defMult: 5, xpMult: 18, goldMult: 25 }, floors: 4, biome: 'cave', minLevel: 15 },
     ],
 
+    // Quest system supports:
+    //  type: 'kill'    - kill target monsters (count)
+    //  type: 'collect' - gather items (count, spawned near targetZone)
+    //  type: 'dungeon' - complete dungeon boss (target = dungeon id)
+    //  type: 'visit'   - visit a zone on the island (target = zone name)
+    //  type: 'level'   - reach a level (count)
+    //  type: 'chain'   - multi-step quest with steps[] array
+    //
+    //  requires: ['quest_id'] - prerequisite quests (must be turned_in)
+    //  steps[]: array of sub-objectives for chain quests, each step has its own type/target/count
+    //
+    // Chain quest step types: kill, collect, visit, dungeon
+    // Chain quests track: _step (current index), _progress (progress in current step)
+
     quests: [
-        // Quest NPC quests - assigned to specific NPCs in the town
-        { id: 'si_rybak', title: 'Pierwsza Przysługa', desc: 'Zabij 8 Krabów na plaży dla Rybaka.', type: 'kill', target: 'Krab', count: 8, xp: 30, gold: 15, minLevel: 1, npc: 'Rybak' },
-        { id: 'si_straznik', title: 'Obrona Dróg', desc: 'Zabij 10 Wilków zagrażających leśnej drodze.', type: 'kill', target: 'Wilk', count: 10, xp: 60, gold: 30, minLevel: 4, npc: 'Strażnik' },
-        { id: 'si_zielarka', title: 'Zioła z Bagna', desc: 'Zbierz 5 Ziół Bagiennych w bagnie na północnym zachodzie.', type: 'collect', target: 'Zioło Bagienne', count: 5, xp: 50, gold: 25, minLevel: 3, npc: 'Zielarka' },
-        { id: 'si_zona_ziel', title: 'Rzadki Kwiat', desc: 'Znajdź Kwiat Polany w Lesie Szeptów.', type: 'collect', target: 'Kwiat Polany', count: 1, xp: 45, gold: 20, minLevel: 5, npc: 'Żona Zielarki' },
-        { id: 'si_kowal', title: 'Ruda z Kopalni', desc: 'Przynieś 10 Rud Żelaza z Kopalni Krasnoludów.', type: 'collect', target: 'Ruda Żelaza', count: 10, xp: 100, gold: 60, minLevel: 8, npc: 'Kowal' },
-        { id: 'si_burmistrz1', title: 'Zagrożenie Pirackie', desc: 'Zabij 8 Piratów w Pirackiej Zatoce.', type: 'kill', target: 'Pirat', count: 8, xp: 80, gold: 40, minLevel: 6, npc: 'Burmistrz' },
-        { id: 'si_burmistrz2', title: 'Kapitan Piratów', desc: 'Pokonaj Kapitana Piratów.', type: 'kill', target: 'Pirat Kapitan', count: 1, xp: 150, gold: 80, minLevel: 10, npc: 'Burmistrz' },
-        { id: 'si_kaplan', title: 'Oczyść Kryptę', desc: 'Pokonaj bossa Krypty pod Ruinami.', type: 'dungeon', target: 'si_crypt', count: 1, xp: 200, gold: 100, minLevel: 12, npc: 'Kapłan' },
-        { id: 'si_kupiec', title: 'Odzyskaj Towary', desc: 'Zabij 6 Bandytów i odzyskaj skradziony towar.', type: 'kill', target: 'Bandyta', count: 6, xp: 70, gold: 35, minLevel: 5, npc: 'Kupiec' },
-        { id: 'si_uczony', title: 'Tajemnice Ruin', desc: 'Zbadaj Ruiny na północy i przynieś Artefakt Starożytnych.', type: 'collect', target: 'Artefakt Starożytnych', count: 1, xp: 120, gold: 60, minLevel: 10, npc: 'Uczony' },
-        { id: 'si_druid', title: 'Oczyść Bagno', desc: 'Zabij 8 Duchów Bagna.', type: 'kill', target: 'Duch Bagna', count: 8, xp: 100, gold: 50, minLevel: 8, npc: 'Druid' },
-        { id: 'si_zeglarz', title: 'Piracki Skarb', desc: 'Znajdź Mapę Skarbów w Tunelach Piratów.', type: 'collect', target: 'Mapa Skarbów', count: 1, xp: 90, gold: 45, minLevel: 9, npc: 'Stary Żeglarz' },
-        { id: 'si_karczmarka', title: 'Prowiant', desc: 'Przynieś 5 Mięs z polowania na zwierzęta.', type: 'collect', target: 'Mięso', count: 5, xp: 40, gold: 20, minLevel: 2, npc: 'Karczmarka' },
-        { id: 'si_kapitan', title: 'Gotowy na Świat', desc: 'Osiągnij poziom 20 aby opuścić wyspę.', type: 'level', count: 20, xp: 0, gold: 200, minLevel: 18, npc: 'Kapitan Statku' },
+        // ===== PROSTE QUESTY (simple, early game) =====
+
+        // Rybak - prosty quest na start
+        { id: 'si_rybak1', title: 'Pierwszy Połów', desc: 'Zabij 5 Krabów na plaży.',
+          type: 'kill', target: 'Krab', count: 5, xp: 25, gold: 10, minLevel: 1, npc: 'Rybak' },
+
+        // Karczmarka - prosty collect
+        { id: 'si_karczmarka1', title: 'Prowiant na Wieczór', desc: 'Upoluj 5 sztuk Mięsa.',
+          type: 'collect', target: 'Mięso', count: 5, xp: 30, gold: 15, minLevel: 1, npc: 'Karczmarka',
+          targetZone: 'forest_east' },
+
+        // Strażnik - prosty quest, ale wymaga żeby rybak/karczmarka byli zrobieni
+        { id: 'si_straznik1', title: 'Patrole Leśne', desc: 'Zabij 6 Wilków w lesie na wschodzie.',
+          type: 'kill', target: 'Wilk', count: 6, xp: 50, gold: 25, minLevel: 3, npc: 'Strażnik',
+          requires: ['si_rybak1'] },
+
+        // ===== ŚREDNIE QUESTY (medium, multi-step or with requirements) =====
+
+        // Rybak chain: kraby -> meduzy -> odwiedź Grotę Krabów
+        { id: 'si_rybak2', title: 'Zagadka Plaży', desc: 'Rybak potrzebuje pomocy z narastającym zagrożeniem na plaży.',
+          type: 'chain', xp: 80, gold: 40, minLevel: 3, npc: 'Rybak',
+          requires: ['si_rybak1'],
+          steps: [
+            { desc: 'Zabij 5 Meduz zatruwających wody.', type: 'kill', target: 'Meduza', count: 5 },
+            { desc: 'Zbadaj Grotę Krabów - wejdź do środka.', type: 'visit', target: 'crab_cave' },
+          ]},
+
+        // Zielarka chain: zbierz zioła, potem zabij żaby co je strzegą
+        { id: 'si_zielarka1', title: 'Receptura Zielarki', desc: 'Zielarka potrzebuje składników na nową miksturę.',
+          type: 'chain', xp: 70, gold: 35, minLevel: 3, npc: 'Zielarka',
+          steps: [
+            { desc: 'Zbierz 5 Ziół Bagiennych na bagnach (NW).', type: 'collect', target: 'Zioło Bagienne', count: 5 },
+            { desc: 'Zabij 3 Żaby Trujące strzegące polany z ziołami.', type: 'kill', target: 'Żaba Trująca', count: 3 },
+          ],
+          targetZone: 'swamp_nw' },
+
+        // Żona Zielarki - szukaj kwiatu + odwiedź polanę druida
+        { id: 'si_zona_ziel1', title: 'Kwiat dla Ukochanej', desc: 'Żona Zielarki marzy o rzadkim kwiecie z Polany Druida.',
+          type: 'chain', xp: 60, gold: 30, minLevel: 4, npc: 'Żona Zielarki',
+          steps: [
+            { desc: 'Odwiedź Polanę Druida na południowym wschodzie.', type: 'visit', target: 'druid_clearing' },
+            { desc: 'Zbierz Kwiat Polany.', type: 'collect', target: 'Kwiat Polany', count: 1 },
+          ],
+          targetZone: 'druid_clearing' },
+
+        // Kupiec chain: najpierw zwiad, potem walka, potem odzyskaj
+        { id: 'si_kupiec1', title: 'Skradzione Towary', desc: 'Kupiec stracił towar przez bandytów. Pomóż go odzyskać.',
+          type: 'chain', xp: 90, gold: 45, minLevel: 5, npc: 'Kupiec',
+          steps: [
+            { desc: 'Idź na Piracką Zatokę i rozejrzyj się.', type: 'visit', target: 'pirate_bay' },
+            { desc: 'Zabij 6 Bandytów pilnujących towaru.', type: 'kill', target: 'Bandyta', count: 6 },
+            { desc: 'Odzyskaj 3 Skrzynie Kupca.', type: 'collect', target: 'Skrzynia Kupca', count: 3 },
+          ],
+          targetZone: 'pirate_bay' },
+
+        // Strażnik chain: wilki -> pająki -> bandyci (eskalacja zagrożeń)
+        { id: 'si_straznik2', title: 'Zagrożenie z Lasu', desc: 'Lasy stają się coraz bardziej niebezpieczne. Sprawdź co się dzieje.',
+          type: 'chain', xp: 120, gold: 60, minLevel: 6, npc: 'Strażnik',
+          requires: ['si_straznik1'],
+          steps: [
+            { desc: 'Zabij 5 Pająków w głębi lasu.', type: 'kill', target: 'Pająk', count: 5 },
+            { desc: 'Zbadaj głąb lasu szukając źródła zagrożenia.', type: 'visit', target: 'forest_east' },
+            { desc: 'Zabij 4 Bandytów ukrywających się w lesie.', type: 'kill', target: 'Bandyta', count: 4 },
+          ]},
+
+        // ===== ZAWIŁE QUESTY (complex, long chains, prerequisites) =====
+
+        // Burmistrz epicka linia questów: wywiad -> piraci -> kapitan -> tunel
+        { id: 'si_burmistrz1', title: 'Problem Piracki', desc: 'Burmistrz ma poważny problem z piratami najeżdżającymi południowe wybrzeże.',
+          type: 'chain', xp: 200, gold: 100, minLevel: 6, npc: 'Burmistrz',
+          steps: [
+            { desc: 'Zbadaj Piracką Zatokę na południu.', type: 'visit', target: 'pirate_bay' },
+            { desc: 'Zabij 8 Piratów stacjonujących w zatoce.', type: 'kill', target: 'Pirat', count: 8 },
+            { desc: 'Znajdź Rozkazy Piratów upuszczone przez piratów.', type: 'collect', target: 'Rozkazy Piratów', count: 1 },
+          ],
+          targetZone: 'pirate_bay' },
+
+        // Burmistrz 2: kontynuacja - kapitan i tunel
+        { id: 'si_burmistrz2', title: 'Zemsta Kapitana', desc: 'Rozkazy wskazują na Kapitana Piratów. Trzeba go powstrzymać!',
+          type: 'chain', xp: 300, gold: 150, minLevel: 10, npc: 'Burmistrz',
+          requires: ['si_burmistrz1'],
+          steps: [
+            { desc: 'Pokonaj Kapitana Piratów w Pirackiej Zatoce.', type: 'kill', target: 'Pirat Kapitan', count: 1 },
+            { desc: 'Przeszukaj Tunele Piratów - pokonaj bossa.', type: 'dungeon', target: 'si_pirate_tunnel', count: 1 },
+          ]},
+
+        // Uczony: wieloetapowa ekspedycja naukowa
+        { id: 'si_uczony1', title: 'Ekspedycja Archeologiczna', desc: 'Uczony potrzebuje pomocy w badaniu starożytnych ruin na północy.',
+          type: 'chain', xp: 250, gold: 120, minLevel: 10, npc: 'Uczony',
+          steps: [
+            { desc: 'Odwiedź Ruiny na północy wyspy.', type: 'visit', target: 'ruins_north' },
+            { desc: 'Zabij 6 Szkieletów strzegących wejścia do ruin.', type: 'kill', target: 'Szkielet', count: 6 },
+            { desc: 'Zbierz 3 Fragmenty Inskrypcji wśród ruin.', type: 'collect', target: 'Fragment Inskrypcji', count: 3 },
+            { desc: 'Zanurz się w Krypcie pod Ruinami i pokonaj Strażnika.', type: 'dungeon', target: 'si_crypt', count: 1 },
+          ],
+          targetZone: 'ruins_north' },
+
+        // Kapłan: linia oczyszczania wyspy z nieumarłych
+        { id: 'si_kaplan1', title: 'Klątwa Nieumarłych', desc: 'Kapłan wyczuwa mroczną energię z północy. Trzeba oczyścić wyspę.',
+          type: 'chain', xp: 280, gold: 140, minLevel: 11, npc: 'Kapłan',
+          steps: [
+            { desc: 'Zabij 8 Duchów Bagna na bagnach.', type: 'kill', target: 'Duch Bagna', count: 8 },
+            { desc: 'Odwiedź Ruiny i znajdź źródło klątwy.', type: 'visit', target: 'ruins_north' },
+            { desc: 'Oczyść Kryptę pod Ruinami - pokonaj bossa.', type: 'dungeon', target: 'si_crypt', count: 1 },
+          ]},
+
+        // Druid: poznanie wyspy + ochrona natury
+        { id: 'si_druid1', title: 'Harmonia Wyspy', desc: 'Druid prosi o przywrócenie równowagi na wyspie.',
+          type: 'chain', xp: 180, gold: 90, minLevel: 7, npc: 'Druid',
+          steps: [
+            { desc: 'Odwiedź Latarnię Morską na zachodzie.', type: 'visit', target: 'lighthouse' },
+            { desc: 'Odwiedź Bagno na północnym zachodzie.', type: 'visit', target: 'swamp_nw' },
+            { desc: 'Zabij 5 Węży Jadowitych zatruwających bagno.', type: 'kill', target: 'Wąż Jadowity', count: 5 },
+            { desc: 'Zbierz 3 Kryształy Natury z polany.', type: 'collect', target: 'Kryształ Natury', count: 3 },
+          ],
+          targetZone: 'druid_clearing' },
+
+        // Kowal: kopalnia - wymaga questów strażnika
+        { id: 'si_kowal1', title: 'Ruda i Ogień', desc: 'Kowal potrzebuje rudy z opuszczonej Kopalni Krasnoludów.',
+          type: 'chain', xp: 350, gold: 180, minLevel: 13, npc: 'Kowal',
+          requires: ['si_straznik2'],
+          steps: [
+            { desc: 'Zbadaj wejście do Kopalni na wschodzie.', type: 'visit', target: 'mine_entrance' },
+            { desc: 'Zabij 5 Golemów Kamiennych pilnujących kopalni.', type: 'kill', target: 'Golem Kamienny', count: 5 },
+            { desc: 'Zbierz 8 Rud Żelaza wewnątrz kopalni.', type: 'collect', target: 'Ruda Żelaza', count: 8 },
+            { desc: 'Pokonaj Kamiennego Króla w Kopalni Krasnoludów.', type: 'dungeon', target: 'si_mine', count: 1 },
+          ],
+          targetZone: 'mine_entrance' },
+
+        // Żeglarz: piracki skarb - zagadka eksploracyjna
+        { id: 'si_zeglarz1', title: 'Legenda o Skarbie', desc: 'Stary Żeglarz zna legendę o pirackim skarbie ukrytym na wyspie.',
+          type: 'chain', xp: 200, gold: 100, minLevel: 8, npc: 'Stary Żeglarz',
+          steps: [
+            { desc: 'Odwiedź Piracką Zatokę i szukaj wskazówek.', type: 'visit', target: 'pirate_bay' },
+            { desc: 'Zabij 4 Piratów i znajdź fragment Mapy Skarbów.', type: 'kill', target: 'Pirat', count: 4 },
+            { desc: 'Zbierz Mapę Skarbów.', type: 'collect', target: 'Mapa Skarbów', count: 1 },
+            { desc: 'Odwiedź Latarnię Morską - tam wskazuje mapa.', type: 'visit', target: 'lighthouse' },
+          ],
+          targetZone: 'pirate_bay' },
+
+        // Karczmarka 2: wymaga karczmarki 1 i strażnika 1
+        { id: 'si_karczmarka2', title: 'Bankiet Bohaterów', desc: 'Karczmarka organizuje ucztę, ale potrzebuje egzotycznych składników.',
+          type: 'chain', xp: 100, gold: 50, minLevel: 6, npc: 'Karczmarka',
+          requires: ['si_karczmarka1', 'si_straznik1'],
+          steps: [
+            { desc: 'Zbierz 3 Grzyby Leśne w lesie na wschodzie.', type: 'collect', target: 'Grzyb Leśny', count: 3 },
+            { desc: 'Zabij 3 Kraby na plaży po Krabowe Mięso.', type: 'kill', target: 'Krab', count: 3 },
+            { desc: 'Odwiedź Polanę Druida po zioła.', type: 'visit', target: 'druid_clearing' },
+          ],
+          targetZone: 'forest_east' },
+
+        // Zielarka 2: zaawansowana alchemia - wymaga zielarki 1
+        { id: 'si_zielarka2', title: 'Eliksir Ochrony', desc: 'Zielarka opracowała przepis na potężny eliksir, ale brakuje składników.',
+          type: 'chain', xp: 150, gold: 75, minLevel: 8, npc: 'Zielarka',
+          requires: ['si_zielarka1'],
+          steps: [
+            { desc: 'Zabij 4 Węże Jadowite i zbierz ich jad.', type: 'kill', target: 'Wąż Jadowity', count: 4 },
+            { desc: 'Zbierz 3 Kwiaty Bagna w bagnie.', type: 'collect', target: 'Kwiat Bagna', count: 3 },
+            { desc: 'Odwiedź Ruiny po Starożytny Katalizator.', type: 'visit', target: 'ruins_north' },
+            { desc: 'Zbierz 1 Starożytny Katalizator wśród ruin.', type: 'collect', target: 'Starożytny Katalizator', count: 1 },
+          ],
+          targetZone: 'swamp_nw' },
+
+        // Kapitan statku - zawsze ostatni quest
+        { id: 'si_kapitan', title: 'Gotowy na Świat', desc: 'Osiągnij poziom 20 aby opuścić wyspę.',
+          type: 'level', count: 20, xp: 0, gold: 200, minLevel: 18, npc: 'Kapitan Statku' },
     ],
 };
 

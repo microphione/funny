@@ -491,18 +491,59 @@ GameInput.checkCollectQuest = function() {
     const p = Game.player;
     const key = `${p.x},${p.y}`;
     const qi = World.questItems[key];
-    if (qi) {
-        const q = Game.quests.find(q => q.id === qi.questId && !q.completed);
-        if (q) {
-            q.progress++;
-            delete World.questItems[key];
-            Game.log(`Zebrano ${qi.itemName} (${q.progress}/${q.required})`, 'loot');
-            if (q.progress >= q.required) {
-                q.completed = true;
-                Game.log(`Quest "${q.title}" ukończony! Wróć do zleceniodawcy.`, 'info');
-                for (const k in World.questItems) {
-                    if (World.questItems[k].questId === q.id) delete World.questItems[k];
+    if (!qi) return;
+
+    // Standard quest system (main quests, city quests)
+    const q = Game.quests.find(q => q.id === qi.questId && !q.completed);
+    if (q) {
+        q.progress++;
+        delete World.questItems[key];
+        Game.log(`Zebrano ${qi.itemName} (${q.progress}/${q.required})`, 'loot');
+        if (q.progress >= q.required) {
+            q.completed = true;
+            Game.log(`Quest "${q.title}" ukończony! Wróć do zleceniodawcy.`, 'info');
+            for (const k in World.questItems) {
+                if (World.questItems[k].questId === q.id) delete World.questItems[k];
+            }
+        }
+        return;
+    }
+
+    // Starter island quest system (simple collect + chain collect steps)
+    if (Game.starterIslandQuests) {
+        const siq = Game.starterIslandQuests;
+        for (const sq of STARTER_ISLAND.quests) {
+            if (siq[sq.id] !== 'active') continue;
+            if (sq.id !== qi.questId) continue;
+
+            if (sq.type === 'chain') {
+                const stepIdx = siq[sq.id + '_step'] || 0;
+                const step = sq.steps[stepIdx];
+                if (step && step.type === 'collect' && step.target === qi.itemName) {
+                    const pKey = sq.id + '_progress';
+                    siq[pKey] = (siq[pKey] || 0) + 1;
+                    delete World.questItems[key];
+                    Game.log(`Zebrano ${qi.itemName} (${siq[pKey]}/${step.count})`, 'loot');
+                    if (siq[pKey] >= step.count) {
+                        Game.log(`Etap ${stepIdx + 1} questu "${sq.title}" ukończony! Wróć do ${sq.npc}.`, 'info');
+                        for (const k in World.questItems) {
+                            if (World.questItems[k].questId === sq.id) delete World.questItems[k];
+                        }
+                    }
+                    return;
                 }
+            } else if (sq.type === 'collect' && sq.target === qi.itemName) {
+                const pKey = sq.id + '_progress';
+                siq[pKey] = (siq[pKey] || 0) + 1;
+                delete World.questItems[key];
+                Game.log(`Zebrano ${qi.itemName} (${siq[pKey]}/${sq.count})`, 'loot');
+                if (siq[pKey] >= sq.count) {
+                    Game.log(`Quest "${sq.title}" ukończony! Wróć do ${sq.npc}.`, 'info');
+                    for (const k in World.questItems) {
+                        if (World.questItems[k].questId === sq.id) delete World.questItems[k];
+                    }
+                }
+                return;
             }
         }
     }

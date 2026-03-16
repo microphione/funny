@@ -111,6 +111,11 @@ GameInput.tryMove = function(dx, dy, dir) {
     // Collect quest items (overworld only)
     if (!World.activeDungeon) this.checkCollectQuest();
 
+    // Zone visit tracking for starter island quests
+    if (!World.activeDungeon && !World.activeBuildingFloor && Game.starterIslandQuests) {
+        this.checkZoneVisit(nx, ny);
+    }
+
     // Music update
     if (!World.activeDungeon) {
         const biome = World.getBiome(nx, ny);
@@ -121,4 +126,39 @@ GameInput.tryMove = function(dx, dy, dir) {
 
     // Cleanup far chunks periodically
     if (!World.activeDungeon && Math.random() < 0.05) World.cleanupChunks(nx, ny);
+};
+
+// Check if player entered a zone relevant to active quests
+GameInput.checkZoneVisit = function(wx, wy) {
+    const siq = Game.starterIslandQuests;
+    if (!siq) return;
+
+    const zone = World.getIslandZone(wx, wy);
+    if (!zone || zone === 'plains' || zone === 'town_stairs') return;
+
+    // Check all active starter island quests
+    for (const q of STARTER_ISLAND.quests) {
+        if (siq[q.id] !== 'active') continue;
+
+        if (q.type === 'chain') {
+            const stepIdx = siq[q.id + '_step'] || 0;
+            const step = q.steps[stepIdx];
+            if (step && step.type === 'visit' && !siq[q.id + '_visited_' + step.target]) {
+                // Check if player is in the target zone
+                if (zone === step.target || zone.startsWith(step.target)) {
+                    siq[q.id + '_visited_' + step.target] = true;
+                    Game.log(`Odkryto lokację: ${step.target}! Etap ukończony.`, 'info');
+                    Game.log(`Wróć do ${q.npc} aby kontynuować quest.`, 'info');
+                }
+            }
+        } else if (q.type === 'visit') {
+            if (!siq[q.id + '_visited_' + q.target]) {
+                if (zone === q.target || zone.startsWith(q.target)) {
+                    siq[q.id + '_visited_' + q.target] = true;
+                    Game.log(`Odkryto lokację: ${q.target}!`, 'info');
+                    Game.log(`Wróć do ${q.npc} aby zdać quest.`, 'info');
+                }
+            }
+        }
+    }
 };

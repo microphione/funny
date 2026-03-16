@@ -249,16 +249,34 @@ const GameCombat = {
             }
         });
 
-        // Starter island quest tracking
+        // Starter island quest tracking (simple + chain quests)
         if (Game.starterIslandQuests) {
+            const siq = Game.starterIslandQuests;
+            const monsterName = m.baseName || m.name;
             for (const q of STARTER_ISLAND.quests) {
-                if (Game.starterIslandQuests[q.id] === 'active' && q.type === 'kill' && q.target === (m.baseName || m.name)) {
+                if (siq[q.id] !== 'active') continue;
+
+                if (q.type === 'chain') {
+                    // Chain quest: check current step
+                    const stepIdx = siq[q.id + '_step'] || 0;
+                    const step = q.steps[stepIdx];
+                    if (step && step.type === 'kill' && step.target === monsterName) {
+                        const key = q.id + '_progress';
+                        siq[key] = (siq[key] || 0) + 1;
+                        if (siq[key] >= step.count) {
+                            Game.log(`Etap ${stepIdx + 1} questu "${q.title}" ukończony! Wróć do ${q.npc}.`, 'info');
+                        } else {
+                            Game.log(`${step.target}: ${siq[key]}/${step.count}`, 'info');
+                        }
+                    }
+                } else if (q.type === 'kill' && q.target === monsterName) {
+                    // Simple kill quest
                     const key = q.id + '_progress';
-                    Game.starterIslandQuests[key] = (Game.starterIslandQuests[key] || 0) + 1;
-                    if (Game.starterIslandQuests[key] >= q.count) {
+                    siq[key] = (siq[key] || 0) + 1;
+                    if (siq[key] >= q.count) {
                         Game.log(`Quest "${q.title}" ukończony! Wróć do ${q.npc || 'zleceniodawcy'}.`, 'info');
                     } else {
-                        Game.log(`${q.target}: ${Game.starterIslandQuests[key]}/${q.count}`, 'info');
+                        Game.log(`${q.target}: ${siq[key]}/${q.count}`, 'info');
                     }
                 }
             }
