@@ -300,7 +300,7 @@ const GameCombat = {
                 const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
                 for (const d of dirs) {
                     const nx = m.x + d.dx, ny = m.y + d.dy;
-                    if (World.isWalkable(nx, ny) && !(nx === p.x && ny === p.y)) {
+                    if (World.isWalkable(nx, ny, p.x, p.y) && !(nx === p.x && ny === p.y)) {
                         p.x = nx; p.y = ny; p.visualX = nx; p.visualY = ny;
                         break;
                     }
@@ -462,7 +462,7 @@ const GameCombat = {
                 let nx = p.x, ny = p.y;
                 for (let i = 0; i < dist; i++) {
                     const testX = nx + d.dx, testY = ny + d.dy;
-                    if (World.isWalkable(testX, testY)) { nx = testX; ny = testY; }
+                    if (World.isWalkable(testX, testY, nx, ny)) { nx = testX; ny = testY; }
                     else break;
                 }
                 p.x = nx; p.y = ny; p.visualX = nx; p.visualY = ny;
@@ -1026,7 +1026,7 @@ const GameCombat = {
                     if (mdx !== 0 || mdy !== 0) {
                         const nx = m.x + mdx;
                         const ny = m.y + mdy;
-                        if (World.isWalkable(nx, ny) && !(nx === p.x && ny === p.y)) {
+                        if (World.isWalkable(nx, ny, m.x, m.y) && !(nx === p.x && ny === p.y)) {
                             World.moveMonster(m, nx, ny);
                         }
                     }
@@ -1042,11 +1042,11 @@ const GameCombat = {
         // Try direct path
         const nx = m.x + moveX;
         const ny = m.y + moveY;
-        if (World.isWalkable(nx, ny) && !(nx === p.x && ny === p.y)) {
+        if (World.isWalkable(nx, ny, m.x, m.y) && !(nx === p.x && ny === p.y)) {
             World.moveMonster(m, nx, ny);
-        } else if (moveX !== 0 && World.isWalkable(m.x + moveX, m.y) && !(m.x + moveX === p.x && m.y === p.y)) {
+        } else if (moveX !== 0 && World.isWalkable(m.x + moveX, m.y, m.x, m.y) && !(m.x + moveX === p.x && m.y === p.y)) {
             World.moveMonster(m, m.x + moveX, m.y);
-        } else if (moveY !== 0 && World.isWalkable(m.x, m.y + moveY) && !(m.x === p.x && m.y + moveY === p.y)) {
+        } else if (moveY !== 0 && World.isWalkable(m.x, m.y + moveY, m.x, m.y) && !(m.x === p.x && m.y + moveY === p.y)) {
             World.moveMonster(m, m.x, m.y + moveY);
         }
     },

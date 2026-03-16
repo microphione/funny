@@ -62,6 +62,8 @@ const GameRender = {
             case T.HOUSE_ROOF: return 'house_roof';
             case T.HOUSE_FLOOR: return 'house_floor';
             case T.HOUSE_WINDOW: return 'house_window';
+            case T.STAIRS_UP: return 'stairs_up';
+            case T.STAIRS_DOWN: return 'stairs_down';
             default: return `grass_0`;
         }
     },
@@ -119,14 +121,22 @@ const GameRender = {
             T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC, T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC,
             T.FENCE, T.INN, T.HOUSE, T.VILLAGE_HUT, T.ROCK, T.HOUSE_DOOR,
             T.TOWN_BUILDING, T.TOWN_BUILDING_DOOR, T.SNOW_PINE,
-            T.HOUSE_WALL, T.HOUSE_WINDOW]);
+            T.HOUSE_WALL, T.HOUSE_WINDOW, T.STAIRS_UP, T.STAIRS_DOWN]);
+
+        // Height offset lookup for elevation rendering
+        const heightOffsets = { 0: 4, 1: 0, 2: -4 }; // low=down, mid=normal, high=up
 
         // First pass: ground tiles
         for (let wy = startY; wy < endY; wy++) {
             for (let wx = startX; wx < endX; wx++) {
                 const sx = Math.floor((wx - camX) * TILE);
-                const sy = Math.floor((wy - camY) * TILE);
+                let sy = Math.floor((wy - camY) * TILE);
                 const tile = World.getTile(wx, wy);
+
+                // Apply height offset (visual elevation)
+                const h = World.activeDungeon ? 0 : World.getHeight(wx, wy);
+                const hOff = (h >= 0) ? (heightOffsets[h] || 0) : 0;
+                sy += hOff;
 
                 if (overlayTiles.has(tile)) {
                     // Draw appropriate ground underneath
@@ -148,6 +158,29 @@ const GameRender = {
 
                 const spriteKey = this.getTileSprite(tile, wx, wy, animFrame);
                 Sprites.draw(ctx, spriteKey, sx, sy);
+
+                // Draw cliff edges between different height levels
+                if (!World.activeDungeon && h >= 0) {
+                    const hSouth = World.getHeight(wx, wy + 1);
+                    if (hSouth >= 0 && h > hSouth) {
+                        // Cliff edge shadow on south side
+                        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                        ctx.fillRect(sx, sy + TILE - 1, TILE, 3 + (h - hSouth) * 2);
+                    }
+                    const hEast = World.getHeight(wx + 1, wy);
+                    if (hEast >= 0 && h > hEast) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                        ctx.fillRect(sx + TILE - 1, sy, 2, TILE);
+                    }
+                    // Darken low tiles slightly, brighten high tiles
+                    if (h === 0) {
+                        ctx.fillStyle = 'rgba(0,0,20,0.15)';
+                        ctx.fillRect(sx, sy, TILE, TILE);
+                    } else if (h === 2) {
+                        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                        ctx.fillRect(sx, sy, TILE, TILE);
+                    }
+                }
 
                 // Opened chest check
                 if (tile === T.CHEST && World.openedChests.has(`${wx},${wy}`)) {
@@ -302,7 +335,9 @@ const GameRender = {
         for (const m of nearMonsters) {
             if (!m.alive) continue;
             const sx = Math.floor((m.x - camX) * TILE);
-            const sy = Math.floor((m.y - camY) * TILE);
+            const mh = World.activeDungeon ? 0 : World.getHeight(m.x, m.y);
+            const mhOff = (mh >= 0) ? (heightOffsets[mh] || 0) : 0;
+            const sy = Math.floor((m.y - camY) * TILE) + mhOff;
             if (sx < -TILE || sx > W + TILE || sy < -TILE || sy > H + TILE) continue;
 
             const spriteKey = m.isElite
@@ -328,9 +363,11 @@ const GameRender = {
             ctx.textAlign = 'left';
         }
 
-        // Draw player
+        // Draw player (with height offset)
+        const playerH = World.activeDungeon ? 0 : World.getHeight(p.x, p.y);
+        const playerHOff = (playerH >= 0) ? (heightOffsets[playerH] || 0) : 0;
         const px = Math.floor((p.visualX - camX) * TILE);
-        const py = Math.floor((p.visualY - camY) * TILE);
+        const py = Math.floor((p.visualY - camY) * TILE) + playerHOff;
         const walkFrame = G.animating ? 1 : 0;
         const playerSprite = `player_${p.dir}_${walkFrame}`;
         if (p.stealth) ctx.globalAlpha = 0.4;
@@ -397,14 +434,21 @@ const GameRender = {
         // Direction indicator (small arrow)
         this.drawDirectionIndicator(ctx, px, py, p.dir);
 
-        // Location label
+        // Location label with height indicator
         const locLabel = document.getElementById('location-label');
         if (locLabel) {
-            if (World.activeDungeon) {
+            if (World.activeBuildingFloor) {
+                const bf = World.activeBuildingFloor;
+                locLabel.textContent = `${bf.name} - Piętro ${bf.floor + 1}/${bf.numFloors}`;
+            } else if (World.activeDungeon) {
                 const d = World.activeDungeon;
                 locLabel.textContent = `${d.type.name} - Piętro ${d.floor}/${d.type.floors}`;
             } else {
-                locLabel.textContent = World.getAreaName(p.x, p.y);
+                const heightNames = { 0: 'Niziny', 1: '', 2: 'Wyżyny' };
+                const h = World.getHeight(p.x, p.y);
+                const hName = (h >= 0) ? heightNames[h] : '';
+                const areaName = World.getAreaName(p.x, p.y);
+                locLabel.textContent = hName ? `${areaName} [${hName}]` : areaName;
             }
         }
     },
@@ -462,6 +506,8 @@ const GameRender = {
                 else if (tile === T.SNOW || tile === T.SNOW_PINE) color = '#ecf0f1';
                 else if (tile === T.HOUSE_WALL || tile === T.HOUSE_WINDOW || tile === T.HOUSE_ROOF) color = '#8B4513';
                 else if (tile === T.HOUSE_FLOOR) color = '#B8860B';
+                else if (tile === T.STAIRS_UP) color = '#2ecc71';
+                else if (tile === T.STAIRS_DOWN) color = '#e74c3c';
 
                 // Monster dot
                 const mob = World.getMonsterAt(wx, wy);

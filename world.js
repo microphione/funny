@@ -30,6 +30,8 @@ const World = {
         HOUSE_ROOF: 48,   // roof over interior (hidden when inside)
         HOUSE_FLOOR: 49,  // walkable interior floor
         HOUSE_WINDOW: 50, // window in wall (can see through)
+        STAIRS_UP: 51,    // stairs going up (enter to go to upper floor)
+        STAIRS_DOWN: 52,  // stairs going down (enter to return to lower floor)
     },
 
     BIOME: { PLAINS: 0, FOREST: 1, SWAMP: 2, MOUNTAIN: 3, DESERT: 4, SNOW: 5 },
@@ -123,6 +125,8 @@ const World = {
         this.houses = {}; // "x,y" -> { price, name, owned: false }
         this.townBuildings = {}; // "x,y" -> { npcName }
         this.cityNpcsSpawned = false;
+        this.buildingFloors = {}; // "x,y" -> { floors: [{tiles, w, h}], name }
+        this.activeBuildingFloor = null; // { key, floor, tiles, w, h, entryX, entryY, savedPos }
     },
 
     // ========== GROUND LOOT SYSTEM ==========
@@ -456,7 +460,7 @@ const World = {
     },
 
     // Helper: place a town building with proper walls, roof, floor, door + NPC inside
-    placeTownBuilding(tiles, ox, oy, bx, by, w, h, npcName) {
+    placeTownBuilding(tiles, ox, oy, bx, by, w, h, npcName, numFloors) {
         const CS = this.CHUNK_SIZE;
         const T = this.T;
         const doorX = bx + Math.floor(w / 2);
@@ -516,6 +520,13 @@ const World = {
         const doorKey = `${ox + doorX},${oy + doorY}`;
         this.townBuildings = this.townBuildings || {};
         this.townBuildings[doorKey] = { npcName: npcName || 'Mieszkaniec', houseId };
+
+        // Register multi-story building if specified
+        if (numFloors && numFloors > 1) {
+            this.registerMultiStoryBuilding(doorKey, `${npcName}`, numFloors, w, h);
+            this.townBuildings[doorKey].multiStory = true;
+            this.townBuildings[doorKey].numFloors = numFloors;
+        }
     },
 
     // Helper: place a buyable house with proper walls, roof, floor, door
@@ -606,9 +617,9 @@ const World = {
         tiles[(c - 3) * CS + c] = T.SIGN;
         this.signTexts[`${ox + c},${oy + c - 3}`] = 'Witaj w Stolicy Krainy!\nPlac Główny - serce miasta.';
 
-        // Town buildings in the four quadrants
-        this.placeTownBuilding(tiles, ox, oy, 1, 1, 4, 3, 'Bibliotekarz');
-        this.placeTownBuilding(tiles, ox, oy, CS-5, 1, 4, 3, 'Kartograf');
+        // Town buildings in the four quadrants (some multi-story)
+        this.placeTownBuilding(tiles, ox, oy, 1, 1, 4, 3, 'Bibliotekarz', 3);
+        this.placeTownBuilding(tiles, ox, oy, CS-5, 1, 4, 3, 'Kartograf', 2);
         this.placeTownBuilding(tiles, ox, oy, 1, CS-4, 4, 3, 'Alchemik');
         this.placeTownBuilding(tiles, ox, oy, CS-5, CS-4, 4, 3, 'Jubiler');
 
@@ -701,8 +712,8 @@ const World = {
         const T = this.T;
         const c = Math.floor(CS / 2);
 
-        // Temple building (large, proper building)
-        this.placeTownBuilding(tiles, ox, oy, c - 3, 2, 7, 5, 'Kapłan');
+        // Temple building (large, proper building, 3 floors)
+        this.placeTownBuilding(tiles, ox, oy, c - 3, 2, 7, 5, 'Kapłan', 3);
         tiles[1 * CS + c] = T.SIGN;
         this.signTexts[`${ox + c},${oy + 1}`] = 'Świątynia Światła';
 
@@ -1267,6 +1278,170 @@ const World = {
         return this.getHouseAt(p.x, p.y);
     },
 
+    // ========== MULTI-STORY BUILDING SYSTEM ==========
+    registerMultiStoryBuilding(doorKey, name, numFloors, w, h) {
+        const T = this.T;
+        const floors = [];
+        for (let f = 0; f < numFloors; f++) {
+            const tiles = new Array(w * h).fill(T.HOUSE_FLOOR);
+            // Walls around the perimeter
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const isEdge = y === 0 || y === h - 1 || x === 0 || x === w - 1;
+                    if (isEdge) tiles[y * w + x] = T.HOUSE_WALL;
+                }
+            }
+            // Windows on walls
+            if (w >= 5) {
+                tiles[Math.floor(w / 2)] = T.HOUSE_WINDOW; // top wall center
+                tiles[Math.floor(h / 2) * w] = T.HOUSE_WINDOW; // left wall middle
+                tiles[Math.floor(h / 2) * w + (w - 1)] = T.HOUSE_WINDOW; // right wall middle
+            }
+            // Stairs up (except top floor)
+            if (f < numFloors - 1) {
+                tiles[(h - 2) * w + (w - 2)] = T.STAIRS_UP;
+            }
+            // Stairs down (except ground floor)
+            if (f > 0) {
+                tiles[1 * w + 1] = T.STAIRS_DOWN;
+            }
+            // Ground floor: entrance tile
+            if (f === 0) {
+                tiles[(h - 1) * w + Math.floor(w / 2)] = T.STAIRS_DOWN; // exit back outside
+            }
+            floors.push({ tiles, w, h });
+        }
+        this.buildingFloors[doorKey] = { name, floors, numFloors };
+    },
+
+    enterBuildingFloor(doorKey, floor) {
+        const building = this.buildingFloors[doorKey];
+        if (!building || floor < 0 || floor >= building.numFloors) return false;
+
+        const p = Game.player;
+        const floorData = building.floors[floor];
+
+        // Save position for returning
+        if (!this.activeBuildingFloor) {
+            this.activeBuildingFloor = {
+                key: doorKey,
+                floor: floor,
+                tiles: floorData.tiles,
+                w: floorData.w,
+                h: floorData.h,
+                name: building.name,
+                numFloors: building.numFloors,
+                savedPos: { x: p.x, y: p.y }
+            };
+        } else {
+            this.activeBuildingFloor.floor = floor;
+            this.activeBuildingFloor.tiles = floorData.tiles;
+            this.activeBuildingFloor.w = floorData.w;
+            this.activeBuildingFloor.h = floorData.h;
+        }
+
+        // Place player at stairs down (entry point)
+        if (floor === 0) {
+            p.x = Math.floor(floorData.w / 2);
+            p.y = floorData.h - 2;
+        } else {
+            p.x = 1; p.y = 1;
+        }
+        p.visualX = p.x;
+        p.visualY = p.y;
+
+        Game.log(`${building.name} - Piętro ${floor + 1}/${building.numFloors}`, 'info');
+        return true;
+    },
+
+    exitBuildingFloor() {
+        if (!this.activeBuildingFloor) return;
+        const saved = this.activeBuildingFloor.savedPos;
+        const p = Game.player;
+        p.x = saved.x;
+        p.y = saved.y;
+        p.visualX = p.x;
+        p.visualY = p.y;
+        this.activeBuildingFloor = null;
+        Game.log('Wychodzisz z budynku.', 'info');
+    },
+
+    goUpFloor() {
+        if (!this.activeBuildingFloor) return;
+        const building = this.buildingFloors[this.activeBuildingFloor.key];
+        const nextFloor = this.activeBuildingFloor.floor + 1;
+        if (nextFloor < building.numFloors) {
+            this.enterBuildingFloor(this.activeBuildingFloor.key, nextFloor);
+        }
+    },
+
+    goDownFloor() {
+        if (!this.activeBuildingFloor) return;
+        const prevFloor = this.activeBuildingFloor.floor - 1;
+        if (prevFloor >= 0) {
+            this.enterBuildingFloor(this.activeBuildingFloor.key, prevFloor);
+        } else {
+            this.exitBuildingFloor();
+        }
+    },
+
+    // Get tile inside a building floor
+    getBuildingTile(x, y) {
+        const bf = this.activeBuildingFloor;
+        if (!bf) return this.T.HOUSE_WALL;
+        if (x < 0 || x >= bf.w || y < 0 || y >= bf.h) return this.T.HOUSE_WALL;
+        return bf.tiles[y * bf.w + x];
+    },
+
+    // ========== 3 HEIGHT LEVELS SYSTEM ==========
+    // Height 0 = low (water, swamp, plains)
+    // Height 1 = mid (forest, hills, normal terrain)
+    // Height 2 = high (mountains, snow peaks, elevated plateaus)
+    getHeight(wx, wy) {
+        // Inside dungeons or houses: flat (no height)
+        if (this.activeDungeon) return 0;
+        const tile = this.getTile(wx, wy);
+        const T = this.T;
+
+        // Explicit tile heights
+        if (tile === T.WATER || tile === T.LAVA || tile === T.SWAMP) return 0;
+        if (tile === T.MOUNTAIN || tile === T.SNOW) return 2;
+        if (tile === T.ROCK) return 2;
+
+        // Biome-based heights
+        const biome = this.getBiome(wx, wy);
+        if (biome === this.BIOME.MOUNTAIN) return 2;
+        if (biome === this.BIOME.SNOW) return 2;
+        if (biome === this.BIOME.SWAMP) return 0;
+
+        // Village/town areas always at mid level
+        const cx = Math.floor(wx / this.CHUNK_SIZE);
+        const cy = Math.floor(wy / this.CHUNK_SIZE);
+        if (this.isVillageChunk(cx, cy)) return 1;
+
+        // Paths and bridges are always traversable (act as ramps)
+        if (tile === T.PATH || tile === T.BRIDGE || tile === T.STONE_FLOOR ||
+            tile === T.CAVE_ENTRY || tile === T.FOREST_ENTRY) return -1; // -1 = "any height" (ramp)
+
+        // Forest = mid
+        if (biome === this.BIOME.FOREST) return 1;
+        // Desert = mid
+        if (biome === this.BIOME.DESERT) return 1;
+
+        // Default plains = mid
+        return 1;
+    },
+
+    // Check if movement between two heights is allowed
+    canTraverseHeight(fromX, fromY, toX, toY) {
+        const h1 = this.getHeight(fromX, fromY);
+        const h2 = this.getHeight(toX, toY);
+        // Ramp tiles (-1) connect to any height
+        if (h1 === -1 || h2 === -1) return true;
+        // Can move between adjacent height levels (diff <= 1)
+        return Math.abs(h1 - h2) <= 1;
+    },
+
     isTileBlocked(t) {
         const T = this.T;
         return [T.WATER, T.WALL, T.TREE, T.HOUSE, T.CAVE_WALL, T.FENCE,
@@ -1486,6 +1661,7 @@ const World = {
     },
 
     getTile(wx, wy) {
+        if (this.activeBuildingFloor) return this.getBuildingTile(wx, wy);
         if (this.activeDungeon) return this.getDungeonTile(wx, wy);
         const cx = Math.floor(wx / this.CHUNK_SIZE);
         const cy = Math.floor(wy / this.CHUNK_SIZE);
@@ -1494,7 +1670,7 @@ const World = {
         return this.getChunk(cx, cy).tiles[ly * this.CHUNK_SIZE + lx];
     },
 
-    isWalkable(wx, wy) {
+    isWalkable(wx, wy, fromX, fromY) {
         const t = this.getTile(wx, wy);
         if (this.isTileBlocked(t)) return false;
         // House door: walkable only if owned
@@ -1508,6 +1684,10 @@ const World = {
         }
         if (this.getMonsterAt(wx, wy)) return false;
         if (this.getCityNpcAt(wx, wy)) return false;
+        // Height check - can't climb cliffs (height diff > 1)
+        if (fromX !== undefined && fromY !== undefined && !this.activeDungeon) {
+            if (!this.canTraverseHeight(fromX, fromY, wx, wy)) return false;
+        }
         return true;
     },
 

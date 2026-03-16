@@ -1204,6 +1204,48 @@ const Sprites = {
             px(ctx, 0, 0, '#5a4a3a', S, 1);
             px(ctx, 0, S - 1, '#5a4a3a', S, 1);
         });
+
+        // Stairs going up
+        this.create('stairs_up', (ctx) => {
+            ctx.fillStyle = '#B8860B';
+            ctx.fillRect(0, 0, S, S);
+            // Steps (going upward - top is higher)
+            for (let i = 0; i < 5; i++) {
+                const y = 4 + i * 5;
+                const shade = Math.floor(180 - i * 20);
+                ctx.fillStyle = `rgb(${shade},${shade - 40},${shade - 80})`;
+                ctx.fillRect(4, y, 24, 4);
+                ctx.fillStyle = `rgb(${shade + 20},${shade - 20},${shade - 60})`;
+                ctx.fillRect(4, y, 24, 1);
+            }
+            // Side rails
+            px(ctx, 2, 0, '#5a2d0e', 2, S);
+            px(ctx, 28, 0, '#5a2d0e', 2, S);
+            // Arrow up indicator
+            px(ctx, 14, 1, '#2ecc71', 4, 2);
+            px(ctx, 15, 0, '#2ecc71', 2, 1);
+        });
+
+        // Stairs going down
+        this.create('stairs_down', (ctx) => {
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(0, 0, S, S);
+            // Steps (going downward - bottom is lower/darker)
+            for (let i = 0; i < 5; i++) {
+                const y = 4 + i * 5;
+                const shade = Math.floor(100 + i * 20);
+                ctx.fillStyle = `rgb(${shade},${shade - 40},${shade - 80})`;
+                ctx.fillRect(4, y, 24, 4);
+                ctx.fillStyle = `rgb(${shade - 20},${shade - 60},${shade - 100})`;
+                ctx.fillRect(4, y + 3, 24, 1);
+            }
+            // Side rails
+            px(ctx, 2, 0, '#5a2d0e', 2, S);
+            px(ctx, 28, 0, '#5a2d0e', 2, S);
+            // Arrow down indicator
+            px(ctx, 14, S - 3, '#e74c3c', 4, 2);
+            px(ctx, 15, S - 1, '#e74c3c', 2, 1);
+        });
     },
 
     // ========== PLAYER SPRITES (32x32 detailed) ==========

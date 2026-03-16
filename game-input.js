@@ -115,8 +115,8 @@ const GameInput = {
             return;
         }
 
-        // Check walkable
-        if (!World.isWalkable(nx, ny)) return;
+        // Check walkable (pass current position for height check)
+        if (!World.isWalkable(nx, ny, p.x, p.y)) return;
 
         // Set walk cooldown
         Game.walkCooldown = Game.getWalkSpeed();
@@ -165,6 +165,21 @@ const GameInput = {
 
         // Walk-through dungeon entry: stepping on cave/forest entry = auto-enter
         const destTile = World.getTile(nx, ny);
+
+        // Stairs in multi-story buildings
+        if (World.activeBuildingFloor) {
+            if (destTile === World.T.STAIRS_UP) {
+                World.goUpFloor();
+                GameRender.updateHUD();
+                return;
+            }
+            if (destTile === World.T.STAIRS_DOWN) {
+                World.goDownFloor();
+                GameRender.updateHUD();
+                return;
+            }
+        }
+
         if (destTile === World.T.CAVE_ENTRY || destTile === World.T.FOREST_ENTRY) {
             if (World.activeDungeon) {
                 const dd = World.activeDungeon;
@@ -237,6 +252,13 @@ const GameInput = {
     interact() {
         const p = Game.player;
         if (!p) return;
+
+        // If inside a building floor, check stairs on current tile
+        if (World.activeBuildingFloor) {
+            const curTile = World.getTile(p.x, p.y);
+            if (curTile === World.T.STAIRS_UP) { World.goUpFloor(); GameRender.updateHUD(); return; }
+            if (curTile === World.T.STAIRS_DOWN) { World.goDownFloor(); GameRender.updateHUD(); return; }
+        }
 
         // Pickup flow: first under player, then surrounding tiles (one item at a time)
         if (this.tryPickupOneItem()) return;
@@ -405,11 +427,18 @@ const GameInput = {
             return;
         }
 
-        // Town building door (NPC inside)
+        // Town building door (NPC inside) - check multi-story first
         if (tile === T.TOWN_BUILDING_DOOR) {
             const bKey = `${tx},${ty}`;
             const bldg = World.townBuildings && World.townBuildings[bKey];
             const npcName = bldg ? bldg.npcName : 'Mieszkaniec';
+
+            // Multi-story building: enter upper floors
+            if (bldg && bldg.multiStory && World.buildingFloors[bKey]) {
+                World.enterBuildingFloor(bKey, 0);
+                GameRender.updateHUD();
+                return;
+            }
             // Special NPCs
             if (npcName === 'Bankier') {
                 GameUI.openBank();
@@ -445,13 +474,19 @@ const GameInput = {
             return;
         }
 
-        // Buyable house door - interact to buy (if not owned)
+        // Buyable house door - interact to buy or enter (if owned)
         if (tile === T.HOUSE_DOOR) {
             const houseKey = `${tx},${ty}`;
             const house = World.houses[houseKey];
             if (house) {
                 if (house.owned || (p.ownedHouses && p.ownedHouses.includes(houseKey))) {
-                    Game.log(`${house.name} - Twój dom! Wejdź do środka.`, 'info');
+                    // Check if multi-story
+                    if (World.buildingFloors[houseKey]) {
+                        World.enterBuildingFloor(houseKey, 0);
+                        GameRender.updateHUD();
+                    } else {
+                        Game.log(`${house.name} - Twój dom! Wejdź naciskając klawisz ruchu w stronę drzwi.`, 'info');
+                    }
                 } else {
                     GameUI.showHouseBuyDialog(houseKey, house);
                 }

@@ -85,6 +85,9 @@
         // Init input
         GameInput.init();
 
+        // Init draggable panels
+        GameUI.initDraggablePanels();
+
         // Init music
         Music.init();
 
