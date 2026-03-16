@@ -86,6 +86,40 @@ World.generateIslandChunkTerrain = function(tiles, cx, cy, ox, oy) {
             let tile = T.GRASS;
 
             switch (zone) {
+                case 'town': {
+                    // Town on overworld - stone floor base with paths
+                    const trx = wx - ic.x, try_ = wy - ic.y;
+                    const tdist = Math.sqrt(trx * trx + try_ * try_);
+
+                    // Town boundary: grass ring at edges
+                    if (tdist > 27) {
+                        tile = T.GRASS;
+                        if (this.rng(wx, wy, 2000) < 0.08) tile = T.TREE;
+                        if (this.rng(wx, wy, 2001) < 0.03) tile = T.FLOWER;
+                    } else if (tdist > 25) {
+                        // Stone wall boundary
+                        tile = T.FENCE;
+                    } else {
+                        tile = T.STONE_FLOOR;
+
+                        // Main streets (cross pattern, 3 tiles wide)
+                        if ((Math.abs(trx) <= 1 && Math.abs(try_) <= 22) ||
+                            (Math.abs(try_) <= 1 && Math.abs(trx) <= 22)) {
+                            tile = T.PATH;
+                        }
+
+                        // Central plaza (diamond shape)
+                        if (Math.abs(trx) + Math.abs(try_) <= 5) {
+                            tile = T.STONE_FLOOR;
+                        }
+
+                        // Scattered flowers in town
+                        if (tile === T.STONE_FLOOR && this.rng(wx, wy, 2100) < 0.02) {
+                            tile = T.FLOWER;
+                        }
+                    }
+                    break;
+                }
                 case 'forest':
                 case 'forest_east': {
                     tile = T.DARK_GRASS;
@@ -181,26 +215,20 @@ World.placeIslandLocations = function(tiles, cx, cy, ox, oy) {
             const rx = wx - ic.x;
             const ry = wy - ic.y;
 
-            // Town stairs at center (exact center tile)
+            // Central plaza fountain/well
             if (rx === 0 && ry === 0) {
-                tiles[ly * CS + lx] = T.STAIRS_UP;
-                this.signTexts[`${wx},${wy}`] = 'Schody do Miasta Szmaragdowego';
-            }
-            // Sign near stairs
-            if (rx === 0 && ry === -1) {
-                tiles[ly * CS + lx] = T.SIGN;
-                this.signTexts[`${wx},${wy}`] = 'Miasto Szmaragdowe - Wejście (SPACJA)';
-            }
-            // Well near center for respawn
-            if (rx === 2 && ry === 0) {
                 tiles[ly * CS + lx] = T.WELL;
             }
-            // Stone floor around center
-            if (Math.abs(rx) <= 4 && Math.abs(ry) <= 4 && tiles[ly * CS + lx] !== T.STAIRS_UP && tiles[ly * CS + lx] !== T.SIGN && tiles[ly * CS + lx] !== T.WELL) {
-                tiles[ly * CS + lx] = T.STONE_FLOOR;
+            // Sign at center
+            if (rx === 0 && ry === -3) {
+                tiles[ly * CS + lx] = T.SIGN;
+                this.signTexts[`${wx},${wy}`] = 'Miasto Szmaragdowe - Plac Centralny';
             }
         }
     }
+
+    // Place town buildings on overworld
+    this.placeTownOverworldBuildings(tiles, cx, cy, ox, oy);
 
     // Place dungeon entrances
     const dungeonLocations = [
@@ -375,8 +403,8 @@ World.spawnStarterIslandMonsters = function(cx, cy, ox, oy, tiles) {
     // Get zone for this chunk
     const zone = this.getIslandZone(chunkCenterX, chunkCenterY);
 
-    // Skip monster spawning near town stairs
-    if (zone === 'town_stairs' || zone === 'port' || zone === 'lighthouse') return;
+    // Skip monster spawning in safe zones
+    if (zone === 'town' || zone === 'port' || zone === 'lighthouse') return;
 
     // Map zones to monster zone tags
     const zoneToMonsterZone = {
@@ -440,7 +468,231 @@ World.spawnStarterIslandMonsters = function(cx, cy, ox, oy, tiles) {
     }
 };
 
-// ========== STARTER TOWN (Building Floor on +1) ==========
+// ========== TOWN BUILDINGS ON OVERWORLD ==========
+World.placeTownOverworldBuildings = function(tiles, cx, cy, ox, oy) {
+    const CS = this.CHUNK_SIZE;
+    const T = this.T;
+    const ic = this.getIslandCenter();
+
+    // Town building definitions (positions relative to island center)
+    // Each building: { rx, ry, w, h, name, type, npcId, npcName, npcType }
+    const townBuildings = [
+        // Temple - north of center
+        { rx: -5, ry: -16, w: 11, h: 7, name: 'Świątynia', npcId: 'si_kaplan', npcName: 'Kapłan', npcType: 'starter_island_npc' },
+        // Weapon shop - east
+        { rx: 6, ry: -6, w: 7, h: 5, name: 'Sklep z Bronią', npcId: 'si_zbrojmistrz', npcName: 'Zbrojmistrz', npcType: 'town_shop_weapon', isShop: true },
+        // Armor shop - east, south of weapon
+        { rx: 6, ry: 2, w: 7, h: 5, name: 'Sklep ze Zbrojami', npcId: 'si_platnerz', npcName: 'Płatnerz', npcType: 'town_shop_armor', isShop: true },
+        // Potion shop - west
+        { rx: -13, ry: -5, w: 7, h: 5, name: 'Apteka Zielarki', npcId: 'si_zielarka', npcName: 'Zielarka', npcType: 'town_shop_potion', isShop: true },
+        // Tavern - south-east
+        { rx: 5, ry: 9, w: 10, h: 6, name: 'Karczma', npcId: 'si_karczmarka', npcName: 'Karczmarka', npcType: 'starter_island_npc' },
+        // Town hall - north-east
+        { rx: 5, ry: -13, w: 8, h: 6, name: 'Ratusz', npcId: 'si_burmistrz', npcName: 'Burmistrz', npcType: 'starter_island_npc' },
+        // Smithy - far east
+        { rx: 15, ry: -3, w: 6, h: 5, name: 'Kuźnia', npcId: 'si_kowal', npcName: 'Kowal', npcType: 'starter_island_npc' },
+        // Tool shop - west, south
+        { rx: -13, ry: 3, w: 7, h: 5, name: 'Sklep z Narzędziami', npcId: 'si_narzedziowiec', npcName: 'Narzędziowiec', npcType: 'town_shop_tool', isShop: true },
+    ];
+
+    // Standalone NPCs (placed on stone floor, no building)
+    const standAloneNpcs = [
+        { rx: -2, ry: -4, npcId: 'si_zona_zielarki', npcName: 'Żona Zielarki', npcType: 'starter_island_npc' },
+        { rx: 2, ry: 18, npcId: 'si_straznik', npcName: 'Strażnik', npcType: 'starter_island_npc' },
+        { rx: -2, ry: 1, npcId: 'si_kupiec', npcName: 'Kupiec', npcType: 'starter_island_npc' },
+        { rx: -2, ry: 18, npcId: 'si_rybak', npcName: 'Rybak', npcType: 'starter_island_npc' },
+        { rx: 10, ry: -11, npcId: 'si_uczony', npcName: 'Uczony', npcType: 'starter_island_npc' },
+    ];
+
+    // Buyable houses
+    const townHouses = [
+        { rx: -18, ry: -10, w: 5, h: 5, price: 500, name: 'Chatka Rybacka' },
+        { rx: -18, ry: -3, w: 5, h: 5, price: 500, name: 'Domek Leśny' },
+        { rx: 17, ry: -10, w: 5, h: 5, price: 800, name: 'Dom Mieszczański' },
+        { rx: 17, ry: 3, w: 6, h: 5, price: 1000, name: 'Rezydencja' },
+        { rx: -7, ry: 14, w: 5, h: 5, price: 600, name: 'Domek przy Placu' },
+        { rx: 2, ry: 14, w: 5, h: 5, price: 600, name: 'Domek Kupca' },
+    ];
+
+    // Place each building if it overlaps this chunk
+    for (const bld of townBuildings) {
+        const bwx = ic.x + bld.rx;
+        const bwy = ic.y + bld.ry;
+
+        // Check if any part of the building falls in this chunk
+        for (let dy = 0; dy < bld.h; dy++) {
+            for (let dx = 0; dx < bld.w; dx++) {
+                const wx = bwx + dx;
+                const wy = bwy + dy;
+                const lx = wx - ox;
+                const ly = wy - oy;
+                if (lx < 0 || lx >= CS || ly < 0 || ly >= CS) continue;
+
+                const isEdge = dy === 0 || dy === bld.h - 1 || dx === 0 || dx === bld.w - 1;
+                const doorX = Math.floor(bld.w / 2);
+                const isDoor = dx === doorX && dy === bld.h - 1;
+
+                if (isDoor) {
+                    tiles[ly * CS + lx] = T.TOWN_BUILDING_DOOR;
+                    this.townBuildings = this.townBuildings || {};
+                    this.townBuildings[`${wx},${wy}`] = { npcName: bld.npcName, houseId: `tb_${wx},${wy}` };
+                } else if (isEdge) {
+                    const isMidH = dx === Math.floor(bld.w / 2) && dy === 0;
+                    const isMidV = dy === Math.floor(bld.h / 2) && (dx === 0 || dx === bld.w - 1);
+                    if ((isMidH || isMidV) && bld.w >= 4) {
+                        tiles[ly * CS + lx] = T.HOUSE_WINDOW;
+                    } else {
+                        tiles[ly * CS + lx] = T.HOUSE_WALL;
+                    }
+                } else {
+                    tiles[ly * CS + lx] = T.HOUSE_FLOOR;
+                }
+            }
+        }
+
+        // Place NPC inside building (1 tile below top wall, center)
+        const npcWx = bwx + Math.floor(bld.w / 2);
+        const npcWy = bwy + 1;
+        const npcLx = npcWx - ox;
+        const npcLy = npcWy - oy;
+        if (npcLx >= 0 && npcLx < CS && npcLy >= 0 && npcLy < CS) {
+            const tileType = bld.isShop ?
+                (bld.npcType === 'town_shop_weapon' ? T.SHOP_WEAPON_NPC :
+                 bld.npcType === 'town_shop_armor' ? T.SHOP_ARMOR_NPC : T.SHOP_POTION_NPC) :
+                T.NPC_QUEST;
+            tiles[npcLy * CS + npcLx] = tileType;
+            this.questNpcs[`${npcWx},${npcWy}`] = {
+                id: bld.npcId, type: bld.npcType, name: bld.npcName,
+            };
+            if (bld.isShop) {
+                this.npcs[`${npcWx},${npcWy}`] = { name: bld.npcName, difficulty: 1 };
+            }
+        }
+
+        // Register house for roof system
+        const doorWx = bwx + Math.floor(bld.w / 2);
+        const doorWy = bwy + bld.h - 1;
+        const houseId = `tb_${doorWx},${doorWy}`;
+        const floorTiles = [];
+        const roofTiles = [];
+        const wallTiles = [];
+        for (let dy = 0; dy < bld.h; dy++) {
+            for (let dx = 0; dx < bld.w; dx++) {
+                const wx = bwx + dx, wy = bwy + dy;
+                const key = `${wx},${wy}`;
+                const isEdge = dy === 0 || dy === bld.h - 1 || dx === 0 || dx === bld.w - 1;
+                roofTiles.push(key);
+                if (isEdge) wallTiles.push(key);
+                else floorTiles.push(key);
+            }
+        }
+        this.houses[houseId] = {
+            price: 0, name: bld.name, owned: true,
+            floorTiles, roofTiles, wallTiles,
+            bx: bwx, by: bwy, w: bld.w, h: bld.h, isTownBuilding: true,
+        };
+    }
+
+    // Place standalone NPCs
+    for (const npc of standAloneNpcs) {
+        const npcWx = ic.x + npc.rx;
+        const npcWy = ic.y + npc.ry;
+        const lx = npcWx - ox;
+        const ly = npcWy - oy;
+        if (lx >= 0 && lx < CS && ly >= 0 && ly < CS) {
+            tiles[ly * CS + lx] = T.NPC_QUEST;
+            this.questNpcs[`${npcWx},${npcWy}`] = {
+                id: npc.npcId, type: npc.npcType, name: npc.npcName,
+            };
+        }
+    }
+
+    // Place buyable houses
+    for (const h of townHouses) {
+        const hwx = ic.x + h.rx;
+        const hwy = ic.y + h.ry;
+        for (let dy = 0; dy < h.h; dy++) {
+            for (let dx = 0; dx < h.w; dx++) {
+                const wx = hwx + dx;
+                const wy = hwy + dy;
+                const lx = wx - ox;
+                const ly = wy - oy;
+                if (lx < 0 || lx >= CS || ly < 0 || ly >= CS) continue;
+
+                const isEdge = dy === 0 || dy === h.h - 1 || dx === 0 || dx === h.w - 1;
+                const doorX = Math.floor(h.w / 2);
+                const isDoor = dx === doorX && dy === h.h - 1;
+
+                if (isDoor) {
+                    tiles[ly * CS + lx] = T.HOUSE_DOOR;
+                } else if (isEdge) {
+                    const isMidH = dx === Math.floor(h.w / 2) && dy === 0;
+                    const isMidV = dy === Math.floor(h.h / 2) && (dx === 0 || dx === h.w - 1);
+                    if ((isMidH || isMidV) && h.w >= 4) {
+                        tiles[ly * CS + lx] = T.HOUSE_WINDOW;
+                    } else {
+                        tiles[ly * CS + lx] = T.HOUSE_WALL;
+                    }
+                } else {
+                    tiles[ly * CS + lx] = T.HOUSE_FLOOR;
+                }
+            }
+        }
+        // Register for roof/purchase system
+        const doorWx = hwx + Math.floor(h.w / 2);
+        const doorWy = hwy + h.h - 1;
+        const houseId = `${doorWx},${doorWy}`;
+        const floorTiles = [], roofTiles = [], wallTiles = [];
+        for (let dy = 0; dy < h.h; dy++) {
+            for (let dx = 0; dx < h.w; dx++) {
+                const wx = hwx + dx, wy = hwy + dy;
+                const key = `${wx},${wy}`;
+                const isEdge = dy === 0 || dy === h.h - 1 || dx === 0 || dx === h.w - 1;
+                roofTiles.push(key);
+                if (isEdge) wallTiles.push(key);
+                else floorTiles.push(key);
+            }
+        }
+        this.houses[houseId] = {
+            price: h.price, name: h.name, owned: false,
+            floorTiles, roofTiles, wallTiles,
+            bx: hwx, by: hwy, w: h.w, h: h.h,
+        };
+    }
+
+    // Decorative trees at plaza corners
+    const decorPositions = [
+        { rx: -3, ry: -3 }, { rx: 3, ry: -3 },
+        { rx: -3, ry: 3 }, { rx: 3, ry: 3 },
+    ];
+    for (const dp of decorPositions) {
+        const wx = ic.x + dp.rx, wy = ic.y + dp.ry;
+        const lx = wx - ox, ly = wy - oy;
+        if (lx >= 0 && lx < CS && ly >= 0 && ly < CS) {
+            if (tiles[ly * CS + lx] === T.STONE_FLOOR) {
+                tiles[ly * CS + lx] = T.TREE;
+            }
+        }
+    }
+
+    // Town entry signs at road exits
+    const signPositions = [
+        { rx: 0, ry: 24, text: 'Wyjście z Miasta - Południe' },
+        { rx: 0, ry: -24, text: 'Wyjście z Miasta - Północ' },
+        { rx: 24, ry: 0, text: 'Wyjście z Miasta - Wschód' },
+        { rx: -24, ry: 0, text: 'Wyjście z Miasta - Zachód' },
+    ];
+    for (const sp of signPositions) {
+        const wx = ic.x + sp.rx, wy = ic.y + sp.ry;
+        const lx = wx - ox, ly = wy - oy;
+        if (lx >= 0 && lx < CS && ly >= 0 && ly < CS) {
+            tiles[ly * CS + lx] = T.SIGN;
+            this.signTexts[`${wx},${wy}`] = sp.text;
+        }
+    }
+};
+
+// ========== STARTER TOWN (LEGACY - kept for save compat) ==========
 World.generateStarterTown = function() {
     const T = this.T;
     const W = 100, H = 80; // Town dimensions

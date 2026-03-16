@@ -12,7 +12,7 @@ const STARTER_ISLAND = {
 
     // Zone definitions for different areas of the island
     zones: {
-        town_stairs: { x: 0, y: 0, radius: 3 },        // Center - stairs to town on +1
+        town: { x: 0, y: 0, radius: 30 },                // Center - town on overworld
         beach_south: { x: 0, y: 250, radius: 120 },     // Southern beach
         forest_east: { x: 200, y: -50, radius: 150 },   // Eastern forest
         swamp_nw: { x: -200, y: -150, radius: 120 },    // Northwest swamp
@@ -48,7 +48,7 @@ const STARTER_ISLAND = {
         { name: 'Golem Kamienny', sprite: 'golem',      hp: 65, atk: 14, armor: 10, xp: 45, gold: [8,18], minDiff: 10, maxDiff: 20, zone: 'ruins' },
         { name: 'Ożywiona Zbroja',sprite: 'dark_knight',hp: 55, atk: 16, armor: 8,  xp: 50, gold: [10,22],minDiff: 12, maxDiff: 20, zone: 'ruins' },
         // General (scaling)
-        { name: 'Dziki Królik',   sprite: 'wolf',       hp: 18, atk: 3,  armor: 1,  xp: 8,  gold: [1,4],  minDiff: 1, maxDiff: 8,  zone: 'any' },
+        { name: 'Dziki Królik',   sprite: 'rabbit',       hp: 18, atk: 3,  armor: 1,  xp: 8,  gold: [1,4],  minDiff: 1, maxDiff: 8,  zone: 'any' },
         { name: 'Nietoperz',      sprite: 'ghost',      hp: 14, atk: 5,  armor: 0,  xp: 10, gold: [1,3],  minDiff: 2, maxDiff: 8,  zone: 'cave' },
     ],
 

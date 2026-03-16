@@ -112,6 +112,49 @@ Sprites.initMonsters = function() {
         });
     }
 
+    // ---- RABBIT ----
+    for (let dir = 0; dir < 2; dir++) {
+        this.create(`mob_rabbit_${dir}`, (ctx) => {
+            const bob = dir === 1 ? -2 : 0;
+            px(ctx, 10, 28, 'rgba(0,0,0,0.3)', 12, 4);
+            // Hind legs
+            px(ctx, 10 + dir, 24, '#a08060', 4, 6);
+            px(ctx, 18 - dir, 24, '#a08060', 4, 6);
+            // Feet (large hind feet)
+            px(ctx, 8 + dir, 28, '#b09070', 6, 3);
+            px(ctx, 18 - dir, 28, '#b09070', 6, 3);
+            // Body - small round
+            px(ctx, 10, 16 + bob, '#a08060', 12, 10);
+            px(ctx, 12, 18 + bob, '#b09070', 8, 6);
+            // Belly
+            px(ctx, 12, 22 + bob, '#c8b8a0', 8, 4);
+            // Head - round
+            px(ctx, 10, 8 + bob, '#a08060', 10, 10);
+            px(ctx, 12, 10 + bob, '#b09070', 6, 6);
+            // Long ears
+            px(ctx, 11, 0 + bob, '#a08060', 3, 10);
+            px(ctx, 12, 1 + bob, '#c8a0a0', 1, 8);
+            px(ctx, 18, 0 + bob, '#a08060', 3, 10);
+            px(ctx, 19, 1 + bob, '#c8a0a0', 1, 8);
+            // Eyes
+            px(ctx, 12, 11 + bob, '#000', 2, 2);
+            px(ctx, 18, 11 + bob, '#000', 2, 2);
+            px(ctx, 12, 11 + bob, '#fff', 1, 1);
+            px(ctx, 18, 11 + bob, '#fff', 1, 1);
+            // Nose
+            px(ctx, 15, 14 + bob, '#d08080', 2, 2);
+            // Whiskers
+            px(ctx, 8, 14 + bob, '#888', 4, 1);
+            px(ctx, 20, 14 + bob, '#888', 4, 1);
+            // Tail (small fluffy)
+            px(ctx, 22, 18 + bob, '#c8b8a0', 3, 3);
+            px(ctx, 23, 19 + bob, '#ddd', 2, 2);
+            // Front paws
+            px(ctx, 12, 24, '#b09070', 3, 4);
+            px(ctx, 17, 24, '#b09070', 3, 4);
+        });
+    }
+
     // ---- SPIDER ----
     for (let dir = 0; dir < 2; dir++) {
         this.create(`mob_spider_${dir}`, (ctx) => {

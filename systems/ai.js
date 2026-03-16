@@ -115,7 +115,7 @@ GameCombat.monsterAttackPlayer = function(m) {
         return;
     }
 
-    let dmg = Math.max(1, m.atk - stats.armor * 0.1 + Math.floor(Math.random() * 2));
+    let dmg = Math.floor(Math.max(1, m.atk - stats.armor * 0.1 + Math.floor(Math.random() * 2)));
 
     // Iron skin buff
     const ironSkin = p.buffs.find(b => b.id === 'iron_skin');

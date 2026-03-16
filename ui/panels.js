@@ -1,5 +1,5 @@
 // ============================================================
-// GAME UI - Core panel management, dragging, overlays, confirm
+// GAME UI - Core panel management, overlays, confirm
 // ============================================================
 
 const GameUI = {
@@ -41,83 +41,8 @@ const GameUI = {
         this.closedPanels.clear();
     },
 
-    // ========== DRAGGABLE PANELS ==========
-    dragState: null,
-
     initDraggablePanels() {
-        const panels = document.querySelectorAll('#side-panel .panel-box');
-        panels.forEach(panel => {
-            const title = panel.querySelector('.panel-title');
-            if (!title) return;
-            title.addEventListener('mousedown', (e) => {
-                // Ignore clicks on minimize/close buttons
-                if (e.target.classList.contains('panel-minimize') || e.target.classList.contains('panel-close')) return;
-                e.preventDefault();
-                const rect = panel.getBoundingClientRect();
-                this.dragState = {
-                    panel,
-                    startX: e.clientX,
-                    startY: e.clientY,
-                    origLeft: rect.left,
-                    origTop: rect.top,
-                    origWidth: rect.width,
-                    isDragging: false,
-                    origParent: panel.parentNode,
-                    origNext: panel.nextSibling,
-                };
-            });
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!this.dragState) return;
-            const ds = this.dragState;
-            const dx = e.clientX - ds.startX;
-            const dy = e.clientY - ds.startY;
-
-            // Start drag after 5px threshold
-            if (!ds.isDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
-                ds.isDragging = true;
-                ds.panel.classList.add('dragging');
-                ds.panel.style.left = ds.origLeft + 'px';
-                ds.panel.style.top = ds.origTop + 'px';
-                ds.panel.style.width = ds.origWidth + 'px';
-                document.body.appendChild(ds.panel);
-            }
-
-            if (ds.isDragging) {
-                ds.panel.style.left = (ds.origLeft + dx) + 'px';
-                ds.panel.style.top = (ds.origTop + dy) + 'px';
-            }
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (!this.dragState) return;
-            const ds = this.dragState;
-            if (ds.isDragging) {
-                ds.panel.classList.remove('dragging');
-                // Check if dropped back near side panel
-                const sidePanel = document.getElementById('side-panel');
-                const spRect = sidePanel.getBoundingClientRect();
-                const panelRect = ds.panel.getBoundingClientRect();
-                const centerX = panelRect.left + panelRect.width / 2;
-
-                if (centerX > spRect.left - 50 && centerX < spRect.right + 50) {
-                    // Snap back to side panel
-                    ds.panel.style.left = '';
-                    ds.panel.style.top = '';
-                    ds.panel.style.width = '';
-                    ds.panel.style.position = '';
-                    ds.panel.style.zIndex = '';
-                    if (ds.origNext && ds.origNext.parentNode === ds.origParent) {
-                        ds.origParent.insertBefore(ds.panel, ds.origNext);
-                    } else {
-                        ds.origParent.appendChild(ds.panel);
-                    }
-                }
-                // Otherwise, panel stays floating where dropped
-            }
-            this.dragState = null;
-        });
+        // Panels are no longer draggable - they stay in the side panel
     },
 
     // ========== OVERLAY HELPERS ==========
@@ -138,7 +63,6 @@ const GameUI = {
 
     // ========== CONFIRMATION POPUP ==========
     confirmAction(message, onConfirm) {
-        // Remove any existing confirm popup
         const existing = document.getElementById('confirm-popup');
         if (existing) existing.remove();
 

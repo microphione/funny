@@ -43,4 +43,4 @@ const BIOME = { PLAINS: 0, FOREST: 1, SWAMP: 2, MOUNTAIN: 3, DESERT: 4, SNOW: 5 
 // INT: CDR, mana
 const BASE_ATTRIBUTES = ['str', 'dex', 'agi', 'vit', 'int'];
 const ATTRIBUTE_NAMES = { str: 'Siła', dex: 'Zręczność', agi: 'Zwinność', vit: 'Wytrzymałość', int: 'Inteligencja' };
-const MAX_STAT_POINTS = 100; // max points per attribute
+const MAX_STAT_POINTS = 20; // max points per attribute
