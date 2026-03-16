@@ -8,23 +8,23 @@
 const STARTER_ISLAND = {
     // Island center in world coords (chunk 20,20 = tile 400,400)
     cx: 20, cy: 20,
-    radius: 400, // island radius in tiles (800x800)
+    radius: 500, // island radius in tiles (1000x1000)
 
     // Zone definitions for different areas of the island
     zones: {
-        town: { x: 0, y: 0, radius: 30 },                // Center - town on overworld
-        beach_south: { x: 0, y: 250, radius: 120 },     // Southern beach
-        forest_east: { x: 200, y: -50, radius: 150 },   // Eastern forest
-        swamp_nw: { x: -200, y: -150, radius: 120 },    // Northwest swamp
-        ruins_north: { x: 0, y: -250, radius: 100 },    // Northern ruins
-        pirate_bay: { x: -200, y: 200, radius: 100 },   // Southwest pirate bay
-        druid_clearing: { x: 150, y: 150, radius: 40 }, // Southeast druid area
-        lighthouse: { x: -300, y: 0, radius: 30 },      // Western lighthouse
-        port: { x: 0, y: 300, radius: 40 },             // Southern port
-        mine_entrance: { x: 250, y: -200, radius: 20 }, // Mine dungeon entrance
-        crab_cave: { x: 100, y: 280, radius: 15 },      // Mini dungeon under beach
-        pirate_tunnel: { x: -250, y: 250, radius: 15 }, // Pirate mini dungeon
-        crypt_entrance: { x: 50, y: -280, radius: 15 }, // Crypt dungeon entrance
+        town: { x: 0, y: 0, radius: 60 },                // Center - walled town 120x120
+        beach_south: { x: 0, y: 312, radius: 150 },      // Southern beach
+        forest_east: { x: 250, y: -62, radius: 188 },    // Eastern forest
+        swamp_nw: { x: -250, y: -188, radius: 150 },     // Northwest swamp
+        ruins_north: { x: 0, y: -312, radius: 125 },     // Northern ruins
+        pirate_bay: { x: -250, y: 250, radius: 125 },    // Southwest pirate bay
+        druid_clearing: { x: 188, y: 188, radius: 50 },  // Southeast druid area
+        lighthouse: { x: -375, y: 0, radius: 38 },       // Western lighthouse
+        port: { x: 0, y: 375, radius: 50 },              // Southern port
+        mine_entrance: { x: 312, y: -250, radius: 20 },  // Mine dungeon entrance
+        crab_cave: { x: 125, y: 350, radius: 15 },       // Mini dungeon under beach
+        pirate_tunnel: { x: -312, y: 312, radius: 15 },  // Pirate mini dungeon
+        crypt_entrance: { x: 62, y: -350, radius: 15 },  // Crypt dungeon entrance
     },
 
     monsters: [

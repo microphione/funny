@@ -104,6 +104,7 @@
             // Spawn in town center (near the well)
             const ic = World.getIslandCenter();
             World.getChunk(STARTER_ISLAND.cx, STARTER_ISLAND.cy);
+            World.spawnTownWanderingNpcs();
             Game.player.x = ic.x;
             Game.player.y = ic.y + 2; // Spawn just south of well
             Game.player.visualX = Game.player.x;

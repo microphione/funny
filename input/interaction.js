@@ -238,53 +238,8 @@ GameInput.interact = function() {
         return;
     }
 
-    // Town building door (NPC inside) - check multi-story first
-    if (tile === T.TOWN_BUILDING_DOOR) {
-        const bKey = `${tx},${ty}`;
-        const bldg = World.townBuildings && World.townBuildings[bKey];
-        const npcName = bldg ? bldg.npcName : 'Mieszkaniec';
-
-        // Multi-story building: enter upper floors
-        if (bldg && bldg.multiStory && World.buildingFloors[bKey]) {
-            World.enterBuildingFloor(bKey, 0);
-            GameRender.updateHUD();
-            return;
-        }
-        // Special NPCs
-        if (npcName === 'Bankier') {
-            GameUI.openBank();
-            return;
-        }
-        if (npcName === 'Stajennik') {
-            const mountPrice = 500;
-            if (p.ownedMounts && p.ownedMounts.length > 0) {
-                Game.log(`Stajennik: Twój koń czeka! Naciśnij R by wsiadać/zsiadać.`, 'info');
-            } else {
-                GameUI.confirmAction(`Kupić wierzchowca za ${mountPrice} złota? (+40% szybkości ruchu)`, () => {
-                    if (p.gold >= mountPrice) {
-                        p.gold -= mountPrice;
-                        Game.syncGold();
-                        p.ownedMounts = p.ownedMounts || [];
-                        p.ownedMounts.push('horse');
-                        Game.log(`Kupiono wierzchowca! Naciśnij R by wsiadać/zsiadać.`, 'loot');
-                        GameRender.updateHUD();
-                    } else {
-                        Game.log(`Za mało złota! (potrzeba ${mountPrice})`, 'info');
-                    }
-                });
-            }
-            return;
-        }
-        const dialogues = [
-            `${npcName}: Witaj podróżniku! Czym mogę służyć?`,
-            `${npcName}: Miło cię widzieć w naszym mieście!`,
-            `${npcName}: Powodzenia w twoich przygodach!`,
-            `${npcName}: Uważaj za murami miasta, pełno tam potworów.`,
-            `${npcName}: Wróć kiedy będziesz potrzebować pomocy!`,
-        ];
-        Game.log(dialogues[Math.floor(Math.random() * dialogues.length)], 'info');
-        return;
-    }
+    // Town building door - player walks through physically (door is walkable)
+    // NPC interaction happens when player is inside and faces the NPC tile
 
     // Buyable house door - interact to buy or enter (if owned)
     if (tile === T.HOUSE_DOOR) {

@@ -405,6 +405,13 @@ const GameRender = {
             for (const hk in World.houses) {
                 const house = World.houses[hk];
                 if (!house.roofTiles) continue;
+
+                // Viewport culling: skip houses entirely outside view
+                if (house.bx !== undefined) {
+                    if (house.bx + (house.w || 10) < startX || house.bx > endX ||
+                        house.by + (house.h || 10) < startY || house.by > endY) continue;
+                }
+
                 const isPlayerInside = (hk === playerHouseKey);
                 // Near house (within 2 tiles of door) = semi-transparent roof
                 const [doorX, doorY] = hk.split(',').map(Number);

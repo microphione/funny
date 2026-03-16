@@ -111,6 +111,11 @@ Game.load = function() {
             });
         }
 
+        // Spawn town wandering NPCs if on starter island
+        if (p.onStarterIsland) {
+            World.spawnTownWanderingNpcs();
+        }
+
         this.refreshStats();
         return true;
     } catch(e) { return false; }
