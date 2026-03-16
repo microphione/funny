@@ -69,6 +69,41 @@
         .mp-fill { height: 100%; background: linear-gradient(#9b59b6, #8e44ad); transition: width 0.3s; }
         .xp-fill { height: 100%; background: linear-gradient(#3498db, #2980b9); transition: width 0.3s; }
 
+        #game-toolbar {
+            display: flex;
+            width: 100%;
+            background: #0d0d22;
+            border: 1px solid #1a1a4a;
+            border-radius: 0 0 4px 4px;
+            padding: 2px 4px;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+        .tb-btn {
+            background: #1a1a3a;
+            border: 1px solid #333;
+            border-radius: 3px;
+            color: #ccc;
+            font-size: 12px;
+            width: 28px;
+            height: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s;
+        }
+        .tb-btn:hover { background: #2a2a5a; border-color: #e67e22; }
+
+        .panel-minimize {
+            cursor: pointer;
+            color: #888;
+            font-size: 10px;
+            float: right;
+            margin-left: 4px;
+        }
+        .panel-minimize:hover { color: #fff; }
+
         /* Main content area: game + side panel */
         #main-area {
             display: flex;
@@ -112,7 +147,16 @@
             border: 2px solid #1a1a4a;
             border-radius: 4px;
             padding: 6px;
+            transition: box-shadow 0.15s;
         }
+        .panel-box.dragging {
+            position: fixed;
+            z-index: 1000;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+            opacity: 0.92;
+            pointer-events: auto;
+        }
+        .panel-box.panel-closed { display: none; }
 
         .panel-title {
             font-size: 8px;
@@ -121,7 +165,19 @@
             text-align: center;
             border-bottom: 1px solid #1a1a4a;
             padding-bottom: 3px;
+            cursor: grab;
+            user-select: none;
         }
+        .panel-title:active { cursor: grabbing; }
+
+        .panel-close {
+            cursor: pointer;
+            color: #888;
+            font-size: 10px;
+            float: right;
+            margin-left: 4px;
+        }
+        .panel-close:hover { color: #e74c3c; }
 
         /* Equipment panel */
         #eq-panel .eq-slot {
@@ -511,24 +567,34 @@
             <div class="stat">LVL <span id="stat-level">1</span></div>
             <div class="stat">
                 HP
-                <div class="bar-container"><div class="hp-fill" id="hp-bar" style="width:100%"></div></div>
+                <div class="bar-container" style="width:80px"><div class="hp-fill" id="hp-bar" style="width:100%"></div></div>
                 <span id="stat-hp" style="font-size:7px">50/50</span>
             </div>
             <div class="stat">
                 MP
-                <div class="bar-container"><div class="mp-fill" id="mp-bar" style="width:100%"></div></div>
+                <div class="bar-container" style="width:60px"><div class="mp-fill" id="mp-bar" style="width:100%"></div></div>
                 <span id="stat-mp" style="font-size:7px">20/20</span>
             </div>
             <div class="stat">
                 XP
                 <div class="bar-container"><div class="xp-fill" id="xp-bar" style="width:0%"></div></div>
+                <span id="stat-xp-pct" style="font-size:6px;color:#3498db"></span>
             </div>
-            <div class="stat" style="color:#f1c40f"><span id="stat-gold">0</span> zl</div>
-            <div class="stat">ATK <span id="stat-atk">5</span></div>
-            <div class="stat">DEF <span id="stat-def">2</span></div>
-            <div class="stat" style="color:#2ecc71">AGI <span id="stat-agi">3</span></div>
+            <div class="stat" style="color:#e67e22">DMG <span id="stat-atk">5</span></div>
+            <div class="stat" style="color:#3498db">PNC <span id="stat-def">2</span></div>
+            <div class="stat" style="color:#2ecc71">UNK <span id="stat-agi">3</span></div>
             <div class="stat" style="color:#888;font-size:7px"><span id="stat-time">0:00</span></div>
-            <div class="stat" style="color:#e74c3c;font-size:7px">&#9760;<span id="stat-deaths">0</span></div>
+        </div>
+        <!-- Toolbar buttons -->
+        <div id="game-toolbar">
+            <button class="tb-btn" onclick="GameUI.openInventory()" title="Ekwipunek [I]">&#128188;</button>
+            <button class="tb-btn" onclick="GameUI.openSkillTree()" title="Drzewko [K]">&#127795;</button>
+            <button class="tb-btn" onclick="GameUI.openStatAllocation()" title="Atrybuty [T]">&#9733;</button>
+            <button class="tb-btn" onclick="GameUI.openQuests()" title="Questy [J]">&#128220;</button>
+            <button class="tb-btn" onclick="GameUI.openBestiary()" title="Bestiariusz [B]">&#128058;</button>
+            <button class="tb-btn" onclick="GameUI.openWorldMap()" title="Mapa [N]">&#127758;</button>
+            <button class="tb-btn" onclick="Game.save()" title="Zapisz [P]">&#128190;</button>
+            <button class="tb-btn" onclick="GameUI.reopenAllPanels()" title="Pokaż panele">&#128196;</button>
         </div>
 
         <div id="main-area">
@@ -585,32 +651,35 @@
             <div id="side-panel">
                 <!-- Minimap -->
                 <div class="panel-box" id="minimap-panel">
-                    <div class="panel-title">Minimapa</div>
-                    <canvas id="minimap" width="210" height="120"></canvas>
+                    <div class="panel-title"><span class="panel-close" onclick="GameUI.closePanel('minimap-panel')">[x]</span>Minimapa <span class="panel-minimize" onclick="GameUI.togglePanel('minimap-panel')">[-]</span></div>
+                    <div class="panel-content"><canvas id="minimap" width="210" height="120"></canvas></div>
+                </div>
+
+                <!-- Character Stats -->
+                <div class="panel-box" id="char-panel">
+                    <div class="panel-title"><span class="panel-close" onclick="GameUI.closePanel('char-panel')">[x]</span>Postać <span class="panel-minimize" onclick="GameUI.togglePanel('char-panel')">[-]</span></div>
+                    <div class="panel-content" id="char-stats" style="font-size:7px;line-height:1.8"></div>
                 </div>
 
                 <!-- Equipment -->
                 <div class="panel-box" id="eq-panel">
-                    <div class="panel-title">Wyposażenie</div>
-                    <div id="eq-slots"></div>
+                    <div class="panel-title"><span class="panel-close" onclick="GameUI.closePanel('eq-panel')">[x]</span>Wyposażenie <span class="panel-minimize" onclick="GameUI.togglePanel('eq-panel')">[-]</span></div>
+                    <div class="panel-content"><div id="eq-slots"></div></div>
                 </div>
 
                 <!-- Skills bar -->
-                <div class="panel-box">
-                    <div class="panel-title">Umiejętności [1-3]</div>
-                    <div id="skill-bar"></div>
-                </div>
-
-                <!-- Combat Skills (Tibia-style) -->
-                <div class="panel-box" id="skills-panel">
-                    <div class="panel-title">Skille Bojowe</div>
-                    <div id="combat-skills"></div>
+                <div class="panel-box" id="skillbar-panel">
+                    <div class="panel-title"><span class="panel-close" onclick="GameUI.closePanel('skillbar-panel')">[x]</span>Umiejętności [1-3] <span class="panel-minimize" onclick="GameUI.togglePanel('skillbar-panel')">[-]</span></div>
+                    <div class="panel-content"><div id="skill-bar"></div></div>
                 </div>
 
                 <!-- Backpack -->
                 <div class="panel-box" id="bp-panel">
-                    <div class="panel-title">Plecak <span id="bp-count">0/20</span></div>
-                    <div class="bp-grid" id="bp-grid"></div>
+                    <div class="panel-title"><span class="panel-close" onclick="GameUI.closePanel('bp-panel')">[x]</span>Plecak <span id="bp-count">0/20</span> <span class="panel-minimize" onclick="GameUI.togglePanel('bp-panel')">[-]</span></div>
+                    <div class="panel-content">
+                        <div id="bp-gold" style="font-size:7px;color:#f1c40f;padding:2px 0;text-align:center"></div>
+                        <div class="bp-grid" id="bp-grid"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -618,7 +687,7 @@
         <div id="bottom-bar">
             <div id="message-log"></div>
             <div id="controls-hint">
-                [WASD] Ruch &nbsp; [SPACJA] Podniez/Interakcja &nbsp; [E] Atak &nbsp; [1-3] Skille &nbsp; [F1/F2] Mikstury HP/MP &nbsp; [I] Ekwipunek &nbsp; [K] Umiejetnosci &nbsp; [J] Questy &nbsp; [N] Mapa &nbsp; [M] Muzyka &nbsp; [P] Zapis &nbsp; [PPM] Upusc
+                [WASD] Ruch &nbsp; [SPACJA] Cel/Drzwi/Podnieś &nbsp; [E] Interakcja &nbsp; [1-3] Skille &nbsp; [F1/F2] Mikstury &nbsp; [I] Inwentarz &nbsp; [K] Drzewko &nbsp; [T] Atrybuty &nbsp; [J] Questy &nbsp; [B] Bestiariusz &nbsp; [N] Mapa &nbsp; [R] Wierzchowiec &nbsp; [P] Zapis &nbsp; [PPM] Menu
             </div>
         </div>
     </div>
@@ -642,16 +711,70 @@
         </div>
     </div>
 
-    <script src="perlin.js"></script>
-    <script src="sprites.js"></script>
-    <script src="items.js"></script>
-    <script src="music.js"></script>
-    <script src="world.js"></script>
-    <script src="game-core.js"></script>
-    <script src="game-render.js"></script>
-    <script src="game-combat.js"></script>
-    <script src="game-ui.js"></script>
-    <script src="game-input.js"></script>
-    <script src="game-main.js"></script>
+    <!-- Utilities -->
+    <script src="utils/perlin.js"></script>
+
+    <!-- Sprites -->
+    <script src="render/sprites/sprite-core.js"></script>
+    <script src="render/sprites/sprite-terrain.js"></script>
+    <script src="render/sprites/sprite-entities.js"></script>
+    <script src="render/sprites/sprite-monsters.js"></script>
+    <script src="render/sprites/sprite-monsters2.js"></script>
+
+    <!-- Config & Data -->
+    <script src="config/tile-types.js"></script>
+    <script src="config/item-defs.js"></script>
+    <script src="config/currency.js"></script>
+    <script src="config/class-defs.js"></script>
+    <script src="config/quest-defs.js"></script>
+    <script src="config/monster-defs.js"></script>
+    <script src="models/item-factory.js"></script>
+
+    <!-- Audio -->
+    <script src="audio/music.js"></script>
+
+    <!-- World -->
+    <script src="world/world-core.js"></script>
+    <script src="world/building.js"></script>
+    <script src="world/height.js"></script>
+    <script src="world/chunk-gen.js"></script>
+    <script src="world/village-gen.js"></script>
+    <script src="world/capital-gen.js"></script>
+    <script src="world/dungeon.js"></script>
+
+    <!-- Game Core -->
+    <script src="config/game-init.js"></script>
+    <script src="models/player.js"></script>
+    <script src="systems/save-load.js"></script>
+
+    <!-- Rendering -->
+    <script src="render/renderer.js"></script>
+    <script src="render/minimap.js"></script>
+    <script src="render/hud.js"></script>
+
+    <!-- Combat & Systems -->
+    <script src="systems/combat.js"></script>
+    <script src="systems/skills.js"></script>
+    <script src="systems/skills2.js"></script>
+    <script src="systems/ai.js"></script>
+    <script src="systems/buffs.js"></script>
+
+    <!-- UI -->
+    <script src="ui/panels.js"></script>
+    <script src="ui/side-panel.js"></script>
+    <script src="ui/inventory-ui.js"></script>
+    <script src="ui/shop-ui.js"></script>
+    <script src="ui/skill-tree-ui.js"></script>
+    <script src="ui/overlays.js"></script>
+
+    <!-- Input -->
+    <script src="input/keyboard.js"></script>
+    <script src="input/movement.js"></script>
+    <script src="input/interaction.js"></script>
+    <script src="input/mobile.js"></script>
+    <script src="input/quests.js"></script>
+
+    <!-- Main Game Loop -->
+    <script src="main.js"></script>
 </body>
 </html>

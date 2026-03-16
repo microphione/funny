@@ -85,15 +85,35 @@
         // Init input
         GameInput.init();
 
+        // Init draggable panels
+        GameUI.initDraggablePanels();
+
         // Init music
         Music.init();
 
         // Title screen buttons
         document.getElementById('btn-new-game').addEventListener('click', () => {
             document.getElementById('title-screen').style.display = 'none';
-            Game.state = 'class_select';
-            GameUI.showClassSelect();
             Music.ensureContext();
+            // Start as novice on starter island - no class selection
+            Game.createPlayer('novice');
+            Game.player.onStarterIsland = true;
+            Game.state = 'playing';
+            Game.startTime = Date.now();
+            World.init();
+            // Spawn on starter island center
+            const islandX = STARTER_ISLAND.cx * World.CHUNK_SIZE + Math.floor(World.CHUNK_SIZE / 2);
+            const islandY = STARTER_ISLAND.cy * World.CHUNK_SIZE + Math.floor(World.CHUNK_SIZE / 2);
+            World.getChunk(STARTER_ISLAND.cx, STARTER_ISLAND.cy);
+            Game.player.x = islandX;
+            Game.player.y = islandY;
+            Game.player.visualX = islandX;
+            Game.player.visualY = islandY;
+            Game.starterIslandQuests = {};
+            Music.updateBiome(0, false, false);
+            Game.log('Budzisz się na nieznanej wyspie...', 'info');
+            Game.log('Eksploruj, walcz i osiągnij poziom 20, aby opuścić wyspę!', 'info');
+            Game.log('WASD = ruch, SPACJA = interakcja, E = atak, I = ekwipunek', 'info');
         });
 
         document.getElementById('btn-load-game').addEventListener('click', () => {

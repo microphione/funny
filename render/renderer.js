@@ -1,5 +1,5 @@
 // ============================================================
-// GAME RENDER - Camera, tiles, monsters, HP bars, minimap
+// GAME RENDER - Camera, tiles, monsters, player rendering
 // ============================================================
 
 const GameRender = {
@@ -58,6 +58,12 @@ const GameRender = {
             case T.LAVA: return `lava_${animFrame % 4}`;
             case T.SNOW: return `snow_${v}`;
             case T.SNOW_PINE: return 'snow_pine';
+            case T.HOUSE_WALL: return 'house_wall';
+            case T.HOUSE_ROOF: return 'house_roof';
+            case T.HOUSE_FLOOR: return 'house_floor';
+            case T.HOUSE_WINDOW: return 'house_window';
+            case T.STAIRS_UP: return 'stairs_up';
+            case T.STAIRS_DOWN: return 'stairs_down';
             default: return `grass_0`;
         }
     },
@@ -114,14 +120,23 @@ const GameRender = {
         const overlayTiles = new Set([T.TREE, T.SWAMP_TREE, T.CACTUS, T.CHEST, T.SIGN, T.WELL, T.STATUE,
             T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC, T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC,
             T.FENCE, T.INN, T.HOUSE, T.VILLAGE_HUT, T.ROCK, T.HOUSE_DOOR,
-            T.TOWN_BUILDING, T.TOWN_BUILDING_DOOR, T.SNOW_PINE]);
+            T.TOWN_BUILDING, T.TOWN_BUILDING_DOOR, T.SNOW_PINE,
+            T.HOUSE_WALL, T.HOUSE_WINDOW, T.STAIRS_UP, T.STAIRS_DOWN]);
+
+        // Height offset lookup for elevation rendering
+        const heightOffsets = { 0: 4, 1: 0, 2: -4 }; // low=down, mid=normal, high=up
 
         // First pass: ground tiles
         for (let wy = startY; wy < endY; wy++) {
             for (let wx = startX; wx < endX; wx++) {
                 const sx = Math.floor((wx - camX) * TILE);
-                const sy = Math.floor((wy - camY) * TILE);
+                let sy = Math.floor((wy - camY) * TILE);
                 const tile = World.getTile(wx, wy);
+
+                // Apply height offset (visual elevation)
+                const h = World.activeDungeon ? 0 : World.getHeight(wx, wy);
+                const hOff = (h >= 0) ? (heightOffsets[h] || 0) : 0;
+                sy += hOff;
 
                 if (overlayTiles.has(tile)) {
                     // Draw appropriate ground underneath
@@ -143,6 +158,29 @@ const GameRender = {
 
                 const spriteKey = this.getTileSprite(tile, wx, wy, animFrame);
                 Sprites.draw(ctx, spriteKey, sx, sy);
+
+                // Draw cliff edges between different height levels
+                if (!World.activeDungeon && h >= 0) {
+                    const hSouth = World.getHeight(wx, wy + 1);
+                    if (hSouth >= 0 && h > hSouth) {
+                        // Cliff edge shadow on south side
+                        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                        ctx.fillRect(sx, sy + TILE - 1, TILE, 3 + (h - hSouth) * 2);
+                    }
+                    const hEast = World.getHeight(wx + 1, wy);
+                    if (hEast >= 0 && h > hEast) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                        ctx.fillRect(sx + TILE - 1, sy, 2, TILE);
+                    }
+                    // Darken low tiles slightly, brighten high tiles
+                    if (h === 0) {
+                        ctx.fillStyle = 'rgba(0,0,20,0.15)';
+                        ctx.fillRect(sx, sy, TILE, TILE);
+                    } else if (h === 2) {
+                        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                        ctx.fillRect(sx, sy, TILE, TILE);
+                    }
+                }
 
                 // Opened chest check
                 if (tile === T.CHEST && World.openedChests.has(`${wx},${wy}`)) {
@@ -238,16 +276,58 @@ const GameRender = {
                 } else {
                     continue;
                 }
-                // Animated bouncing marker
+                // Animated bouncing marker with black outline
                 const my = sy - 12 + questBob;
-                ctx.fillStyle = markerColor;
                 ctx.font = 'bold 14px "Press Start 2P"';
                 ctx.textAlign = 'center';
                 ctx.globalAlpha = 0.8 + Math.sin(Date.now() / 200) * 0.2;
+                // Black outline (stroke)
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.strokeText(markerChar, sx + TILE / 2, my);
+                // Colored fill
+                ctx.fillStyle = markerColor;
                 ctx.fillText(markerChar, sx + TILE / 2, my);
                 ctx.globalAlpha = 1;
                 ctx.textAlign = 'left';
             }
+
+            // Draw ? markers above quest target monsters
+            const questBob2 = Math.sin(Date.now() / 350) * 2;
+            for (const q of G.quests) {
+                if (q.completed || q.turned_in) continue;
+                if (q.type === 'kill') {
+                    // Show ? above matching monsters in view
+                    const nearM = World.getMonstersNear(p.x, p.y, Math.max(G.VIEW_W, G.VIEW_H));
+                    for (const m of nearM) {
+                        if (m.baseName === q.target && m.alive) {
+                            const mx = Math.floor((m.x - camX) * TILE);
+                            const my2 = Math.floor((m.y - camY) * TILE) - 10 + questBob2;
+                            if (mx < -TILE || mx > W + TILE || my2 < -TILE || my2 > H + TILE) continue;
+                            ctx.font = 'bold 10px "Press Start 2P"';
+                            ctx.textAlign = 'center';
+                            ctx.strokeStyle = '#000';
+                            ctx.lineWidth = 2;
+                            ctx.strokeText('?', mx + TILE / 2, my2);
+                            ctx.fillStyle = '#f39c12';
+                            ctx.fillText('?', mx + TILE / 2, my2);
+                            ctx.textAlign = 'left';
+                        }
+                    }
+                }
+            }
+        }
+
+        // Auto-attack target indicator
+        if (G.autoAttackTarget && G.autoAttackTarget.alive) {
+            const t = G.autoAttackTarget;
+            const tsx = Math.floor((t.x - camX) * TILE);
+            const tsy = Math.floor((t.y - camY) * TILE);
+            const pulse = 0.5 + Math.sin(Date.now() / 200) * 0.3;
+            ctx.strokeStyle = `rgba(231, 76, 60, ${pulse})`;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(tsx + 1, tsy + 1, TILE - 2, TILE - 2);
+            ctx.lineWidth = 1;
         }
 
         // Draw monsters
@@ -255,7 +335,9 @@ const GameRender = {
         for (const m of nearMonsters) {
             if (!m.alive) continue;
             const sx = Math.floor((m.x - camX) * TILE);
-            const sy = Math.floor((m.y - camY) * TILE);
+            const mh = World.activeDungeon ? 0 : World.getHeight(m.x, m.y);
+            const mhOff = (mh >= 0) ? (heightOffsets[mh] || 0) : 0;
+            const sy = Math.floor((m.y - camY) * TILE) + mhOff;
             if (sx < -TILE || sx > W + TILE || sy < -TILE || sy > H + TILE) continue;
 
             const spriteKey = m.isElite
@@ -281,9 +363,11 @@ const GameRender = {
             ctx.textAlign = 'left';
         }
 
-        // Draw player
+        // Draw player (with height offset)
+        const playerH = World.activeDungeon ? 0 : World.getHeight(p.x, p.y);
+        const playerHOff = (playerH >= 0) ? (heightOffsets[playerH] || 0) : 0;
         const px = Math.floor((p.visualX - camX) * TILE);
-        const py = Math.floor((p.visualY - camY) * TILE);
+        const py = Math.floor((p.visualY - camY) * TILE) + playerHOff;
         const walkFrame = G.animating ? 1 : 0;
         const playerSprite = `player_${p.dir}_${walkFrame}`;
         if (p.stealth) ctx.globalAlpha = 0.4;
@@ -309,6 +393,34 @@ const GameRender = {
             ctx.fillRect(px, py + TILE + 3, phpW * (1 - atkPct), 1);
         }
 
+        // House roof overlay - draw roofs over everything, except player's current house
+        const playerHouseKey = World.getPlayerHouse();
+        if (!World.activeDungeon) {
+            for (const hk in World.houses) {
+                const house = World.houses[hk];
+                if (!house.roofTiles) continue;
+                const isPlayerInside = (hk === playerHouseKey);
+                // Near house (within 2 tiles of door) = semi-transparent roof
+                const [doorX, doorY] = hk.split(',').map(Number);
+                const distToDoor = Math.abs(p.x - doorX) + Math.abs(p.y - doorY);
+                const isNear = distToDoor <= 2;
+
+                if (isPlayerInside) continue; // Don't draw roof at all when inside
+
+                if (isNear) ctx.globalAlpha = 0.4;
+
+                for (const rt of house.roofTiles) {
+                    const [rx, ry] = rt.split(',').map(Number);
+                    const rsx = Math.floor((rx - camX) * TILE);
+                    const rsy = Math.floor((ry - camY) * TILE);
+                    if (rsx < -TILE || rsx > W + TILE || rsy < -TILE || rsy > H + TILE) continue;
+                    Sprites.draw(ctx, 'house_roof', rsx, rsy);
+                }
+
+                if (isNear) ctx.globalAlpha = 1;
+            }
+        }
+
         // Targeting crosshair
         if (G.targeting) {
             const tx = Math.floor((G.targetX - camX) * TILE);
@@ -322,14 +434,21 @@ const GameRender = {
         // Direction indicator (small arrow)
         this.drawDirectionIndicator(ctx, px, py, p.dir);
 
-        // Location label
+        // Location label with height indicator
         const locLabel = document.getElementById('location-label');
         if (locLabel) {
-            if (World.activeDungeon) {
+            if (World.activeBuildingFloor) {
+                const bf = World.activeBuildingFloor;
+                locLabel.textContent = `${bf.name} - Piętro ${bf.floor + 1}/${bf.numFloors}`;
+            } else if (World.activeDungeon) {
                 const d = World.activeDungeon;
                 locLabel.textContent = `${d.type.name} - Piętro ${d.floor}/${d.type.floors}`;
             } else {
-                locLabel.textContent = World.getAreaName(p.x, p.y);
+                const heightNames = { 0: 'Niziny', 1: '', 2: 'Wyżyny' };
+                const h = World.getHeight(p.x, p.y);
+                const hName = (h >= 0) ? heightNames[h] : '';
+                const areaName = World.getAreaName(p.x, p.y);
+                locLabel.textContent = hName ? `${areaName} [${hName}]` : areaName;
             }
         }
     },
@@ -343,153 +462,5 @@ const GameRender = {
             case 'left': ctx.fillRect(px - 4, cy - 2, 3, 4); break;
             case 'right': ctx.fillRect(px + 33, cy - 2, 3, 4); break;
         }
-    },
-
-    renderMinimap() {
-        const p = Game.player;
-        if (!p || !this.minimapCtx) return;
-        const mctx = this.minimapCtx;
-        const mw = this.minimapCanvas.width;
-        const mh = this.minimapCanvas.height;
-        mctx.fillStyle = '#111';
-        mctx.fillRect(0, 0, mw, mh);
-
-        const scale = 2;
-        const hw = Math.floor(mw / scale / 2);
-        const hh = Math.floor(mh / scale / 2);
-
-        for (let dy = -hh; dy <= hh; dy++) {
-            for (let dx = -hw; dx <= hw; dx++) {
-                const wx = p.x + dx;
-                const wy = p.y + dy;
-                const tile = World.getTile(wx, wy);
-                let color = '#333';
-                const T = World.T;
-                if (tile === T.WATER) color = '#2980b9';
-                else if (tile === T.GRASS || tile === T.FLOWER) color = '#4a8c3f';
-                else if (tile === T.DARK_GRASS) color = '#2d5a2a';
-                else if (tile === T.PATH || tile === T.BRIDGE) color = '#c4a663';
-                else if (tile === T.TREE || tile === T.SWAMP_TREE) color = '#1a5c1a';
-                else if ([T.HOUSE, T.VILLAGE_HUT, T.FENCE].includes(tile)) color = '#8B4513';
-                else if (tile === T.STONE_FLOOR || tile === T.SHOP_FLOOR) color = '#888';
-                else if (tile === T.SWAMP) color = '#556b2f';
-                else if (tile === T.MOUNTAIN || tile === T.ROCK) color = '#808080';
-                else if (tile === T.DESERT) color = '#daa520';
-                else if ([T.SHOP_WEAPON_NPC, T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC, T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER].includes(tile)) color = '#e67e22';
-                else if (tile === T.WELL) color = '#3498db';
-                else if (tile === T.CAVE_ENTRY || tile === T.FOREST_ENTRY) color = '#ff4444';
-                else if (tile === T.CHEST) color = '#f1c40f';
-                else if (tile === T.CACTUS) color = '#2ecc71';
-                else if (tile === T.HOUSE_DOOR) color = '#8B4513';
-                else if (tile === T.DOOR) color = '#c4a663';
-                else if (tile === T.TOWN_BUILDING || tile === T.TOWN_BUILDING_DOOR) color = '#a89078';
-                else if (tile === T.LAVA) color = '#e74c3c';
-                else if (tile === T.SNOW || tile === T.SNOW_PINE) color = '#ecf0f1';
-
-                // Monster dot
-                const mob = World.getMonsterAt(wx, wy);
-                if (mob) color = mob.isElite ? '#f1c40f' : '#e74c3c';
-                // City NPC dot
-                if (World.getCityNpcAt(wx, wy)) color = '#3498db';
-
-                mctx.fillStyle = color;
-                mctx.fillRect((dx + hw) * scale, (dy + hh) * scale, scale, scale);
-            }
-        }
-
-        // Quest target areas on minimap (? markers for discovered areas)
-        Game.quests.forEach(q => {
-            if (q.turned_in) return;
-            if (!q.completed && q.targetX !== undefined && q.targetY !== undefined) {
-                const qdx = q.targetX - p.x;
-                const qdy = q.targetY - p.y;
-                if (Math.abs(qdx) <= hw && Math.abs(qdy) <= hh) {
-                    // Pulsing quest area indicator
-                    const pulse = 0.4 + Math.sin(Date.now() / 400) * 0.3;
-                    mctx.globalAlpha = pulse;
-                    mctx.fillStyle = '#f39c12';
-                    // Draw a small area around the target
-                    for (let r = -2; r <= 2; r++) {
-                        for (let c = -2; c <= 2; c++) {
-                            const mx = (qdx + c + hw) * scale;
-                            const my = (qdy + r + hh) * scale;
-                            if (mx >= 0 && mx < mw && my >= 0 && my < mh) {
-                                mctx.fillRect(mx, my, scale, scale);
-                            }
-                        }
-                    }
-                    mctx.globalAlpha = 1;
-                    // Question mark in center
-                    mctx.fillStyle = '#fff';
-                    mctx.font = '6px "Press Start 2P"';
-                    mctx.textAlign = 'center';
-                    mctx.fillText('?', (qdx + hw) * scale + 1, (qdy + hh) * scale + 5);
-                    mctx.textAlign = 'left';
-                }
-            }
-        });
-        // Quest NPCs on minimap (green ? for completable, orange for active)
-        for (const key in World.questNpcs) {
-            const [nx, ny] = key.split(',').map(Number);
-            const qdx = nx - p.x, qdy = ny - p.y;
-            if (Math.abs(qdx) <= hw && Math.abs(qdy) <= hh) {
-                const quest = Game.quests.find(q => q.id === World.questNpcs[key].id);
-                if (quest && quest.completed && !quest.turned_in) {
-                    mctx.fillStyle = '#2ecc71'; // green - ready to turn in
-                } else if (quest && !quest.turned_in) {
-                    mctx.fillStyle = '#e67e22'; // orange - in progress
-                } else if (!quest) {
-                    mctx.fillStyle = '#f1c40f'; // yellow - available
-                } else {
-                    continue; // turned in, skip
-                }
-                mctx.fillRect((qdx + hw) * scale, (qdy + hh) * scale, scale, scale);
-            }
-        }
-
-        // Dungeon/cave entry markers - larger blinking icons
-        for (let dy = -hh; dy <= hh; dy++) {
-            for (let dx = -hw; dx <= hw; dx++) {
-                const wx = p.x + dx;
-                const wy = p.y + dy;
-                const tile = World.getTile(wx, wy);
-                if (tile === World.T.CAVE_ENTRY || tile === World.T.FOREST_ENTRY) {
-                    const blink = Math.sin(Date.now() / 500 + dx + dy) > -0.3;
-                    if (blink) {
-                        mctx.fillStyle = '#ff4444';
-                        mctx.fillRect((dx + hw) * scale - 1, (dy + hh) * scale - 1, scale + 2, scale + 2);
-                        mctx.fillStyle = '#ff8888';
-                        mctx.fillRect((dx + hw) * scale, (dy + hh) * scale, scale, scale);
-                    }
-                }
-            }
-        }
-
-        // Player dot
-        mctx.fillStyle = '#fff';
-        mctx.fillRect(hw * scale, hh * scale, scale, scale);
-    },
-
-    updateHUD() {
-        const p = Game.player;
-        if (!p) return;
-        const s = Game.getStats();
-
-        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-        const setW = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = pct + '%'; };
-
-        set('stat-level', p.level);
-        set('stat-hp', `${p.hp}/${p.maxHp}`);
-        set('stat-mp', `${p.mp}/${p.maxMp}`);
-        setW('hp-bar', (p.hp / p.maxHp) * 100);
-        setW('mp-bar', (p.mp / p.maxMp) * 100);
-        setW('xp-bar', (p.xp / p.xpToNext) * 100);
-        set('stat-gold', p.gold);
-        set('stat-atk', s.atk);
-        set('stat-def', s.def);
-        set('stat-agi', s.agi);
-        set('stat-class', CLASSES[p.classId]?.name || '');
-        set('stat-time', Game.getPlayTime());
-        set('stat-deaths', Game.deathCount);
     },
 };
