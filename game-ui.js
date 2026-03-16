@@ -229,6 +229,40 @@ const GameUI = {
         Game.activeOverlay = id;
     },
 
+    // ========== CONFIRMATION POPUP ==========
+    confirmAction(message, onConfirm) {
+        // Remove any existing confirm popup
+        const existing = document.getElementById('confirm-popup');
+        if (existing) existing.remove();
+
+        const popup = document.createElement('div');
+        popup.id = 'confirm-popup';
+        popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1a1a2e;border:2px solid #f1c40f;padding:16px 20px;z-index:10000;font-family:"Press Start 2P";text-align:center;min-width:200px;box-shadow:0 0 20px rgba(0,0,0,0.8)';
+
+        const msg = document.createElement('div');
+        msg.style.cssText = 'color:#ddd;font-size:8px;margin-bottom:14px;line-height:1.6';
+        msg.textContent = message;
+        popup.appendChild(msg);
+
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:10px;justify-content:center';
+
+        const yesBtn = document.createElement('button');
+        yesBtn.textContent = 'Tak';
+        yesBtn.style.cssText = 'font-family:"Press Start 2P";font-size:8px;padding:6px 16px;background:#2ecc71;color:#000;border:none;cursor:pointer';
+        yesBtn.onclick = () => { popup.remove(); onConfirm(); };
+
+        const noBtn = document.createElement('button');
+        noBtn.textContent = 'Nie';
+        noBtn.style.cssText = 'font-family:"Press Start 2P";font-size:8px;padding:6px 16px;background:#e74c3c;color:#fff;border:none;cursor:pointer';
+        noBtn.onclick = () => popup.remove();
+
+        btnRow.appendChild(yesBtn);
+        btnRow.appendChild(noBtn);
+        popup.appendChild(btnRow);
+        document.body.appendChild(popup);
+    },
+
     // ========== CLASS SELECTION ==========
     showClassSelect() {
         const el = document.getElementById('class-select');
@@ -386,7 +420,7 @@ const GameUI = {
             div.innerHTML = `<div>${nameSpan}${descSpan}${compare}</div>${priceSpan}`;
 
             if (p.gold >= item.price) {
-                div.onclick = () => this.buyItem(idx);
+                div.onclick = () => this.confirmAction(`Kupić ${item.name} za ${item.price} zł?`, () => this.buyItem(idx));
             }
             content.appendChild(div);
         });
@@ -411,22 +445,24 @@ const GameUI = {
                     <div class="item-desc">${item.desc || ''}</div></div>
                     <span class="item-price" style="color:#2ecc71">+${sellPrice} zł</span>`;
                 div.onclick = () => {
-                    const idx = p.inventory.indexOf(item);
-                    if (idx === -1) return;
-                    p.gold += sellPrice;
-                    if (Object.values(p.equipment).some(e => e && e.id === item.id)) {
-                        for (const s in p.equipment) { if (p.equipment[s]?.id === item.id) p.equipment[s] = null; }
-                    }
-                    if (item.count > 1) {
-                        item.count--;
-                    } else {
-                        p.inventory.splice(idx, 1);
-                    }
-                    Game.refreshStats();
-                    this.renderShopItems();
-                    this.updateSidePanel();
-                    GameRender.updateHUD();
-                    Game.log(`Sprzedano: ${item.name} za ${sellPrice}zł`, 'shop');
+                    this.confirmAction(`Sprzedać ${item.name} za ${sellPrice} zł?`, () => {
+                        const idx = p.inventory.indexOf(item);
+                        if (idx === -1) return;
+                        p.gold += sellPrice;
+                        if (Object.values(p.equipment).some(e => e && e.id === item.id)) {
+                            for (const s in p.equipment) { if (p.equipment[s]?.id === item.id) p.equipment[s] = null; }
+                        }
+                        if (item.count > 1) {
+                            item.count--;
+                        } else {
+                            p.inventory.splice(idx, 1);
+                        }
+                        Game.refreshStats();
+                        this.renderShopItems();
+                        this.updateSidePanel();
+                        GameRender.updateHUD();
+                        Game.log(`Sprzedano: ${item.name} za ${sellPrice}zł`, 'shop');
+                    });
                 };
                 content.appendChild(div);
             });

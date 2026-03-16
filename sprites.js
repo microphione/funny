@@ -1121,6 +1121,89 @@ const Sprites = {
             px(ctx, 10, 2, '#ecf0f1', 12, 2);
             px(ctx, 13, 0, '#fff', 6, 1);
         });
+
+        // --- HOUSE_WALL (proper brick/stone wall) ---
+        this.create('house_wall', (ctx) => {
+            // Stone wall with bricks
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(0, 0, S, S);
+            // Brick rows
+            for (let by = 0; by < S; by += 8) {
+                const offset = (by % 16 === 0) ? 0 : 8;
+                for (let bx = offset; bx < S; bx += 16) {
+                    px(ctx, bx, by, '#7B6345', 15, 7);
+                    px(ctx, bx + 1, by + 1, '#9B8365', 13, 5);
+                }
+                px(ctx, 0, by + 7, '#6B5335', S, 1); // mortar line
+            }
+            // Dark edges
+            px(ctx, 0, 0, '#5a4a3a', S, 1);
+            px(ctx, 0, 0, '#5a4a3a', 1, S);
+            px(ctx, S - 1, 0, '#5a4a3a', 1, S);
+            px(ctx, 0, S - 1, '#5a4a3a', S, 1);
+        });
+
+        // --- HOUSE_ROOF (brown/red roof tiles) ---
+        this.create('house_roof', (ctx) => {
+            ctx.fillStyle = '#8B2500';
+            ctx.fillRect(0, 0, S, S);
+            // Roof tile rows
+            for (let ry = 0; ry < S; ry += 6) {
+                const offset = (ry % 12 === 0) ? 0 : 8;
+                for (let rx = offset; rx < S; rx += 16) {
+                    px(ctx, rx, ry, '#A52A00', 14, 5);
+                    px(ctx, rx + 1, ry + 1, '#B53A10', 12, 3);
+                }
+            }
+            // Highlight on top row
+            px(ctx, 0, 0, '#C54A20', S, 2);
+        });
+
+        // --- HOUSE_FLOOR (wooden floor planks) ---
+        this.create('house_floor', (ctx) => {
+            ctx.fillStyle = '#B8860B';
+            ctx.fillRect(0, 0, S, S);
+            // Wooden planks
+            for (let py = 0; py < S; py += 8) {
+                px(ctx, 0, py, '#A0760B', S, 1);
+                px(ctx, 4 + (py % 16), py + 2, '#C8960B', 8, 1);
+                px(ctx, 20 - (py % 16), py + 5, '#D0A020', 6, 1);
+            }
+            // Wood grain
+            px(ctx, 8, 4, '#9a7000', 1, 6);
+            px(ctx, 24, 12, '#9a7000', 1, 6);
+            px(ctx, 16, 20, '#9a7000', 1, 6);
+        });
+
+        // --- HOUSE_WINDOW (wall with window opening) ---
+        this.create('house_window', (ctx) => {
+            // Base wall
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(0, 0, S, S);
+            // Brick rows
+            for (let by = 0; by < S; by += 8) {
+                px(ctx, 0, by + 7, '#6B5335', S, 1);
+            }
+            // Window frame
+            px(ctx, 8, 6, '#5a2d0e', 16, 20);
+            px(ctx, 9, 7, '#3a1a00', 14, 18);
+            // Glass panes
+            px(ctx, 10, 8, '#5588aa', 6, 8);
+            px(ctx, 16, 8, '#5588aa', 6, 8);
+            px(ctx, 10, 17, '#5588aa', 6, 7);
+            px(ctx, 16, 17, '#5588aa', 6, 7);
+            // Cross frame
+            px(ctx, 15, 8, '#5a2d0e', 2, 16);
+            px(ctx, 10, 15, '#5a2d0e', 12, 2);
+            // Glass shine
+            px(ctx, 11, 9, '#88bbdd', 2, 2);
+            px(ctx, 17, 9, '#88bbdd', 2, 2);
+            // Sill
+            px(ctx, 7, 25, '#6B5335', 18, 2);
+            // Wall edges
+            px(ctx, 0, 0, '#5a4a3a', S, 1);
+            px(ctx, 0, S - 1, '#5a4a3a', S, 1);
+        });
     },
 
     // ========== PLAYER SPRITES (32x32 detailed) ==========

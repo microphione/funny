@@ -58,6 +58,10 @@ const GameRender = {
             case T.LAVA: return `lava_${animFrame % 4}`;
             case T.SNOW: return `snow_${v}`;
             case T.SNOW_PINE: return 'snow_pine';
+            case T.HOUSE_WALL: return 'house_wall';
+            case T.HOUSE_ROOF: return 'house_roof';
+            case T.HOUSE_FLOOR: return 'house_floor';
+            case T.HOUSE_WINDOW: return 'house_window';
             default: return `grass_0`;
         }
     },
@@ -114,7 +118,8 @@ const GameRender = {
         const overlayTiles = new Set([T.TREE, T.SWAMP_TREE, T.CACTUS, T.CHEST, T.SIGN, T.WELL, T.STATUE,
             T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC, T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC,
             T.FENCE, T.INN, T.HOUSE, T.VILLAGE_HUT, T.ROCK, T.HOUSE_DOOR,
-            T.TOWN_BUILDING, T.TOWN_BUILDING_DOOR, T.SNOW_PINE]);
+            T.TOWN_BUILDING, T.TOWN_BUILDING_DOOR, T.SNOW_PINE,
+            T.HOUSE_WALL, T.HOUSE_WINDOW]);
 
         // First pass: ground tiles
         for (let wy = startY; wy < endY; wy++) {
@@ -238,16 +243,58 @@ const GameRender = {
                 } else {
                     continue;
                 }
-                // Animated bouncing marker
+                // Animated bouncing marker with black outline
                 const my = sy - 12 + questBob;
-                ctx.fillStyle = markerColor;
                 ctx.font = 'bold 14px "Press Start 2P"';
                 ctx.textAlign = 'center';
                 ctx.globalAlpha = 0.8 + Math.sin(Date.now() / 200) * 0.2;
+                // Black outline (stroke)
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.strokeText(markerChar, sx + TILE / 2, my);
+                // Colored fill
+                ctx.fillStyle = markerColor;
                 ctx.fillText(markerChar, sx + TILE / 2, my);
                 ctx.globalAlpha = 1;
                 ctx.textAlign = 'left';
             }
+
+            // Draw ? markers above quest target monsters
+            const questBob2 = Math.sin(Date.now() / 350) * 2;
+            for (const q of G.quests) {
+                if (q.completed || q.turned_in) continue;
+                if (q.type === 'kill') {
+                    // Show ? above matching monsters in view
+                    const nearM = World.getMonstersNear(p.x, p.y, Math.max(G.VIEW_W, G.VIEW_H));
+                    for (const m of nearM) {
+                        if (m.baseName === q.target && m.alive) {
+                            const mx = Math.floor((m.x - camX) * TILE);
+                            const my2 = Math.floor((m.y - camY) * TILE) - 10 + questBob2;
+                            if (mx < -TILE || mx > W + TILE || my2 < -TILE || my2 > H + TILE) continue;
+                            ctx.font = 'bold 10px "Press Start 2P"';
+                            ctx.textAlign = 'center';
+                            ctx.strokeStyle = '#000';
+                            ctx.lineWidth = 2;
+                            ctx.strokeText('?', mx + TILE / 2, my2);
+                            ctx.fillStyle = '#f39c12';
+                            ctx.fillText('?', mx + TILE / 2, my2);
+                            ctx.textAlign = 'left';
+                        }
+                    }
+                }
+            }
+        }
+
+        // Auto-attack target indicator
+        if (G.autoAttackTarget && G.autoAttackTarget.alive) {
+            const t = G.autoAttackTarget;
+            const tsx = Math.floor((t.x - camX) * TILE);
+            const tsy = Math.floor((t.y - camY) * TILE);
+            const pulse = 0.5 + Math.sin(Date.now() / 200) * 0.3;
+            ctx.strokeStyle = `rgba(231, 76, 60, ${pulse})`;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(tsx + 1, tsy + 1, TILE - 2, TILE - 2);
+            ctx.lineWidth = 1;
         }
 
         // Draw monsters
@@ -307,6 +354,34 @@ const GameRender = {
             ctx.fillRect(px - 1, py + TILE + 2, phpW + 2, 3);
             ctx.fillStyle = '#e67e22';
             ctx.fillRect(px, py + TILE + 3, phpW * (1 - atkPct), 1);
+        }
+
+        // House roof overlay - draw roofs over everything, except player's current house
+        const playerHouseKey = World.getPlayerHouse();
+        if (!World.activeDungeon) {
+            for (const hk in World.houses) {
+                const house = World.houses[hk];
+                if (!house.roofTiles) continue;
+                const isPlayerInside = (hk === playerHouseKey);
+                // Near house (within 2 tiles of door) = semi-transparent roof
+                const [doorX, doorY] = hk.split(',').map(Number);
+                const distToDoor = Math.abs(p.x - doorX) + Math.abs(p.y - doorY);
+                const isNear = distToDoor <= 2;
+
+                if (isPlayerInside) continue; // Don't draw roof at all when inside
+
+                if (isNear) ctx.globalAlpha = 0.4;
+
+                for (const rt of house.roofTiles) {
+                    const [rx, ry] = rt.split(',').map(Number);
+                    const rsx = Math.floor((rx - camX) * TILE);
+                    const rsy = Math.floor((ry - camY) * TILE);
+                    if (rsx < -TILE || rsx > W + TILE || rsy < -TILE || rsy > H + TILE) continue;
+                    Sprites.draw(ctx, 'house_roof', rsx, rsy);
+                }
+
+                if (isNear) ctx.globalAlpha = 1;
+            }
         }
 
         // Targeting crosshair
@@ -385,6 +460,8 @@ const GameRender = {
                 else if (tile === T.TOWN_BUILDING || tile === T.TOWN_BUILDING_DOOR) color = '#a89078';
                 else if (tile === T.LAVA) color = '#e74c3c';
                 else if (tile === T.SNOW || tile === T.SNOW_PINE) color = '#ecf0f1';
+                else if (tile === T.HOUSE_WALL || tile === T.HOUSE_WINDOW || tile === T.HOUSE_ROOF) color = '#8B4513';
+                else if (tile === T.HOUSE_FLOOR) color = '#B8860B';
 
                 // Monster dot
                 const mob = World.getMonsterAt(wx, wy);

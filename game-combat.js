@@ -35,10 +35,14 @@ const GameCombat = {
         // Auto-attack target if in range
         this.autoAttack(dt);
 
-        // Stealth step counter decays with time
-        if (p.stealth && p.stealthSteps <= 0) {
-            p.stealth = false;
-            Game.log('Niewidzialność się skończyła.', 'info');
+        // Stealth timer (time-based)
+        if (p.stealth && p.stealthDuration !== undefined) {
+            p.stealthDuration -= dt;
+            if (p.stealthDuration <= 0) {
+                p.stealth = false;
+                p.stealthDuration = 0;
+                Game.log('Niewidzialność się skończyła.', 'info');
+            }
         }
     },
 
@@ -59,7 +63,7 @@ const GameCombat = {
         const range = cls.attackRange || 1;
 
         if (dist > range) {
-            Game.autoAttackTarget = null;
+            // Keep target but don't attack until in range
             return;
         }
 
@@ -81,7 +85,7 @@ const GameCombat = {
         if (p.stealth) {
             dmg = Math.floor(dmg * 2.5);
             p.stealth = false;
-            p.stealthSteps = 0;
+            p.stealthDuration = 0;
             Game.log('Atak z ukrycia! x2.5 obrażeń!', 'combat');
         }
 
@@ -239,10 +243,10 @@ const GameCombat = {
 
             // ===== ROGUE SKILLS =====
             case 'stealth': {
-                const steps = 8 + (sLv - 1) * 3;
+                const dur = 5 + (sLv - 1) * 2; // seconds
                 p.stealth = true;
-                p.stealthSteps = steps;
-                Game.log(`Niewidzialność! ${steps} kroków.`, 'combat');
+                p.stealthDuration = dur;
+                Game.log(`Niewidzialność! ${dur}s.`, 'combat');
                 return true;
             }
             case 'backstab': {
@@ -299,7 +303,7 @@ const GameCombat = {
                 const baseMult = this.getSkillMult(skill, p);
                 const mult = p.stealth ? baseMult : baseMult * 0.5;
                 p.stealth = false;
-                p.stealthSteps = 0;
+                p.stealthDuration = 0;
                 const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
                 m.hp -= dmg;
                 Game.log(`Zamach! ${dmg} dmg!`, 'combat');
@@ -331,10 +335,11 @@ const GameCombat = {
             }
             case 'vanish': {
                 const healPct = 0.2 + sLv * 0.05;
+                const dur = 6 + sLv * 2; // seconds
                 p.stealth = true;
-                p.stealthSteps = 8 + sLv * 3;
+                p.stealthDuration = dur;
                 p.hp = Math.min(p.maxHp, p.hp + Math.floor(p.maxHp * healPct));
-                Game.log(`Zniknięcie! Niewidzialny + ${Math.floor(healPct*100)}% HP!`, 'combat');
+                Game.log(`Zniknięcie! Niewidzialny ${dur}s + ${Math.floor(healPct*100)}% HP!`, 'combat');
                 return true;
             }
             case 'death_blossom': {

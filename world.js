@@ -26,6 +26,10 @@ const World = {
         LAVA: 44,
         SNOW: 45,
         SNOW_PINE: 46,
+        HOUSE_WALL: 47,   // proper wall (all sides)
+        HOUSE_ROOF: 48,   // roof over interior (hidden when inside)
+        HOUSE_FLOOR: 49,  // walkable interior floor
+        HOUSE_WINDOW: 50, // window in wall (can see through)
     },
 
     BIOME: { PLAINS: 0, FOREST: 1, SWAMP: 2, MOUNTAIN: 3, DESERT: 4, SNOW: 5 },
@@ -336,35 +340,60 @@ const World = {
         }
     },
 
-    // Helper: place a buyable house
+    // Helper: place a buyable house with proper walls, roof, floor, door
     placeBuyableHouse(tiles, ox, oy, bx, by, w, h, price, name) {
         const CS = this.CHUNK_SIZE;
         const T = this.T;
-        for (let ddy = 0; ddy < h; ddy++)
-            for (let ddx = 0; ddx < w; ddx++) {
-                const ty = by + ddy, tx = bx + ddx;
-                if (ty >= 0 && ty < CS && tx >= 0 && tx < CS)
-                    tiles[ty * CS + tx] = T.HOUSE;
-            }
-        // Door
         const doorX = bx + Math.floor(w / 2);
         const doorY = by + h - 1;
-        if (doorX >= 0 && doorX < CS && doorY >= 0 && doorY < CS) {
-            tiles[doorY * CS + doorX] = T.HOUSE_DOOR;
-            this.houses[`${ox + doorX},${oy + doorY}`] = {
-                price, name, owned: false,
-                floorTiles: []
-            };
-            // Mark interior floor tiles
-            for (let ddy = 1; ddy < h - 1; ddy++)
-                for (let ddx = 0; ddx < w; ddx++) {
-                    const fy = by + ddy, fx = bx + ddx;
-                    if (fy >= 0 && fy < CS && fx >= 0 && fx < CS && tiles[fy * CS + fx] === T.HOUSE) {
-                        tiles[fy * CS + fx] = T.SHOP_FLOOR; // reuse as interior floor
-                        this.houses[`${ox + doorX},${oy + doorY}`].floorTiles.push(`${ox+fx},${oy+fy}`);
+        const houseId = `${ox + doorX},${oy + doorY}`;
+
+        const floorTiles = [];
+        const roofTiles = [];
+        const wallTiles = [];
+
+        for (let ddy = 0; ddy < h; ddy++) {
+            for (let ddx = 0; ddx < w; ddx++) {
+                const ty = by + ddy, tx = bx + ddx;
+                if (ty < 0 || ty >= CS || tx < 0 || tx >= CS) continue;
+                const idx = ty * CS + tx;
+                const isEdge = ddy === 0 || ddy === h - 1 || ddx === 0 || ddx === w - 1;
+                const isDoor = tx === doorX && ty === doorY;
+
+                if (isDoor) {
+                    tiles[idx] = T.HOUSE_DOOR;
+                } else if (isEdge) {
+                    // Window on side walls (middle of each wall, not corners)
+                    const isMidH = ddx === Math.floor(w / 2) && (ddy === 0);
+                    const isMidV = ddy === Math.floor(h / 2) && (ddx === 0 || ddx === w - 1);
+                    if ((isMidH || isMidV) && w >= 4) {
+                        tiles[idx] = T.HOUSE_WINDOW;
+                    } else {
+                        tiles[idx] = T.HOUSE_WALL;
                     }
+                    wallTiles.push(`${ox + tx},${oy + ty}`);
+                } else {
+                    // Interior floor
+                    tiles[idx] = T.HOUSE_FLOOR;
+                    floorTiles.push(`${ox + tx},${oy + ty}`);
                 }
+            }
         }
+
+        // Roof tiles cover the interior (rendered as overlay, hidden when player inside)
+        for (let ddy = 0; ddy < h; ddy++) {
+            for (let ddx = 0; ddx < w; ddx++) {
+                const ty = by + ddy, tx = bx + ddx;
+                if (ty < 0 || ty >= CS || tx < 0 || tx >= CS) continue;
+                roofTiles.push(`${ox + tx},${oy + ty}`);
+            }
+        }
+
+        this.houses[houseId] = {
+            price, name, owned: false,
+            floorTiles, roofTiles, wallTiles,
+            bx: ox + bx, by: oy + by, w, h
+        };
     },
 
     // Center (0,0): Town square, well, statue, main crossroads
@@ -373,7 +402,7 @@ const World = {
         const T = this.T;
         const c = Math.floor(CS / 2);
 
-        tiles[c * CS + c] = T.WELL;
+        tiles[c * CS + c] = T.STATUE; // Removed well (duplicate teleport)
         tiles[(c - 2) * CS + c] = T.STATUE;
         tiles[(c + 2) * CS + c] = T.STATUE;
         tiles[c * CS + (c - 2)] = T.STATUE;
@@ -737,13 +766,31 @@ const World = {
         }
     },
 
+    // Check if world position is inside any house, returns house key or null
+    getHouseAt(wx, wy) {
+        const key = `${wx},${wy}`;
+        for (const hk in this.houses) {
+            const h = this.houses[hk];
+            if (h.floorTiles && h.floorTiles.includes(key)) return hk;
+        }
+        return null;
+    },
+
+    // Check if player is inside a house
+    getPlayerHouse() {
+        const p = Game.player;
+        if (!p) return null;
+        return this.getHouseAt(p.x, p.y);
+    },
+
     isTileBlocked(t) {
         const T = this.T;
         return [T.WATER, T.WALL, T.TREE, T.HOUSE, T.CAVE_WALL, T.FENCE,
                 T.WELL, T.STATUE, T.ROCK, T.SWAMP_TREE, T.CACTUS, T.VILLAGE_HUT,
                 T.NPC_QUEST, T.NPC_QUEST2, T.NPC_SHOPKEEPER, T.SHOP_WEAPON_NPC,
-                T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC, T.INN, T.CHEST, T.HOUSE_DOOR,
-                T.TOWN_BUILDING, T.TOWN_BUILDING_DOOR, T.LAVA, T.SNOW_PINE].includes(t);
+                T.SHOP_ARMOR_NPC, T.SHOP_POTION_NPC, T.INN, T.CHEST,
+                T.TOWN_BUILDING, T.TOWN_BUILDING_DOOR, T.LAVA, T.SNOW_PINE,
+                T.HOUSE_WALL, T.HOUSE_ROOF, T.HOUSE_WINDOW].includes(t);
     },
 
     getMonsterAt(wx, wy) {
@@ -966,6 +1013,15 @@ const World = {
     isWalkable(wx, wy) {
         const t = this.getTile(wx, wy);
         if (this.isTileBlocked(t)) return false;
+        // House door: walkable only if owned
+        if (t === this.T.HOUSE_DOOR) {
+            const hk = `${wx},${wy}`;
+            const house = this.houses[hk];
+            if (!house) return false;
+            const p = Game.player;
+            if (house.owned || (p && p.ownedHouses && p.ownedHouses.includes(hk))) return true;
+            return false;
+        }
         if (this.getMonsterAt(wx, wy)) return false;
         if (this.getCityNpcAt(wx, wy)) return false;
         return true;

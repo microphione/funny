@@ -111,7 +111,7 @@ const Game = {
             activeSkills: [null, null, null],
             buffs: [], // { id, duration (seconds), ... }
             stealth: false,
-            stealthSteps: 0,
+            stealthDuration: 0,
             // Tibia-style combat skills
             combatSkills: {
                 melee: { level: 10, tries: 0, triesNeeded: 50 },

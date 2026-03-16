@@ -42,10 +42,10 @@ const GameInput = {
         else if (['KeyS','ArrowDown'].includes(e.code)) { this.heldDir = { dx: 0, dy: 1, dir: 'down' }; this.tryMove(0, 1, 'down'); e.preventDefault(); }
         else if (['KeyA','ArrowLeft'].includes(e.code)) { this.heldDir = { dx: -1, dy: 0, dir: 'left' }; this.tryMove(-1, 0, 'left'); e.preventDefault(); }
         else if (['KeyD','ArrowRight'].includes(e.code)) { this.heldDir = { dx: 1, dy: 0, dir: 'right' }; this.tryMove(1, 0, 'right'); e.preventDefault(); }
-        // Interact / Pick up loot
-        else if (e.code === 'Space') { this.interact(); e.preventDefault(); }
-        // Manual attack (E or Enter)
-        else if (e.code === 'Enter' || e.code === 'KeyE') { this.manualAttack(); e.preventDefault(); }
+        // Target nearest monster (Space) - Tibia-style: mark for auto-attack
+        else if (e.code === 'Space') { this.targetNearestMonster(); e.preventDefault(); }
+        // Interact / Pick up loot (E or Enter)
+        else if (e.code === 'Enter' || e.code === 'KeyE') { this.interact(); e.preventDefault(); }
         // Inventory
         else if (e.code === 'KeyI') { GameUI.openInventory(); e.preventDefault(); }
         // Skills
@@ -94,13 +94,9 @@ const GameInput = {
         const nx = p.x + dx;
         const ny = p.y + dy;
 
-        // Check for monster - bump attack (manual)
+        // Monster on target tile - block movement (no bump attack)
         const monster = World.getMonsterAt(nx, ny);
         if (monster) {
-            if (Game.attackCooldown <= 0) {
-                GameCombat.playerAttack(nx, ny);
-                Game.attackCooldown = Game.getAttackSpeed();
-            }
             return;
         }
 
@@ -120,21 +116,20 @@ const GameInput = {
         p.x = nx;
         p.y = ny;
 
-        // Track explored chunks (overworld only)
+        // Track explored chunks - reveal full viewport area (overworld only)
         if (!World.activeDungeon) {
-            const ecx = Math.floor(nx / World.CHUNK_SIZE);
-            const ecy = Math.floor(ny / World.CHUNK_SIZE);
-            Game.exploredChunks.add(`${ecx},${ecy}`);
-        }
-
-        // Stealth step counter
-        if (p.stealth && p.stealthSteps > 0) {
-            p.stealthSteps--;
-            if (p.stealthSteps <= 0) {
-                p.stealth = false;
-                Game.log('Niewidzialność się skończyła.', 'info');
+            const halfW = Math.floor(Game.VIEW_W / 2 / World.CHUNK_SIZE) + 1;
+            const halfH = Math.floor(Game.VIEW_H / 2 / World.CHUNK_SIZE) + 1;
+            const pcx = Math.floor(nx / World.CHUNK_SIZE);
+            const pcy = Math.floor(ny / World.CHUNK_SIZE);
+            for (let dy = -halfH; dy <= halfH; dy++) {
+                for (let dx = -halfW; dx <= halfW; dx++) {
+                    Game.exploredChunks.add(`${pcx + dx},${pcy + dy}`);
+                }
             }
         }
+
+        // Stealth is now time-based (handled in realtimeTick)
 
         // Check for ground loot at destination or surrounding
         const lootKey = `${nx},${ny}`;
@@ -153,6 +148,22 @@ const GameInput = {
             else GameUI.hideLootTooltip();
         }
 
+        // Walk-through dungeon entry: stepping on cave/forest entry = auto-enter
+        const destTile = World.getTile(nx, ny);
+        if (destTile === World.T.CAVE_ENTRY || destTile === World.T.FOREST_ENTRY) {
+            if (World.activeDungeon) {
+                const dd = World.activeDungeon;
+                if (nx === dd.entryX && ny === dd.entryY) {
+                    World.exitDungeon();
+                } else if (nx === dd.exitX && ny === dd.exitY) {
+                    World.nextDungeonFloor();
+                }
+            } else {
+                World.enterDungeon(nx, ny);
+            }
+            GameRender.updateHUD();
+        }
+
         // Collect quest items (overworld only)
         if (!World.activeDungeon) this.checkCollectQuest();
 
@@ -168,25 +179,43 @@ const GameInput = {
         if (!World.activeDungeon && Math.random() < 0.05) World.cleanupChunks(nx, ny);
     },
 
-    manualAttack() {
+    // Target nearest monster with Space bar - sets auto-attack target
+    targetNearestMonster() {
         const p = Game.player;
-        if (!p || Game.attackCooldown > 0) return;
+        if (!p) return;
 
         const cls = CLASSES[p.classId];
         const range = cls.attackRange || 1;
-        const dirs = { up: {dx:0,dy:-1}, down: {dx:0,dy:1}, left: {dx:-1,dy:0}, right: {dx:1,dy:0} };
-        const d = dirs[p.dir] || {dx:0,dy:1};
 
-        for (let i = 1; i <= range; i++) {
-            const tx = p.x + d.dx * i;
-            const ty = p.y + d.dy * i;
-            const m = World.getMonsterAt(tx, ty);
-            if (m) {
-                GameCombat.playerAttack(tx, ty);
-                Game.attackCooldown = Game.getAttackSpeed();
-                return;
+        // Find nearest monster within attack range
+        const nearby = World.getMonstersNear(p.x, p.y, range);
+        if (nearby.length === 0) {
+            // Try slightly larger search radius for feedback
+            const wider = World.getMonstersNear(p.x, p.y, range + 2);
+            if (wider.length > 0) {
+                Game.log('Potwór poza zasięgiem ataku.', 'info');
+            } else {
+                // No monster around - fall back to interact/pickup
+                this.interact();
             }
-            if (World.isTileBlocked(World.getTile(tx, ty))) break;
+            return;
+        }
+
+        // Sort by distance, pick closest
+        nearby.sort((a, b) => {
+            const da = Math.abs(a.x - p.x) + Math.abs(a.y - p.y);
+            const db = Math.abs(b.x - p.x) + Math.abs(b.y - p.y);
+            return da - db;
+        });
+
+        const target = nearby[0];
+        Game.autoAttackTarget = target;
+        Game.log(`Cel: ${target.name}`, 'combat');
+
+        // Immediate first attack if cooldown ready
+        if (Game.attackCooldown <= 0) {
+            GameCombat.playerAttack(target.x, target.y);
+            Game.attackCooldown = Game.getAttackSpeed();
         }
     },
 
@@ -206,21 +235,7 @@ const GameInput = {
         const tile = World.getTile(tx, ty);
         const T = World.T;
 
-        // Cave entry
-        if (tile === T.CAVE_ENTRY) {
-            if (World.activeDungeon) {
-                const dd = World.activeDungeon;
-                if (tx === dd.entryX && ty === dd.entryY) {
-                    World.exitDungeon();
-                } else if (tx === dd.exitX && ty === dd.exitY) {
-                    World.nextDungeonFloor();
-                }
-            } else {
-                World.enterDungeon(tx, ty);
-            }
-            GameRender.updateHUD();
-            return;
-        }
+        // Cave entry is now walk-through (handled in tryMove)
 
         // Chest
         if (tile === T.CHEST) {
@@ -321,13 +336,13 @@ const GameInput = {
             return;
         }
 
-        // Buyable house door
+        // Buyable house door - interact to buy (if not owned)
         if (tile === T.HOUSE_DOOR) {
             const houseKey = `${tx},${ty}`;
             const house = World.houses[houseKey];
             if (house) {
                 if (house.owned || (p.ownedHouses && p.ownedHouses.includes(houseKey))) {
-                    Game.log(`${house.name} - Twój dom! Upuść przedmioty w środku.`, 'info');
+                    Game.log(`${house.name} - Twój dom! Wejdź do środka.`, 'info');
                 } else {
                     GameUI.showHouseBuyDialog(houseKey, house);
                 }
@@ -469,33 +484,37 @@ const GameInput = {
         }
 
         if (['melee','ranged','ranged_aoe'].includes(skill.type)) {
-            const target = GameCombat.getTargetTile();
-            if (skill.type === 'ranged' || skill.type === 'ranged_aoe') {
-                const range = cls.attackRange || 3;
-                const dirs = { up: {dx:0,dy:-1}, down: {dx:0,dy:1}, left: {dx:-1,dy:0}, right: {dx:1,dy:0} };
-                const d = dirs[p.dir] || {dx:0,dy:1};
-                for (let i = 1; i <= range; i++) {
-                    const tx = p.x + d.dx * i;
-                    const ty = p.y + d.dy * i;
-                    const m = World.getMonsterAt(tx, ty);
-                    if (m) {
-                        GameCombat.useSkill(skill.id, tx, ty);
-                        return;
-                    }
-                    if (World.isTileBlocked(World.getTile(tx, ty))) break;
+            // Range-based targeting: use autoAttackTarget or find nearest monster in range
+            const skillRange = skill.type === 'melee' ? (cls.attackRange || 1) : (cls.attackRange || 3);
+            let target = null;
+
+            // First check current auto-attack target
+            if (Game.autoAttackTarget && Game.autoAttackTarget.alive) {
+                const dist = Math.abs(Game.autoAttackTarget.x - p.x) + Math.abs(Game.autoAttackTarget.y - p.y);
+                if (dist <= skillRange) target = Game.autoAttackTarget;
+            }
+
+            // If no valid target, find nearest in range
+            if (!target) {
+                const nearby = World.getMonstersNear(p.x, p.y, skillRange);
+                if (nearby.length > 0) {
+                    nearby.sort((a, b) => {
+                        const da = Math.abs(a.x - p.x) + Math.abs(a.y - p.y);
+                        const db = Math.abs(b.x - p.x) + Math.abs(b.y - p.y);
+                        return da - db;
+                    });
+                    target = nearby[0];
                 }
-                if (skill.type === 'ranged_aoe') {
-                    GameCombat.useSkill(skill.id, target.x, target.y);
-                    return;
-                }
-                Game.log('Brak celu w zasięgu.', 'info');
+            }
+
+            if (target) {
+                GameCombat.useSkill(skill.id, target.x, target.y);
+            } else if (skill.type === 'ranged_aoe') {
+                // AoE ranged can target a direction even without a specific monster
+                const dirTarget = GameCombat.getTargetTile();
+                GameCombat.useSkill(skill.id, dirTarget.x, dirTarget.y);
             } else {
-                const m = World.getMonsterAt(target.x, target.y);
-                if (m) {
-                    GameCombat.useSkill(skill.id, target.x, target.y);
-                } else {
-                    Game.log('Brak wroga w tym kierunku.', 'info');
-                }
+                Game.log('Brak celu w zasięgu.', 'info');
             }
         } else if (skill.type === 'buff') {
             GameCombat.useSkill(skill.id, p.x, p.y);
