@@ -64,6 +64,17 @@ const GameInput = {
             this.useSkillByIndex(idx);
             e.preventDefault();
         }
+        // Mount toggle (R)
+        else if (e.code === 'KeyR') {
+            const p = Game.player;
+            if (p && p.ownedMounts && p.ownedMounts.length > 0) {
+                p.mounted = !p.mounted;
+                Game.log(p.mounted ? 'Wsiadasz na wierzchowca!' : 'Zsiadasz z wierzchowca.', 'info');
+            } else {
+                Game.log('Nie posiadasz wierzchowca. Kup go w stajni!', 'info');
+            }
+            e.preventDefault();
+        }
         // Quick potions: F1 = HP potion, F2 = MP potion
         else if (e.code === 'F1') { this.useQuickPotion('hp'); e.preventDefault(); }
         else if (e.code === 'F2') { this.useQuickPotion('mp'); e.preventDefault(); }
@@ -325,6 +336,26 @@ const GameInput = {
             const bKey = `${tx},${ty}`;
             const bldg = World.townBuildings && World.townBuildings[bKey];
             const npcName = bldg ? bldg.npcName : 'Mieszkaniec';
+            // Special NPCs
+            if (npcName === 'Stajennik') {
+                const mountPrice = 500;
+                if (p.ownedMounts && p.ownedMounts.length > 0) {
+                    Game.log(`Stajennik: Twój koń czeka! Naciśnij R by wsiadać/zsiadać.`, 'info');
+                } else {
+                    GameUI.confirmAction(`Kupić wierzchowca za ${mountPrice} złota? (+40% szybkości ruchu)`, () => {
+                        if (p.gold >= mountPrice) {
+                            p.gold -= mountPrice;
+                            p.ownedMounts = p.ownedMounts || [];
+                            p.ownedMounts.push('horse');
+                            Game.log(`Kupiono wierzchowca! Naciśnij R by wsiadać/zsiadać.`, 'loot');
+                            GameRender.updateHUD();
+                        } else {
+                            Game.log(`Za mało złota! (potrzeba ${mountPrice})`, 'info');
+                        }
+                    });
+                }
+                return;
+            }
             const dialogues = [
                 `${npcName}: Witaj podróżniku! Czym mogę służyć?`,
                 `${npcName}: Miło cię widzieć w naszym mieście!`,

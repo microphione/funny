@@ -80,6 +80,8 @@ const Game = {
         // Base walk speed, AGI makes movement faster
         let speed = 0.18;
         speed *= Math.max(0.08, 1 - stats.agi * 0.008);
+        // Mount bonus (40% faster)
+        if (p.mounted) speed *= 0.6;
         return speed;
     },
 
@@ -117,8 +119,11 @@ const Game = {
                 melee: { level: 10, tries: 0, triesNeeded: 50 },
                 shielding: { level: 10, tries: 0, triesNeeded: 50 },
                 magic: { level: 0, tries: 0, triesNeeded: 30 },
+                distance: { level: 10, tries: 0, triesNeeded: 45 },
             },
             ownedHouses: [], // house door keys "x,y"
+            mounted: false,   // mount active
+            ownedMounts: [],  // mount types owned
         };
         // Starting weapon
         const startWeapon = generateItemForClass(classId, 1, 'weapon');
@@ -171,14 +176,26 @@ const Game = {
             const meleeBonus = Math.max(0, p.combatSkills.melee.level - 10);
             const shieldBonus = Math.max(0, p.combatSkills.shielding.level - 10);
             const magicBonus = p.combatSkills.magic.level;
+            const distBonus = p.combatSkills.distance ? Math.max(0, p.combatSkills.distance.level - 10) : 0;
             if (p.classId === 'mage') {
                 atk += magicBonus * 2; // Magic level heavily affects mage damage
+                atk += Math.floor(meleeBonus * 0.3);
+            } else if (p.classId === 'archer') {
+                atk += distBonus * 1.5; // Distance skill main stat for archer
                 atk += Math.floor(meleeBonus * 0.3);
             } else {
                 atk += meleeBonus; // Melee skill adds to ATK
                 atk += Math.floor(magicBonus * 0.3);
             }
             def += Math.floor(shieldBonus * 0.7); // Shielding adds to DEF
+
+            // Buff bonuses
+            if (p.buffs) {
+                const dodgeRoll = p.buffs.find(b => b.id === 'dodge_roll');
+                if (dodgeRoll) agi += dodgeRoll.agiBonus || 0;
+                const hawkEye = p.buffs.find(b => b.id === 'hawk_eye');
+                if (hawkEye) agi += Math.floor(agi * 0.2); // hawk eye adds extra crit via agi
+            }
         }
 
         return { atk: Math.floor(atk), def: Math.floor(def), agi: Math.floor(agi), maxHp: Math.floor(maxHp), maxMp: Math.floor(maxMp) };
@@ -188,8 +205,8 @@ const Game = {
     // Tries needed formula: floor(50 * 1.1^(skill_level - offset))
     // offset is 10 for melee/shielding, 0 for magic
     getTriesNeeded(skillName, level) {
-        const offset = skillName === 'magic' ? 0 : 10;
-        const base = skillName === 'magic' ? 30 : 50;
+        const offset = (skillName === 'magic') ? 0 : 10;
+        const base = (skillName === 'magic') ? 30 : (skillName === 'distance') ? 45 : 50;
         return Math.floor(base * Math.pow(1.1, level - offset));
     },
 
@@ -300,6 +317,8 @@ const Game = {
             dungeonBossesKilled: [...this.dungeonBossesKilled],
             combatSkills: p.combatSkills,
             ownedHouses: p.ownedHouses || [],
+            ownedMounts: p.ownedMounts || [],
+            mounted: p.mounted || false,
         };
         localStorage.setItem('pq_save_v7', JSON.stringify(data));
         this.log('Gra zapisana!', 'info');
@@ -344,6 +363,10 @@ const Game = {
             this.mainQuestStage = d.mainQuestStage || 0;
             if (d.dungeonBossesKilled) this.dungeonBossesKilled = new Set(d.dungeonBossesKilled);
             if (d.combatSkills) p.combatSkills = d.combatSkills;
+            if (d.ownedMounts) p.ownedMounts = d.ownedMounts;
+            if (d.mounted) p.mounted = d.mounted;
+            // Ensure distance skill exists for old saves
+            if (!p.combatSkills.distance) p.combatSkills.distance = { level: 10, tries: 0, triesNeeded: 45 };
             if (d.ownedHouses) p.ownedHouses = d.ownedHouses;
             // Restore owned houses in World
             if (p.ownedHouses) {

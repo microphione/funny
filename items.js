@@ -4,19 +4,24 @@
 
 // ========== TIERS ==========
 const TIERS = {
-    normal:    { name: 'Zwykły',      color: '#aaa',    mult: 1.0, dropWeight: 50 },
-    uncommon:  { name: 'Niezwykły',   color: '#2ecc71', mult: 1.3, dropWeight: 25 },
-    rare:      { name: 'Rzadki',      color: '#3498db', mult: 1.7, dropWeight: 12 },
-    epic:      { name: 'Epicki',      color: '#9b59b6', mult: 2.2, dropWeight: 5 },
-    legendary: { name: 'Legendarny',  color: '#f39c12', mult: 3.0, dropWeight: 2 },
-    mythic:    { name: 'Mityczny',    color: '#e74c3c', mult: 4.0, dropWeight: 0.5 },
+    normal:    { name: 'Zwykły',      color: '#999',    mult: 1.0, dropWeight: 65 },
+    uncommon:  { name: 'Niezwykły',   color: '#2ecc71', mult: 1.3, dropWeight: 22 },
+    rare:      { name: 'Rzadki',      color: '#3498db', mult: 1.7, dropWeight: 8 },
+    epic:      { name: 'Epicki',      color: '#9b59b6', mult: 2.2, dropWeight: 3.5 },
+    legendary: { name: 'Legendarny',  color: '#f39c12', mult: 3.0, dropWeight: 1.2 },
+    mythic:    { name: 'Mityczny',    color: '#ff4444', mult: 4.5, dropWeight: 0.3 },
 };
 const TIER_ORDER = ['normal','uncommon','rare','epic','legendary','mythic'];
 
-function rollTier(luck) {
+function rollTier(luck, maxTier) {
+    const maxIdx = maxTier ? TIER_ORDER.indexOf(maxTier) : TIER_ORDER.length - 1;
     const r = Math.random() * 100 - (luck || 0) * 5;
     let acc = 0;
-    for (const t of TIER_ORDER) { acc += TIERS[t].dropWeight; if (r < acc) return t; }
+    for (let i = 0; i < TIER_ORDER.length; i++) {
+        const t = TIER_ORDER[i];
+        acc += TIERS[t].dropWeight;
+        if (r < acc) return i <= maxIdx ? t : TIER_ORDER[maxIdx];
+    }
     return 'normal';
 }
 
@@ -150,6 +155,46 @@ const CLASSES = {
             ]},
         },
     },
+    archer: {
+        name: 'Łucznik',
+        icon: '🏹',
+        desc: 'Ataki dystansowe (4 kratki), włócznie, łuki.',
+        color: '#e67e22',
+        baseStats: { hp: 45, mp: 30, atk: 5, def: 3, agi: 4 },
+        hpPerLevel: 5, mpPerLevel: 3, atkPerLevel: 1.5, defPerLevel: 1, agiPerLevel: 0.8,
+        attacksPerTurn: 1,
+        baseAttackSpeed: 1.3,
+        attackRange: 4,
+        allowedItems: ['bow','crossbow','spear','hood','leather_armor','leggings','boots','quiver'],
+        skills: [
+            { level: 1,  id: 'aimed_shot', name: 'Celny Strzał', desc: '2x ATK dystansowy (+0.3x/lv)', cost: 10, type: 'ranged', baseMult: 2.0, multPerLv: 0.3 },
+            { level: 2,  id: 'multi_shot', name: 'Wielostrzał', desc: 'Strzela w 3 wrogów 1x (+0.15x/lv)', cost: 14, type: 'ranged_aoe', baseMult: 1.0, multPerLv: 0.15 },
+            { level: 4,  id: 'dodge_roll', name: 'Unik', desc: '+30% AGI na 5s (+1s/lv)', cost: 12, type: 'buff' },
+            { level: 6,  id: 'piercing_arrow', name: 'Przebijający Strzał', desc: '2.5x ATK ignoruje DEF (+0.4x/lv)', cost: 18, type: 'ranged', baseMult: 2.5, multPerLv: 0.4 },
+            { level: 8,  id: 'rain_arrows', name: 'Deszcz Strzał', desc: 'Obszarowe 1.5x w promieniu 2 (+0.2x/lv)', cost: 22, type: 'ranged_aoe', baseMult: 1.5, multPerLv: 0.2 },
+            { level: 10, id: 'spear_throw', name: 'Rzut Włócznią', desc: '3x ATK na 1 cel + ogłuszenie (+0.5x/lv)', cost: 20, type: 'ranged', baseMult: 3.0, multPerLv: 0.5 },
+            { level: 13, id: 'hawk_eye', name: 'Sokolie Oko', desc: '+50% crit na 6s (+1s/lv)', cost: 16, type: 'buff' },
+            { level: 16, id: 'trap', name: 'Pułapka', desc: 'Ogłusza wrogów w promieniu 1 na 3s (+1s/lv)', cost: 18, type: 'aoe' },
+            { level: 19, id: 'sniper_shot', name: 'Snajperski Strzał', desc: '5x ATK na 1 cel (+0.8x/lv)', cost: 30, type: 'ranged', baseMult: 5.0, multPerLv: 0.8 },
+            { level: 22, id: 'arrow_storm', name: 'Burza Strzał', desc: 'Masowy 3x na wszystkich w zasięgu (+0.4x/lv)', cost: 40, type: 'ranged_aoe', baseMult: 3.0, multPerLv: 0.4 },
+        ],
+        tree: {
+            precision: { name: 'Precyzja', nodes: [
+                { id: 'steady_aim', name: 'Pewna Ręka', desc: '+3 ATK', stat: 'atk', val: 3 },
+                { id: 'focus', name: 'Skupienie', desc: '+5 ATK', stat: 'atk', val: 5 },
+                { id: 'marksman', name: 'Strzelec', desc: '+8 ATK', stat: 'atk', val: 8 },
+                { id: 'sharpshooter', name: 'Snajper', desc: '+12 ATK', stat: 'atk', val: 12 },
+                { id: 'deadeye', name: 'Śmiertelne Oko', desc: '+15 ATK', stat: 'atk', val: 15 },
+            ]},
+            survival: { name: 'Przetrwanie', nodes: [
+                { id: 'tough_skin', name: 'Twarda Skóra', desc: '+10 HP', stat: 'maxHp', val: 10 },
+                { id: 'nimble', name: 'Zwinność', desc: '+3 AGI', stat: 'agi', val: 3 },
+                { id: 'hardened', name: 'Zahartowany', desc: '+20 HP', stat: 'maxHp', val: 20 },
+                { id: 'wind_runner', name: 'Biegacz', desc: '+5 AGI', stat: 'agi', val: 5 },
+                { id: 'ranger', name: 'Strażnik', desc: '+30 HP +8 AGI', stat: 'maxHp', val: 30 },
+            ]},
+        },
+    },
 };
 
 // ========== ITEM BASES ==========
@@ -179,6 +224,12 @@ const ITEM_BASES = {
     shield:  { slot: 'offhand', stat: 'def', base: 4, name: 'Tarcza',   classes: ['knight'] },
     tome:    { slot: 'offhand', stat: 'atk', base: 3, name: 'Grimuar',  classes: ['mage'] },
     offhand_dagger: { slot: 'offhand', stat: 'atk', base: 2, name: 'Lewak',  classes: ['rogue'] },
+    // Archer
+    bow:     { slot: 'weapon', stat: 'atk', base: 4, name: 'Łuk',       classes: ['archer'] },
+    crossbow:{ slot: 'weapon', stat: 'atk', base: 5, name: 'Kusza',     classes: ['archer'] },
+    spear:   { slot: 'weapon', stat: 'atk', base: 6, name: 'Włócznia',  classes: ['archer'] },
+    leather_armor: { slot: 'chest', stat: 'def', base: 3, name: 'Skórzana Zbroja', classes: ['archer','rogue'] },
+    quiver:  { slot: 'offhand', stat: 'atk', base: 2, name: 'Kołczan',  classes: ['archer'] },
 };
 
 const TIER_PREFIXES = {
@@ -189,7 +240,7 @@ function genderSuffix(name, tier) {
     if (tier === 'normal') return '';
     const prefix = TIER_PREFIXES[tier];
     // Polish gender - rough approximation
-    const feminine = ['Różdżka','Zbroja','Peleryna','Szata','Tarcza'];
+    const feminine = ['Różdżka','Zbroja','Peleryna','Szata','Tarcza','Kusza','Włócznia','Skórzana Zbroja'];
     const neuter = [];
     if (feminine.some(f => name.includes(f))) return prefix + 'a ';
     const mascPlural = ['Buty','Spodnie','Nogawice','Trzewiki'];
@@ -222,7 +273,7 @@ function generateItem(itemType, level, forceTier, playerClass) {
     return item;
 }
 
-function generateItemForClass(playerClass, level, slot) {
+function generateItemForClass(playerClass, level, slot, maxTier) {
     const classData = CLASSES[playerClass];
     if (!classData) return null;
     // Find valid item types for this class and slot
@@ -231,7 +282,8 @@ function generateItemForClass(playerClass, level, slot) {
     );
     if (valid.length === 0) return null;
     const [type] = valid[Math.floor(Math.random() * valid.length)];
-    return generateItem(type, level);
+    const tier = maxTier ? rollTier(0, maxTier) : undefined;
+    return generateItem(type, level, tier);
 }
 
 function generateLootForClass(playerClass, level, luck) {

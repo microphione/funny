@@ -116,12 +116,34 @@ const World = {
         return (s - 1) / 2147483646;
     },
 
+    // 6 fixed cities defining the world
+    CITIES: [
+        { name: 'Stolica', cx: 0, cy: 0, biome: 0, difficulty: 1, size: 3 }, // 3x3 chunks
+        { name: 'Leśny Gród', cx: -4, cy: -3, biome: 1, difficulty: 3, size: 1 },
+        { name: 'Pustynny Bazar', cx: 5, cy: 2, biome: 4, difficulty: 5, size: 1 },
+        { name: 'Górska Twierdza', cx: -2, cy: 4, biome: 3, difficulty: 4, size: 1 },
+        { name: 'Port Morski', cx: 3, cy: -4, biome: 0, difficulty: 2, size: 1 },
+        { name: 'Mroźna Cytadela', cx: -5, cy: -5, biome: 5, difficulty: 6, size: 1 },
+    ],
+
+    // World boundary radius (in tiles) - water beyond this
+    WORLD_RADIUS: 140,
+
     getBiome(wx, wy) {
         const scale = 0.02;
         const temp = Perlin.fbm(wx * scale + 100, wy * scale + 100, 3);
         const moisture = Perlin.fbm(wx * scale + 500, wy * scale + 500, 3);
         const dist = Math.sqrt(wx * wx + wy * wy);
-        if (dist < 40) return this.BIOME.PLAINS; // Starting area is plains (larger safe zone for capital)
+
+        // World boundary
+        if (dist > this.WORLD_RADIUS) return this.BIOME.PLAINS;
+
+        // Near cities: use city's biome
+        for (const city of this.CITIES) {
+            const cdist = Math.sqrt((wx - city.cx * this.CHUNK_SIZE) ** 2 + (wy - city.cy * this.CHUNK_SIZE) ** 2);
+            if (cdist < 30) return city.biome;
+        }
+
         if (temp > 0.25) return this.BIOME.DESERT;
         if (temp < -0.35) return this.BIOME.SNOW;
         if (temp < -0.25) return this.BIOME.MOUNTAIN;
@@ -130,9 +152,15 @@ const World = {
         return this.BIOME.PLAINS;
     },
 
+    // Fixed difficulty based on distance from nearest city
     getDifficulty(wx, wy) {
-        const dist = Math.sqrt(wx * wx + wy * wy);
-        return Math.max(1, Math.floor(dist / 25) + 1);
+        let minDist = Infinity;
+        for (const city of this.CITIES) {
+            const d = Math.sqrt((wx - city.cx * this.CHUNK_SIZE) ** 2 + (wy - city.cy * this.CHUNK_SIZE) ** 2);
+            minDist = Math.min(minDist, d);
+        }
+        // Closer to cities = easier, further = harder
+        return Math.max(1, Math.min(10, Math.floor(minDist / 15) + 1));
     },
 
     getChunkKey(cx, cy) { return `${cx},${cy}`; },
@@ -149,6 +177,18 @@ const World = {
         return cx >= -1 && cx <= 1 && cy >= -1 && cy <= 1;
     },
 
+    // Check if chunk belongs to any of the 6 cities
+    getCityAt(cx, cy) {
+        for (const city of this.CITIES) {
+            const half = Math.floor(city.size / 2);
+            if (cx >= city.cx - half && cx <= city.cx + half &&
+                cy >= city.cy - half && cy <= city.cy + half) {
+                return city;
+            }
+        }
+        return null;
+    },
+
     generateChunk(cx, cy) {
         const CS = this.CHUNK_SIZE;
         const T = this.T;
@@ -156,9 +196,10 @@ const World = {
         const ox = cx * CS;
         const oy = cy * CS;
 
-        // Check if this is the capital city area (3x3 chunks)
+        // Check if this is a city chunk
         const isStartingCity = this.isCapitalChunk(cx, cy);
-        const isVillage = this.isVillageChunk(cx, cy);
+        const cityAt = this.getCityAt(cx, cy);
+        const isVillage = !cityAt && this.isVillageChunk(cx, cy);
 
         for (let ly = 0; ly < CS; ly++) {
             for (let lx = 0; lx < CS; lx++) {
@@ -166,7 +207,16 @@ const World = {
                 const wy = oy + ly;
                 const biome = this.getBiome(wx, wy);
                 let tile = T.GRASS;
+                const dist = Math.sqrt(wx * wx + wy * wy);
                 const elev = Perlin.fbm(wx * 0.05, wy * 0.05, 3);
+
+                // World boundary - water beyond radius
+                if (dist > this.WORLD_RADIUS) { tiles[ly * CS + lx] = T.WATER; continue; }
+                // Shoreline transition
+                if (dist > this.WORLD_RADIUS - 10) {
+                    const shore = (dist - (this.WORLD_RADIUS - 10)) / 10;
+                    if (this.rng(wx, wy, 999) < shore * 0.8) { tiles[ly * CS + lx] = T.WATER; continue; }
+                }
 
                 if (elev < -0.35) { tile = T.WATER; }
                 else {
@@ -212,6 +262,8 @@ const World = {
         // Starting city (large, covers 3x3 chunks around origin)
         if (isStartingCity) {
             this.placeCapitalChunk(tiles, cx, cy, ox, oy);
+        } else if (cityAt && cityAt.name !== 'Stolica') {
+            this.placeSmallCity(tiles, cx, cy, ox, oy, cityAt);
         } else if (isVillage) {
             this.placeVillage(tiles, cx, cy, ox, oy);
         }
@@ -244,8 +296,8 @@ const World = {
             }
         }
 
-        // Spawn monsters (not in villages or starting city)
-        if (!isVillage && !isStartingCity) this.spawnChunkMonsters(cx, cy, ox, oy, tiles);
+        // Spawn monsters (not in villages, cities, or starting city)
+        if (!isVillage && !isStartingCity && !cityAt) this.spawnChunkMonsters(cx, cy, ox, oy, tiles);
 
         return { tiles, biome: this.getBiome(ox + CS/2, oy + CS/2) };
     },
@@ -639,6 +691,101 @@ const World = {
         this.placeBuyableHouse(tiles, ox, oy, 10, 15, 4, 3, 350, 'Farma #2');
     },
 
+    // ========== SMALL CITIES (non-capital, 1 chunk each) ==========
+    placeSmallCity(tiles, cx, cy, ox, oy, city) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+        const center = Math.floor(CS / 2);
+
+        // Fill with stone floor
+        for (let dy = 1; dy < CS - 1; dy++)
+            for (let dx = 1; dx < CS - 1; dx++)
+                tiles[dy * CS + dx] = T.STONE_FLOOR;
+
+        // Perimeter fence
+        for (let i = 0; i < CS; i++) {
+            tiles[i] = T.FENCE;
+            tiles[(CS - 1) * CS + i] = T.FENCE;
+            tiles[i * CS] = T.FENCE;
+            tiles[i * CS + (CS - 1)] = T.FENCE;
+        }
+        // Gates (openings in fence)
+        tiles[0 * CS + center] = T.PATH; // north gate
+        tiles[(CS-1) * CS + center] = T.PATH; // south gate
+        tiles[center * CS + 0] = T.PATH; // west gate
+        tiles[center * CS + (CS-1)] = T.PATH; // east gate
+
+        // Main crossroads
+        for (let i = 1; i < CS - 1; i++) {
+            tiles[center * CS + i] = T.PATH;
+            tiles[i * CS + center] = T.PATH;
+        }
+
+        // Trees along paths
+        const treeSpots = [
+            [3, 3], [3, CS-4], [CS-4, 3], [CS-4, CS-4],
+            [center-2, 3], [center+2, 3], [center-2, CS-4], [center+2, CS-4]
+        ];
+        for (const [tx, ty] of treeSpots) {
+            if (tiles[ty * CS + tx] === T.STONE_FLOOR) tiles[ty * CS + tx] = T.TREE;
+        }
+
+        // Shops
+        tiles[3 * CS + 3] = T.SHOP_WEAPON_NPC;
+        this.npcs[`${ox+3},${oy+3}`] = { name: 'Kowal', difficulty: city.difficulty };
+        tiles[3 * CS + 5] = T.SHOP_ARMOR_NPC;
+        this.npcs[`${ox+5},${oy+3}`] = { name: 'Płatnerz', difficulty: city.difficulty };
+        tiles[3 * CS + 7] = T.SHOP_POTION_NPC;
+        this.npcs[`${ox+7},${oy+3}`] = { name: 'Alchemik', difficulty: city.difficulty };
+
+        // Inn
+        tiles[5 * CS + CS - 4] = T.INN;
+
+        // Well (save point)
+        tiles[(center + 2) * CS + center] = T.WELL;
+
+        // Sign
+        tiles[2 * CS + center] = T.SIGN;
+        this.signTexts[`${ox + center},${oy + 2}`] = `Witamy w ${city.name}!`;
+
+        // Statue
+        tiles[center * CS + center] = T.STATUE;
+
+        // Quest NPCs
+        tiles[8 * CS + 4] = T.NPC_QUEST;
+        const questId = `${city.name}_quest1`;
+        this.questNpcs[`${ox + 4},${oy + 8}`] = {
+            id: questId, title: `Zadanie z ${city.name}`,
+            type: 'kill', target: this.getCityQuestTarget(city),
+            required: 5 + city.difficulty * 2,
+            reward: { gold: 50 * city.difficulty, xp: 30 * city.difficulty },
+            targetX: ox + center, targetY: oy + center,
+            itemName: null
+        };
+
+        // Town buildings with NPCs
+        this.placeTownBuilding(tiles, ox, oy, CS - 7, 5, 4, 3, 'Bibliotekarz');
+        this.placeTownBuilding(tiles, ox, oy, CS - 7, 10, 4, 3, 'Kupiec');
+
+        // Buyable houses
+        this.placeBuyableHouse(tiles, ox, oy, 3, CS - 7, 4, 3, 200 * city.difficulty, `Dom w ${city.name} #1`);
+        this.placeBuyableHouse(tiles, ox, oy, 9, CS - 7, 4, 3, 250 * city.difficulty, `Dom w ${city.name} #2`);
+
+        // Register as village
+        this.villages[this.getChunkKey(cx, cy)] = {
+            name: city.name, difficulty: city.difficulty,
+            wellX: ox + center, wellY: oy + center + 2
+        };
+    },
+
+    getCityQuestTarget(city) {
+        const targets = {
+            1: 'Szczur', 2: 'Wilk', 3: 'Pająk Leśny',
+            4: 'Golem Skalny', 5: 'Skorpion', 6: 'Lodowy Golem'
+        };
+        return targets[city.difficulty] || 'Szczur';
+    },
+
     // ========== CITY NPCs (wandering) ==========
     spawnCityNpcs() {
         const npcDefs = [
@@ -723,18 +870,26 @@ const World = {
         const validPool = pool.filter(m => diff >= m.minDiff && diff <= m.maxDiff);
         if (validPool.length === 0) return;
 
-        for (let i = 0; i < count; i++) {
-            const mx = Math.floor(this.rng(cx, cy, 510 + i) * (CS - 4)) + 2;
-            const my = Math.floor(this.rng(cx, cy, 520 + i) * (CS - 4)) + 2;
-            const wx = ox + mx;
-            const wy = oy + my;
+        // Spawn in groups at spawn points
+        const spawnPoints = Math.max(1, Math.floor(count / 2));
+        let spawned = 0;
+        for (let sp = 0; sp < spawnPoints && spawned < count; sp++) {
+            const mx = Math.floor(this.rng(cx, cy, 510 + sp) * (CS - 4)) + 2;
+            const my = Math.floor(this.rng(cx, cy, 520 + sp) * (CS - 4)) + 2;
+            const base = validPool[Math.floor(this.rng(cx, cy, 530 + sp) * validPool.length)];
+            const groupSize = 1 + Math.floor(this.rng(cx, cy, 550 + sp) * 3); // 1-3 per group
+
+            for (let gi = 0; gi < groupSize && spawned < count; gi++) {
+            const gx = mx + Math.floor(this.rng(cx, cy, 560 + sp * 10 + gi) * 3) - 1;
+            const gy = my + Math.floor(this.rng(cx, cy, 570 + sp * 10 + gi) * 3) - 1;
+            if (gx < 1 || gx >= CS - 1 || gy < 1 || gy >= CS - 1) continue;
+            const wx = ox + gx;
+            const wy = oy + gy;
             const mKey = `${wx},${wy}`;
 
             if (this.monsters[mKey]) continue;
-            const tile = tiles[my * CS + mx];
+            const tile = tiles[gy * CS + gx];
             if (this.isTileBlocked(tile)) continue;
-
-            const base = validPool[Math.floor(this.rng(cx, cy, 530 + i) * validPool.length)];
             const scale = 1 + (diff - 1) * 0.35;
             const isElite = this.rng(cx, cy, 540 + i) < 0.08;
             const eMult = isElite ? 2.5 : 1;
@@ -762,8 +917,11 @@ const World = {
                 moveTimer: Math.random() * 0.5, // stagger initial movement
                 attackTimer: 0,
                 alive: true,
+                spawnX: wx, spawnY: wy, // For patrol behavior
             };
-        }
+            spawned++;
+            } // end group loop
+        } // end spawn points loop
     },
 
     // Check if world position is inside any house, returns house key or null

@@ -77,6 +77,8 @@ const GameCombat = {
         const p = Game.player;
         const m = World.getMonsterAt(tx, ty);
         if (!m || !m.alive) return false;
+        // Dismount on attack
+        if (p.mounted) { p.mounted = false; Game.log('Zsiadasz z wierzchowca do walki!', 'info'); }
 
         const stats = Game.getStats();
         let dmg = Math.max(1, stats.atk - m.def + Math.floor(Math.random() * 3));
@@ -108,9 +110,10 @@ const GameCombat = {
         Game.log(`Zadajesz ${dmg} obrażeń ${m.name}.`, 'combat');
         this.floatText(`-${dmg}`, m.x, m.y, '#e74c3c');
 
-        // Tibia-style skill training: each hit that deals damage trains melee
+        // Tibia-style skill training: each hit trains appropriate skill
         if (dmg > 0) {
-            const skillName = p.classId === 'mage' ? 'magic' : 'melee';
+            const skillName = p.classId === 'mage' ? 'magic' :
+                              p.classId === 'archer' ? 'distance' : 'melee';
             Game.advanceCombatSkill(skillName);
         }
 
@@ -465,6 +468,114 @@ const GameCombat = {
                 Game.log(`Zatrzymanie Czasu! Zamrożono WSZYSTKO na ${4+sLv*2}s!`, 'combat');
                 return true;
             }
+
+            // ===== ARCHER SKILLS =====
+            case 'aimed_shot': {
+                const m = World.getMonsterAt(tx, ty);
+                if (!m) return false;
+                const mult = this.getSkillMult(skill, p);
+                const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.5));
+                m.hp -= dmg;
+                Game.log(`Celny Strzał! ${dmg} dmg!`, 'combat');
+                this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
+                if (m.hp <= 0) this.killMonster(m);
+                Game.advanceCombatSkill('distance');
+                return true;
+            }
+            case 'multi_shot': {
+                const mult = this.getSkillMult(skill, p);
+                const targets = World.getMonstersNear(tx, ty, 2).slice(0, 3 + Math.floor(sLv / 2));
+                targets.forEach(m => {
+                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.5));
+                    m.hp -= dmg;
+                    this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
+                    if (m.hp <= 0) this.killMonster(m);
+                });
+                Game.log(`Wielostrzał! Trafiono ${targets.length} celów!`, 'combat');
+                Game.advanceCombatSkill('distance');
+                return true;
+            }
+            case 'dodge_roll': {
+                const dur = 5 + sLv;
+                p.buffs.push({ id: 'dodge_roll', duration: dur, agiBonus: Math.floor(stats.agi * 0.3) });
+                Game.log(`Unik! +30% AGI na ${dur}s!`, 'combat');
+                return true;
+            }
+            case 'piercing_arrow': {
+                const m = World.getMonsterAt(tx, ty);
+                if (!m) return false;
+                const mult = this.getSkillMult(skill, p);
+                const dmg = Math.max(1, Math.floor(stats.atk * mult)); // ignores DEF
+                m.hp -= dmg;
+                Game.log(`Przebijający Strzał! ${dmg} dmg (ignoruje pancerz)!`, 'combat');
+                this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
+                if (m.hp <= 0) this.killMonster(m);
+                Game.advanceCombatSkill('distance');
+                return true;
+            }
+            case 'rain_arrows': {
+                const mult = this.getSkillMult(skill, p);
+                const targets = World.getMonstersNear(tx, ty, 2);
+                targets.forEach(m => {
+                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.3));
+                    m.hp -= dmg;
+                    this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
+                    if (m.hp <= 0) this.killMonster(m);
+                });
+                Game.log(`Deszcz Strzał! Trafiono ${targets.length} wrogów!`, 'combat');
+                Game.advanceCombatSkill('distance');
+                return true;
+            }
+            case 'spear_throw': {
+                const m = World.getMonsterAt(tx, ty);
+                if (!m) return false;
+                const mult = this.getSkillMult(skill, p);
+                const dmg = Math.max(1, Math.floor(stats.atk * mult) - m.def);
+                m.hp -= dmg;
+                m.stunDuration = 2 + sLv * 0.5;
+                Game.log(`Rzut Włócznią! ${dmg} dmg + ogłuszenie!`, 'combat');
+                this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
+                if (m.hp <= 0) this.killMonster(m);
+                Game.advanceCombatSkill('distance');
+                return true;
+            }
+            case 'hawk_eye': {
+                const dur = 6 + sLv;
+                p.buffs.push({ id: 'hawk_eye', duration: dur, critBonus: 0.5 });
+                Game.log(`Sokolie Oko! +50% crit na ${dur}s!`, 'combat');
+                return true;
+            }
+            case 'trap': {
+                const nearby = World.getMonstersNear(p.x, p.y, 1);
+                nearby.forEach(m => { m.stunDuration = 3 + sLv; });
+                Game.log(`Pułapka! Ogłuszono ${nearby.length} wrogów na ${3+sLv}s!`, 'combat');
+                return true;
+            }
+            case 'sniper_shot': {
+                const m = World.getMonsterAt(tx, ty);
+                if (!m) return false;
+                const mult = this.getSkillMult(skill, p);
+                const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.3));
+                m.hp -= dmg;
+                Game.log(`Snajperski Strzał! ${dmg} dmg!`, 'combat');
+                this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
+                if (m.hp <= 0) this.killMonster(m);
+                Game.advanceCombatSkill('distance');
+                return true;
+            }
+            case 'arrow_storm': {
+                const mult = this.getSkillMult(skill, p);
+                const nearby = World.getMonstersNear(p.x, p.y, 5);
+                nearby.forEach(m => {
+                    const dmg = Math.max(1, Math.floor(stats.atk * mult) - Math.floor(m.def * 0.3));
+                    m.hp -= dmg;
+                    this.floatText(`-${dmg}`, m.x, m.y, '#e67e22');
+                    if (m.hp <= 0) this.killMonster(m);
+                });
+                Game.log(`Burza Strzał! ${nearby.length} trafień!`, 'combat');
+                Game.advanceCombatSkill('distance');
+                return true;
+            }
         }
         return false;
     },
@@ -580,15 +691,23 @@ const GameCombat = {
                     m.moveTimer = 0;
                     this.monsterChase(m, p, dx, dy);
                 }
-            } else if (dist <= 8) {
-                // Wander randomly
+            } else {
+                // Patrol in circles around spawn point (or wander if far)
                 m.moveTimer += dt;
-                if (m.moveTimer >= 2.0) {
+                const patrolInterval = 1.5;
+                if (m.moveTimer >= patrolInterval) {
                     m.moveTimer = 0;
-                    if (Math.random() < 0.3) {
-                        const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
-                        const d = dirs[Math.floor(Math.random() * 4)];
-                        const nx = m.x + d.dx, ny = m.y + d.dy;
+                    // Initialize patrol state
+                    if (!m.spawnX) { m.spawnX = m.x; m.spawnY = m.y; m.patrolAngle = Math.random() * Math.PI * 2; }
+                    m.patrolAngle = (m.patrolAngle || 0) + 0.8;
+                    const patrolRadius = 3;
+                    const targetX = m.spawnX + Math.round(Math.cos(m.patrolAngle) * patrolRadius);
+                    const targetY = m.spawnY + Math.round(Math.sin(m.patrolAngle) * patrolRadius);
+                    const mdx = Math.sign(targetX - m.x);
+                    const mdy = Math.sign(targetY - m.y);
+                    if (mdx !== 0 || mdy !== 0) {
+                        const nx = m.x + mdx;
+                        const ny = m.y + mdy;
                         if (World.isWalkable(nx, ny) && !(nx === p.x && ny === p.y)) {
                             World.moveMonster(m, nx, ny);
                         }

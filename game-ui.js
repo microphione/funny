@@ -360,14 +360,14 @@ const GameUI = {
         if (shopType === 'weapon') {
             if (title) title.textContent = 'Sklep z Bronią';
             for (let i = 0; i < 6; i++) {
-                const item = generateItemForClass(p.classId, difficulty + Math.floor(Math.random() * 3), 'weapon');
+                const item = generateItemForClass(p.classId, difficulty + Math.floor(Math.random() * 3), 'weapon', 'uncommon');
                 if (item) Game.shopItems.push(item);
             }
         } else if (shopType === 'armor') {
             if (title) title.textContent = 'Sklep z Pancerzem';
             const armorSlots = ['head','chest','legs','feet','offhand'];
             armorSlots.forEach(slot => {
-                const item = generateItemForClass(p.classId, difficulty + Math.floor(Math.random() * 3), slot);
+                const item = generateItemForClass(p.classId, difficulty + Math.floor(Math.random() * 3), slot, 'uncommon');
                 if (item) Game.shopItems.push(item);
             });
         } else if (shopType === 'potion') {
