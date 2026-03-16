@@ -293,6 +293,41 @@ const CLASSES = {
             ]},
         },
     },
+    novice: {
+        name: 'Nowicjusz',
+        icon: '🌱',
+        desc: 'Początkujący poszukiwacz przygód. Wybierz klasę na poziomie 20.',
+        color: '#95a5a6',
+        baseStats: { hp: 120, mp: 40, damage: 5, armor: 2, accuracy: 10, dodge: 3 },
+        baseAttributes: { str: 2, dex: 2, agi: 2, vit: 2, int: 0 },
+        hpPerLevel: 8, mpPerLevel: 4,
+        attacksPerTurn: 1,
+        baseAttackSpeed: 1.4,
+        allowedItems: ['sword','dagger','club','tunic','simple_pants','sandals','wooden_shield'],
+        skills: [
+            { level: 1, id: 'basic_strike', name: 'Prosty Cios', desc: '1.5x obrażenia (+0.2x/lv)', cost: 6, type: 'melee', baseMult: 1.5, multPerLv: 0.2 },
+            { level: 3, id: 'bandage', name: 'Opatrunek', desc: 'Leczy 15% HP (+3%/lv)', cost: 10, type: 'buff' },
+            { level: 6, id: 'battle_shout', name: 'Okrzyk Bitewny', desc: '+20% DMG na 5s (+1s/lv)', cost: 12, type: 'buff' },
+            { level: 10, id: 'desperate_blow', name: 'Desperacki Cios', desc: '2x DMG (+0.3x/lv)', cost: 15, type: 'melee', baseMult: 2.0, multPerLv: 0.3 },
+            { level: 15, id: 'survivor', name: 'Instynkt Przetrwania', desc: '+25% HP na 5s (+1s/lv)', cost: 14, type: 'buff' },
+        ],
+        tree: {
+            combat: { name: 'Walka', nodes: [
+                { id: 'n_str', name: 'Siła', desc: '+2 Obrażenia', stat: 'damage', val: 2 },
+                { id: 'n_tough', name: 'Twardość', desc: '+10 HP', stat: 'maxHp', val: 10 },
+                { id: 'n_power', name: 'Moc', desc: '+3 Obrażenia', stat: 'damage', val: 3 },
+                { id: 'n_endure', name: 'Wytrzymałość', desc: '+15 HP', stat: 'maxHp', val: 15 },
+                { id: 'n_might', name: 'Potęga', desc: '+5 Obrażenia', stat: 'damage', val: 5 },
+            ]},
+            survival: { name: 'Przetrwanie', nodes: [
+                { id: 'n_dodge', name: 'Unik', desc: '+2 Unik', stat: 'dodge', val: 2 },
+                { id: 'n_armor', name: 'Pancerz', desc: '+2 Pancerz', stat: 'armor', val: 2 },
+                { id: 'n_nimble', name: 'Zwinność', desc: '+3 Unik', stat: 'dodge', val: 3 },
+                { id: 'n_shield', name: 'Ochrona', desc: '+3 Pancerz', stat: 'armor', val: 3 },
+                { id: 'n_iron', name: 'Żelazo', desc: '+5 Pancerz', stat: 'armor', val: 5 },
+            ]},
+        },
+    },
 };
 
 // ========== ITEM BASES ==========
@@ -328,6 +363,12 @@ const ITEM_BASES = {
     spear:   { slot: 'weapon', primaryStat: 'damage', base: 6, name: 'Włócznia',  classes: ['archer'] },
     leather_armor: { slot: 'chest', primaryStat: 'armor', base: 3, name: 'Skórzana Zbroja', classes: ['archer','rogue'] },
     quiver:  { slot: 'offhand', primaryStat: 'accuracy', base: 3, name: 'Kołczan',  classes: ['archer'] },
+    // Novice items
+    club:    { slot: 'weapon', primaryStat: 'damage', base: 3, name: 'Maczuga',   classes: ['novice'] },
+    tunic:   { slot: 'chest',  primaryStat: 'armor',  base: 2, name: 'Tunika',    classes: ['novice'] },
+    simple_pants: { slot: 'legs', primaryStat: 'armor', base: 1, name: 'Proste Spodnie', classes: ['novice'] },
+    sandals: { slot: 'feet', primaryStat: 'moveSpeed', base: 1, name: 'Sandały',  classes: ['novice'] },
+    wooden_shield: { slot: 'offhand', primaryStat: 'armor', base: 2, name: 'Drewniana Tarcza', classes: ['novice'] },
 };
 
 const TIER_PREFIXES = {
@@ -438,7 +479,12 @@ function generatePotion(level) {
 function canEquip(item, playerClass, playerLevel) {
     if (!item || item.type !== 'equipment') return false;
     if (item.level > playerLevel) return false;
-    if (item.classes && !item.classes.includes(playerClass)) return false;
+    if (item.classes) {
+        // Novice can equip novice items + sword/dagger (shared)
+        if (playerClass === 'novice') {
+            if (!item.classes.includes('novice') && !['sword','dagger'].includes(item.itemType)) return false;
+        } else if (!item.classes.includes(playerClass)) return false;
+    }
     if (playerClass === 'rogue' && item.itemType === 'shield') return false;
     return true;
 }
@@ -478,6 +524,14 @@ const MONSTER_LOOT_TABLES = {
     'Szkielet Mróz':  { items: ['sword','helmet','shield'], potionChance: 0.2 },
     'Widmo Zimy':     { items: ['wand','tome','hat'], potionChance: 0.2 },
     'Mroźny Wyrm':    { items: ['crossbow','spear','armor','shield','helmet'], potionChance: 0.1 },
+    // Starter island monsters
+    'Szczur':          { items: ['club','sandals'], potionChance: 0.35 },
+    'Krab':            { items: ['wooden_shield','sandals'], potionChance: 0.3 },
+    'Meduza':          { items: ['tunic','simple_pants'], potionChance: 0.25 },
+    'Dziki Królik':    { items: ['sandals','simple_pants','club'], potionChance: 0.3 },
+    'Bies Plażowy':    { items: ['club','tunic','wooden_shield'], potionChance: 0.25 },
+    'Pirat':           { items: ['sword','dagger','tunic','simple_pants'], potionChance: 0.2 },
+    'Kapitan Piratów': { items: ['sword','dagger','tunic','wooden_shield'], potionChance: 0.15 },
 };
 
 function generateMonsterLoot(monsterName, monsterLevel, playerLevel) {
@@ -506,3 +560,30 @@ function tryStackItem(inventory, newItem) {
     }
     return false;
 }
+
+// ========== STARTER ISLAND ==========
+// Starter island config: small island for levels 1-20, no class choice
+const STARTER_ISLAND = {
+    // Island center in world coords (chunk 8,8 = tile 160,160)
+    cx: 8, cy: 8,
+    radius: 25, // island radius in tiles
+    monsters: [
+        { name: 'Szczur',         sprite: 'slime',    hp: 12, atk: 2,  armor: 0,  xp: 5,  gold: [1,3],  minDiff: 1, maxDiff: 5 },
+        { name: 'Krab',           sprite: 'beetle',   hp: 18, atk: 3,  armor: 2,  xp: 8,  gold: [1,4],  minDiff: 1, maxDiff: 8 },
+        { name: 'Meduza',         sprite: 'ghost',    hp: 15, atk: 5,  armor: 0,  xp: 10, gold: [2,5],  minDiff: 2, maxDiff: 10 },
+        { name: 'Dziki Królik',   sprite: 'wolf',     hp: 22, atk: 4,  armor: 1,  xp: 12, gold: [2,6],  minDiff: 2, maxDiff: 12 },
+        { name: 'Bies Plażowy',   sprite: 'goblin',   hp: 30, atk: 6,  armor: 3,  xp: 18, gold: [3,8],  minDiff: 4, maxDiff: 14 },
+        { name: 'Pirat',          sprite: 'bandit',   hp: 40, atk: 8,  armor: 4,  xp: 25, gold: [5,12], minDiff: 6, maxDiff: 18 },
+        { name: 'Kapitan Piratów',sprite: 'dark_knight', hp: 65, atk: 12, armor: 6, xp: 45, gold: [10,20], minDiff: 10, maxDiff: 20 },
+    ],
+    quests: [
+        { id: 'si_q1', title: 'Pierwsze Kroki', desc: 'Zabij 3 Szczury.', type: 'kill', target: 'Szczur', count: 3, xp: 20, gold: 10, minLevel: 1 },
+        { id: 'si_q2', title: 'Obrona Plaży', desc: 'Zabij 5 Krabów.', type: 'kill', target: 'Krab', count: 5, xp: 35, gold: 15, minLevel: 3 },
+        { id: 'si_q3', title: 'Morski Koszmar', desc: 'Zabij 5 Meduz.', type: 'kill', target: 'Meduza', count: 5, xp: 50, gold: 20, minLevel: 5 },
+        { id: 'si_q4', title: 'Polowanie', desc: 'Zabij 8 Dzikich Królików.', type: 'kill', target: 'Dziki Królik', count: 8, xp: 70, gold: 30, minLevel: 7 },
+        { id: 'si_q5', title: 'Zagrożenie Wyspy', desc: 'Zabij 6 Biesów Plażowych.', type: 'kill', target: 'Bies Plażowy', count: 6, xp: 100, gold: 45, minLevel: 9 },
+        { id: 'si_q6', title: 'Piraci!', desc: 'Zabij 8 Piratów.', type: 'kill', target: 'Pirat', count: 8, xp: 150, gold: 60, minLevel: 12 },
+        { id: 'si_q7', title: 'Kapitan', desc: 'Pokonaj Kapitana Piratów.', type: 'kill', target: 'Kapitan Piratów', count: 1, xp: 250, gold: 100, minLevel: 16 },
+        { id: 'si_q8', title: 'Gotowy na Świat', desc: 'Osiągnij poziom 20.', type: 'level', count: 20, xp: 0, gold: 200, minLevel: 18 },
+    ],
+};

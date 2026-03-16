@@ -56,6 +56,8 @@ const GameInput = {
         else if (e.code === 'KeyN') { GameUI.openWorldMap(); e.preventDefault(); }
         // Stat allocation (T)
         else if (e.code === 'KeyT') { GameUI.openStatAllocation(); e.preventDefault(); }
+        // Bestiary
+        else if (e.code === 'KeyB') { GameUI.openBestiary(); e.preventDefault(); }
         // Quick save
         else if (e.code === 'KeyP') { Game.save(); e.preventDefault(); }
         // Music toggle
@@ -311,6 +313,34 @@ const GameInput = {
         if (tile === T.NPC_QUEST || tile === T.NPC_QUEST2) {
             const quest = World.questNpcs[`${tx},${ty}`];
             if (!quest) return;
+
+            // Starter island special NPCs
+            if (quest.type === 'starter_island') {
+                this.handleStarterIslandQuestNpc();
+                return;
+            }
+            if (quest.type === 'starter_mentor') {
+                const tips = [
+                    'Mentor: Witaj na Wyspie Początkowej! Poznaj świat w bezpiecznym otoczeniu.',
+                    'Mentor: Zbieraj doświadczenie walcząc z potworami. Klawisze WASD do ruchu.',
+                    'Mentor: Na poziomie 20 będziesz mógł opuścić wyspę i wybrać klasę!',
+                    'Mentor: Pamiętaj o miksturach - kupuj je u Znachora.',
+                    'Mentor: Im dalej od wioski, tym silniejsze potwory!',
+                    'Mentor: Naciśnij I aby otworzyć ekwipunek, T dla statystyk.',
+                ];
+                Game.log(tips[Math.min(p.level - 1, tips.length - 1)], 'info');
+                return;
+            }
+            if (quest.type === 'starter_captain') {
+                if (p.level < 20) {
+                    Game.log(`Kapitan: Musisz osiągnąć poziom 20 aby opuścić wyspę! (Twój: ${p.level})`, 'info');
+                } else {
+                    Game.log('Kapitan: Jesteś gotowy na kontynent! Wybierz swoją klasę!', 'loot');
+                    GameUI.showClassSelectForIsland();
+                }
+                return;
+            }
+
             const existing = Game.quests.find(q => q.id === quest.id);
             if (existing) {
                 if (existing.completed && !existing.turned_in) {
@@ -410,7 +440,12 @@ const GameInput = {
             const cx = Math.floor(tx / World.CHUNK_SIZE);
             const cy = Math.floor(ty / World.CHUNK_SIZE);
             const vk = World.getChunkKey(cx, cy);
-            if (World.villages[vk]) {
+            // Starter island well
+            if (World.isStarterIslandChunk(cx, cy)) {
+                Game.lastVillageWell = { x: tx, y: ty };
+                Game.log('Punkt odrodzenia: Wyspa Początkowa', 'info');
+                Game.save();
+            } else if (World.villages[vk]) {
                 Game.lastVillageWell = { x: tx, y: ty };
                 Game.usedWells.add(vk);
                 Game.log(`Punkt odrodzenia: ${World.villages[vk].name}`, 'info');
@@ -432,6 +467,68 @@ const GameInput = {
                 Game.log(`Za mało złota na odpoczynek (${cost}zł).`, 'info');
             }
             return;
+        }
+    },
+
+    // ========== STARTER ISLAND QUEST SYSTEM ==========
+    handleStarterIslandQuestNpc() {
+        const p = Game.player;
+        if (!Game.starterIslandQuests) Game.starterIslandQuests = {};
+        const siQuests = STARTER_ISLAND.quests;
+
+        // Find next available quest
+        let activeQuest = null;
+        let nextQuest = null;
+        for (const q of siQuests) {
+            const state = Game.starterIslandQuests[q.id];
+            if (state === 'turned_in') continue;
+            if (state === 'active') { activeQuest = q; break; }
+            if (!state && p.level >= q.minLevel) { nextQuest = q; break; }
+        }
+
+        if (activeQuest) {
+            const state = Game.starterIslandQuests[activeQuest.id];
+            const progress = Game.starterIslandQuests[activeQuest.id + '_progress'] || 0;
+            const needed = activeQuest.count;
+            let completed = false;
+
+            if (activeQuest.type === 'kill') {
+                completed = progress >= needed;
+            } else if (activeQuest.type === 'level') {
+                completed = p.level >= needed;
+            }
+
+            if (completed) {
+                Game.starterIslandQuests[activeQuest.id] = 'turned_in';
+                p.gold += activeQuest.gold;
+                if (activeQuest.xp > 0) Game.addXp(activeQuest.xp);
+                Game.log(`Stary Rybak: Świetna robota! Quest "${activeQuest.title}" ukończony!`, 'loot');
+                Game.log(`+${activeQuest.gold}zł${activeQuest.xp ? ', +' + activeQuest.xp + ' XP' : ''}`, 'loot');
+                GameRender.updateHUD();
+            } else {
+                if (activeQuest.type === 'kill') {
+                    Game.log(`Stary Rybak: Quest "${activeQuest.title}" - ${progress}/${needed}`, 'info');
+                } else {
+                    Game.log(`Stary Rybak: ${activeQuest.desc} (Lv.${p.level}/${needed})`, 'info');
+                }
+            }
+        } else if (nextQuest) {
+            Game.starterIslandQuests[nextQuest.id] = 'active';
+            Game.starterIslandQuests[nextQuest.id + '_progress'] = 0;
+            Game.log(`Stary Rybak: Mam dla ciebie zadanie!`, 'info');
+            Game.log(`Nowy quest: ${nextQuest.title} - ${nextQuest.desc}`, 'info');
+        } else {
+            const allDone = siQuests.every(q => Game.starterIslandQuests[q.id] === 'turned_in');
+            if (allDone) {
+                Game.log('Stary Rybak: Ukończyłeś wszystkie zadania! Porozmawiaj z Kapitanem.', 'info');
+            } else {
+                const next = siQuests.find(q => !Game.starterIslandQuests[q.id] && p.level < q.minLevel);
+                if (next) {
+                    Game.log(`Stary Rybak: Wróć na poziomie ${next.minLevel}, mam więcej zadań!`, 'info');
+                } else {
+                    Game.log('Stary Rybak: Trenuj dalej, podróżniku!', 'info');
+                }
+            }
         }
     },
 

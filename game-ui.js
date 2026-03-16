@@ -269,6 +269,86 @@ const GameUI = {
         this.showOverlay('dialog-overlay');
     },
 
+    // ========== BESTIARY (B key) ==========
+    openBestiary() {
+        const content = document.getElementById('dialog-content');
+        if (!content) return;
+        content.innerHTML = '';
+        content.style.cssText = 'max-height:400px;overflow-y:auto;padding:16px';
+
+        const title = document.createElement('h2');
+        title.textContent = 'BESTIARIUSZ';
+        title.style.cssText = "color:#e67e22;font-size:12px;margin-bottom:12px;font-family:'Press Start 2P',monospace;text-align:center";
+        content.appendChild(title);
+
+        // Gather all known monster types from biomes + starter island
+        const allMonsters = [];
+        for (const biome of ['plains','forest','swamp','mountain','desert','snow']) {
+            const pool = World.MONSTERS[biome];
+            if (pool) pool.forEach(m => {
+                if (!allMonsters.find(a => a.name === m.name)) allMonsters.push({ ...m, biome });
+            });
+        }
+        STARTER_ISLAND.monsters.forEach(m => {
+            if (!allMonsters.find(a => a.name === m.name)) allMonsters.push({ ...m, biome: 'wyspa' });
+        });
+
+        const discovered = Object.keys(Game.bestiary || {}).length;
+        const stats = document.createElement('div');
+        stats.style.cssText = "font-size:7px;color:#888;margin-bottom:10px;text-align:center;font-family:'Press Start 2P',monospace";
+        stats.textContent = `Odkryto: ${discovered}/${allMonsters.length} gatunków`;
+        content.appendChild(stats);
+
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+
+        for (const m of allMonsters) {
+            const entry = Game.bestiary[m.name];
+            const row = document.createElement('div');
+            row.style.cssText = `display:flex;align-items:center;padding:6px 8px;background:${entry ? '#1a1a3a' : '#111'};border:1px solid ${entry ? '#444' : '#222'};border-radius:4px;gap:8px`;
+
+            const nameEl = document.createElement('div');
+            nameEl.style.cssText = `flex:1;font-size:7px;font-family:'Press Start 2P',monospace;color:${entry ? '#fff' : '#555'}`;
+            nameEl.textContent = entry ? m.name : '???';
+
+            const detailEl = document.createElement('div');
+            detailEl.style.cssText = "font-size:6px;font-family:'Press Start 2P',monospace;color:#888;flex:2";
+
+            if (entry) {
+                const kills = entry.kills;
+                let info = `Zabito: ${kills}`;
+                // Progressive info reveal
+                if (kills >= 1) info += ` | HP: ${m.hp}`;
+                if (kills >= 5) info += ` | ATK: ${m.atk}`;
+                if (kills >= 10) info += ` | PNC: ${m.armor || 0}`;
+                if (kills >= 25) info += ` | XP: ${m.xp}`;
+                if (kills >= 50) info += ` | ${m.biome}`;
+                detailEl.textContent = info;
+            } else {
+                detailEl.textContent = 'Nieodkryty';
+            }
+
+            const killBadge = document.createElement('div');
+            killBadge.style.cssText = "font-size:6px;font-family:'Press Start 2P',monospace;min-width:40px;text-align:right";
+            if (entry) {
+                const kills = entry.kills;
+                let badge = '';
+                if (kills >= 100) { badge = '💀 Mistrz'; killBadge.style.color = '#ff4444'; }
+                else if (kills >= 50) { badge = '⭐ Ekspert'; killBadge.style.color = '#f39c12'; }
+                else if (kills >= 25) { badge = '🗡 Łowca'; killBadge.style.color = '#3498db'; }
+                else if (kills >= 10) { badge = '📖 Znawca'; killBadge.style.color = '#2ecc71'; }
+                else { badge = `${kills}x`; killBadge.style.color = '#666'; }
+                killBadge.textContent = badge;
+            }
+
+            row.append(nameEl, detailEl, killBadge);
+            grid.appendChild(row);
+        }
+        content.appendChild(grid);
+
+        this.showOverlay('dialog-overlay');
+    },
+
     // ========== ITEM ACTION MENU (right-click context menu) ==========
     showItemActionMenu(item, idx, x, y) {
         // Remove existing menu
@@ -470,6 +550,7 @@ const GameUI = {
         container.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:700px';
 
         for (const [id, cls] of Object.entries(CLASSES)) {
+            if (id === 'novice') continue; // novice is only for starter island
             const card = document.createElement('div');
             card.style.cssText = `background:#12122a;border:3px solid ${cls.color};border-radius:8px;padding:16px;width:200px;cursor:pointer;transition:transform 0.15s`;
             card.onmouseover = () => card.style.transform = 'scale(1.05)';
@@ -495,6 +576,62 @@ const GameUI = {
                 Game.log(`Wybrano klasę: ${cls.name}!`, 'info');
                 Game.log('Witaj w Stolicy! WASD = ruch, SPACJA = interakcja/podnieś, E = atak', 'info');
                 Game.log('1-3 = umiejętności, F1/F2 = mikstury HP/MP, I = ekwipunek', 'info');
+            };
+
+            const icon = document.createElement('div');
+            icon.textContent = cls.icon;
+            icon.style.cssText = 'font-size:32px;text-align:center;margin-bottom:8px';
+
+            const name = document.createElement('div');
+            name.textContent = cls.name;
+            name.style.cssText = `font-size:12px;color:${cls.color};text-align:center;margin-bottom:6px;font-family:'Press Start 2P',monospace`;
+
+            const desc = document.createElement('div');
+            desc.textContent = cls.desc;
+            desc.style.cssText = "font-size:7px;color:#aaa;text-align:center;margin-bottom:10px;font-family:'Press Start 2P',monospace;line-height:1.5";
+
+            const statsDiv = document.createElement('div');
+            statsDiv.style.cssText = "font-size:7px;color:#888;font-family:'Press Start 2P',monospace;line-height:2";
+            const bs = cls.baseStats;
+            const ba = cls.baseAttributes;
+            statsDiv.innerHTML = `HP:${bs.hp} MP:${bs.mp}<br>DMG:${bs.damage} PNC:${bs.armor}<br>STR:${ba.str} DEX:${ba.dex} AGI:${ba.agi} VIT:${ba.vit} INT:${ba.int}`;
+
+            card.append(icon, name, desc, statsDiv);
+            container.appendChild(card);
+        }
+        el.appendChild(container);
+    },
+
+    // ========== CLASS SELECT FROM STARTER ISLAND ==========
+    showClassSelectForIsland() {
+        const el = document.getElementById('class-select');
+        if (!el) return;
+        el.style.display = 'flex';
+        el.innerHTML = '';
+
+        const title = document.createElement('h1');
+        title.textContent = 'WYBIERZ SWOJĄ KLASĘ';
+        title.style.cssText = 'font-size:16px;color:#e67e22;margin-bottom:8px;text-shadow:2px 2px 0 #000';
+        el.appendChild(title);
+
+        const subtitle = document.createElement('div');
+        subtitle.textContent = 'Twoje atrybuty i postęp zostaną zachowane!';
+        subtitle.style.cssText = "font-size:8px;color:#aaa;margin-bottom:16px;font-family:'Press Start 2P',monospace";
+        el.appendChild(subtitle);
+
+        const container = document.createElement('div');
+        container.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:700px';
+
+        for (const [id, cls] of Object.entries(CLASSES)) {
+            if (id === 'novice') continue; // skip novice in class selection
+            const card = document.createElement('div');
+            card.style.cssText = `background:#12122a;border:3px solid ${cls.color};border-radius:8px;padding:16px;width:200px;cursor:pointer;transition:transform 0.15s`;
+            card.onmouseover = () => card.style.transform = 'scale(1.05)';
+            card.onmouseout = () => card.style.transform = 'scale(1)';
+            card.onclick = () => {
+                Game.changeClass(id);
+                el.style.display = 'none';
+                Music.updateBiome(0, false, false);
             };
 
             const icon = document.createElement('div');

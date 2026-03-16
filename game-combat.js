@@ -602,6 +602,11 @@ const GameCombat = {
         Game.player.gold += goldDrop;
         Game.addXp(m.xp);
         Game.killCount++;
+
+        // Bestiary tracking
+        const bName = m.baseName || m.name.replace('★ ', '');
+        if (!Game.bestiary[bName]) Game.bestiary[bName] = { kills: 0, seen: true };
+        Game.bestiary[bName].kills++;
         Game.log(`${m.name} pokonany! +${m.xp} XP, +${formatCurrency(goldDrop)}.`, 'loot');
         this.floatText(`+${goldDrop}g`, m.x, m.y, '#f1c40f');
 
@@ -652,6 +657,21 @@ const GameCombat = {
                 }
             }
         });
+
+        // Starter island quest tracking
+        if (Game.starterIslandQuests) {
+            for (const q of STARTER_ISLAND.quests) {
+                if (Game.starterIslandQuests[q.id] === 'active' && q.type === 'kill' && q.target === (m.baseName || m.name)) {
+                    const key = q.id + '_progress';
+                    Game.starterIslandQuests[key] = (Game.starterIslandQuests[key] || 0) + 1;
+                    if (Game.starterIslandQuests[key] >= q.count) {
+                        Game.log(`Quest "${q.title}" ukończony! Wróć do Starego Rybaka.`, 'info');
+                    } else {
+                        Game.log(`${q.target}: ${Game.starterIslandQuests[key]}/${q.count}`, 'info');
+                    }
+                }
+            }
+        }
 
         World.removeMonster(m);
         Game.checkMainQuest();

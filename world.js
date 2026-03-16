@@ -130,7 +130,23 @@ const World = {
     // World boundary radius (in tiles) - water beyond this
     WORLD_RADIUS: 140,
 
+    // Check if position is on the starter island
+    isStarterIsland(wx, wy) {
+        const icx = STARTER_ISLAND.cx * this.CHUNK_SIZE + Math.floor(this.CHUNK_SIZE / 2);
+        const icy = STARTER_ISLAND.cy * this.CHUNK_SIZE + Math.floor(this.CHUNK_SIZE / 2);
+        const dist = Math.sqrt((wx - icx) ** 2 + (wy - icy) ** 2);
+        return dist <= STARTER_ISLAND.radius;
+    },
+
+    isStarterIslandChunk(cx, cy) {
+        return cx >= STARTER_ISLAND.cx - 1 && cx <= STARTER_ISLAND.cx + 1 &&
+               cy >= STARTER_ISLAND.cy - 1 && cy <= STARTER_ISLAND.cy + 1;
+    },
+
     getBiome(wx, wy) {
+        // Starter island is always plains biome
+        if (this.isStarterIsland(wx, wy)) return this.BIOME.PLAINS;
+
         const scale = 0.02;
         const temp = Perlin.fbm(wx * scale + 100, wy * scale + 100, 3);
         const moisture = Perlin.fbm(wx * scale + 500, wy * scale + 500, 3);
@@ -201,6 +217,7 @@ const World = {
         const isStartingCity = this.isCapitalChunk(cx, cy);
         const cityAt = this.getCityAt(cx, cy);
         const isVillage = !cityAt && this.isVillageChunk(cx, cy);
+        const isIslandChunk = this.isStarterIslandChunk(cx, cy);
 
         for (let ly = 0; ly < CS; ly++) {
             for (let lx = 0; lx < CS; lx++) {
@@ -210,6 +227,28 @@ const World = {
                 let tile = T.GRASS;
                 const dist = Math.sqrt(wx * wx + wy * wy);
                 const elev = Perlin.fbm(wx * 0.05, wy * 0.05, 3);
+
+                // Starter island: surrounded by water
+                if (isIslandChunk) {
+                    const icx = STARTER_ISLAND.cx * CS + Math.floor(CS / 2);
+                    const icy = STARTER_ISLAND.cy * CS + Math.floor(CS / 2);
+                    const idist = Math.sqrt((wx - icx) ** 2 + (wy - icy) ** 2);
+                    if (idist > STARTER_ISLAND.radius) {
+                        tiles[ly * CS + lx] = T.WATER; continue;
+                    }
+                    if (idist > STARTER_ISLAND.radius - 3) {
+                        tile = T.DESERT; // sandy beach edge
+                        if (this.rng(wx, wy, 800) < 0.15) tile = T.FLOWER;
+                        tiles[ly * CS + lx] = tile; continue;
+                    }
+                    // Island interior
+                    tile = T.GRASS;
+                    if (this.rng(wx, wy, 1) < 0.03) tile = T.FLOWER;
+                    if (this.rng(wx, wy, 2) < 0.02) tile = T.TREE;
+                    // Paths toward center
+                    if (Math.abs(wx - icx) < 1 || Math.abs(wy - icy) < 1) tile = T.PATH;
+                    tiles[ly * CS + lx] = tile; continue;
+                }
 
                 // World boundary - water beyond radius
                 if (dist > this.WORLD_RADIUS) { tiles[ly * CS + lx] = T.WATER; continue; }
@@ -263,6 +302,8 @@ const World = {
         // Starting city (large, covers 3x3 chunks around origin)
         if (isStartingCity) {
             this.placeCapitalChunk(tiles, cx, cy, ox, oy);
+        } else if (isIslandChunk && cx === STARTER_ISLAND.cx && cy === STARTER_ISLAND.cy) {
+            this.placeStarterIslandCenter(tiles, cx, cy, ox, oy);
         } else if (cityAt && cityAt.name !== 'Stolica') {
             this.placeSmallCity(tiles, cx, cy, ox, oy, cityAt);
         } else if (isVillage) {
@@ -298,7 +339,11 @@ const World = {
         }
 
         // Spawn monsters (not in villages, cities, or starting city)
-        if (!isVillage && !isStartingCity && !cityAt) this.spawnChunkMonsters(cx, cy, ox, oy, tiles);
+        if (isIslandChunk && !(cx === STARTER_ISLAND.cx && cy === STARTER_ISLAND.cy)) {
+            this.spawnStarterIslandMonsters(cx, cy, ox, oy, tiles);
+        } else if (!isVillage && !isStartingCity && !cityAt && !isIslandChunk) {
+            this.spawnChunkMonsters(cx, cy, ox, oy, tiles);
+        }
 
         return { tiles, biome: this.getBiome(ox + CS/2, oy + CS/2) };
     },
@@ -859,6 +904,135 @@ const World = {
     },
 
     // ========== MONSTER SPAWNING ==========
+    // ========== STARTER ISLAND ==========
+    placeStarterIslandCenter(tiles, cx, cy, ox, oy) {
+        const CS = this.CHUNK_SIZE;
+        const T = this.T;
+        const center = Math.floor(CS / 2);
+
+        // Place stone floor around the center village area
+        for (let dy = center - 4; dy <= center + 4; dy++) {
+            for (let dx = center - 5; dx <= center + 5; dx++) {
+                if (dy >= 0 && dy < CS && dx >= 0 && dx < CS) {
+                    tiles[dy * CS + dx] = T.STONE_FLOOR;
+                }
+            }
+        }
+
+        // Paths from center to edges
+        for (let i = 0; i < CS; i++) {
+            if (tiles[center * CS + i] !== T.WATER) tiles[center * CS + i] = T.PATH;
+            if (tiles[i * CS + center] !== T.WATER) tiles[i * CS + center] = T.PATH;
+        }
+
+        // Well in center
+        tiles[center * CS + center] = T.WELL;
+
+        // Sign
+        tiles[(center - 1) * CS + center] = T.SIGN;
+        this.signTexts[`${ox + center},${oy + center - 1}`] = 'Wyspa Początkowa - osiągnij Lv.20 aby opuścić!';
+
+        // Potion shop
+        tiles[(center - 3) * CS + (center - 3)] = T.SHOP_POTION_NPC;
+        this.npcs[`${ox + center - 3},${oy + center - 3}`] = { name: 'Znachor', difficulty: 1 };
+
+        // Quest NPC - Stary Rybak (quest giver)
+        tiles[(center + 2) * CS + (center - 3)] = T.NPC_QUEST;
+        this.questNpcs[`${ox + center - 3},${oy + center + 2}`] = {
+            id: 'si_quest_npc', type: 'starter_island',
+            name: 'Stary Rybak',
+        };
+
+        // Mentor NPC - gives guidance
+        tiles[(center + 2) * CS + (center + 3)] = T.NPC_QUEST;
+        this.questNpcs[`${ox + center + 3},${oy + center + 2}`] = {
+            id: 'si_mentor', type: 'starter_mentor',
+            name: 'Mentor',
+        };
+
+        // Captain NPC - leave island at level 20
+        tiles[(center - 3) * CS + (center + 4)] = T.NPC_QUEST;
+        this.questNpcs[`${ox + center + 4},${oy + center - 3}`] = {
+            id: 'si_captain', type: 'starter_captain',
+            name: 'Kapitan',
+        };
+
+        // Ship visual near captain (a sign)
+        tiles[(center - 4) * CS + (center + 5)] = T.SIGN;
+        this.signTexts[`${ox + center + 5},${oy + center - 4}`] = 'Statek do Kontynentu - porozmawiaj z Kapitanem!';
+
+        // Fence around village
+        for (let dx = center - 5; dx <= center + 5; dx++) {
+            if (tiles[(center - 4) * CS + dx] === T.STONE_FLOOR) tiles[(center - 4) * CS + dx] = T.FENCE;
+            if (tiles[(center + 4) * CS + dx] === T.STONE_FLOOR) tiles[(center + 4) * CS + dx] = T.FENCE;
+        }
+        for (let dy = center - 4; dy <= center + 4; dy++) {
+            if (tiles[dy * CS + (center - 5)] === T.STONE_FLOOR) tiles[dy * CS + (center - 5)] = T.FENCE;
+            if (tiles[dy * CS + (center + 5)] === T.STONE_FLOOR) tiles[dy * CS + (center + 5)] = T.FENCE;
+        }
+        // Gates
+        tiles[(center - 4) * CS + center] = T.PATH;
+        tiles[(center + 4) * CS + center] = T.PATH;
+        tiles[center * CS + (center - 5)] = T.PATH;
+        tiles[center * CS + (center + 5)] = T.PATH;
+    },
+
+    spawnStarterIslandMonsters(cx, cy, ox, oy, tiles) {
+        const CS = this.CHUNK_SIZE;
+        const pool = STARTER_ISLAND.monsters;
+        const icx = STARTER_ISLAND.cx * CS + Math.floor(CS / 2);
+        const icy = STARTER_ISLAND.cy * CS + Math.floor(CS / 2);
+
+        // Difficulty based on distance from island center
+        const chunkCenterX = ox + Math.floor(CS / 2);
+        const chunkCenterY = oy + Math.floor(CS / 2);
+        const distFromCenter = Math.sqrt((chunkCenterX - icx) ** 2 + (chunkCenterY - icy) ** 2);
+        const diff = Math.max(1, Math.min(10, Math.floor(distFromCenter / 3) + 1));
+
+        const validPool = pool.filter(m => diff >= m.minDiff && diff <= m.maxDiff);
+        if (validPool.length === 0) return;
+
+        const count = 2 + Math.floor(this.rng(cx, cy, 600) * 3);
+        let spawned = 0;
+        for (let sp = 0; sp < count; sp++) {
+            const mx = Math.floor(this.rng(cx, cy, 610 + sp) * (CS - 4)) + 2;
+            const my = Math.floor(this.rng(cx, cy, 620 + sp) * (CS - 4)) + 2;
+            const wx = ox + mx;
+            const wy = oy + my;
+            const mKey = `${wx},${wy}`;
+
+            if (this.monsters[mKey]) continue;
+            const tile = tiles[my * CS + mx];
+            if (this.isTileBlocked(tile)) continue;
+            if (!this.isStarterIsland(wx, wy)) continue;
+
+            const base = validPool[Math.floor(this.rng(cx, cy, 630 + sp) * validPool.length)];
+            const scale = 1 + (diff - 1) * 0.25;
+
+            this.monsters[mKey] = {
+                id: mKey,
+                name: base.name,
+                baseName: base.name,
+                sprite: base.sprite,
+                x: wx, y: wy,
+                hp: Math.floor(base.hp * scale),
+                maxHp: Math.floor(base.hp * scale),
+                atk: Math.floor(base.atk * scale),
+                armor: Math.floor((base.armor || 0) * scale),
+                def: Math.floor((base.armor || 0) * scale),
+                xp: Math.floor(base.xp * scale),
+                gold: [Math.floor(base.gold[0] * scale), Math.floor(base.gold[1] * scale)],
+                level: diff,
+                isElite: false,
+                biome: 'plains',
+                stunDuration: 0, poisonDuration: 0, frozenDuration: 0, poisonTimer: 0,
+                moveTimer: Math.random() * 0.5,
+                attackTimer: 0,
+            };
+            spawned++;
+        }
+    },
+
     spawnChunkMonsters(cx, cy, ox, oy, tiles) {
         const CS = this.CHUNK_SIZE;
         const biome = this.getBiome(ox + CS/2, oy + CS/2);

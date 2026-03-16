@@ -18,6 +18,7 @@ const Game = {
     mainQuestStage: 0,
     dungeonBossesKilled: new Set(),
     questCheckTimer: 0,
+    bestiary: {}, // { monsterName: { kills: N, seen: true } }
 
     // Canvas
     canvas: null,
@@ -316,7 +317,12 @@ const Game = {
             p.mp = p.maxMp;
 
             // Gradual complexity messages
-            if (p.level === 20) this.log('Odblokowano: Niezwykłe przedmioty mogą teraz padać!', 'loot');
+            if (p.level === 20) {
+                this.log('Odblokowano: Niezwykłe przedmioty mogą teraz padać!', 'loot');
+                if (p.onStarterIsland) {
+                    this.log('Osiągnąłeś poziom 20! Porozmawiaj z Kapitanem aby opuścić wyspę!', 'loot');
+                }
+            }
             if (p.level === 25) this.log('Odblokowano: Drzewko umiejętności! (K)', 'info');
             if (p.level === 40) this.log('Odblokowano: Rzadkie przedmioty mogą teraz padać!', 'loot');
             if (p.level === 60) this.log('Odblokowano: Epickie przedmioty mogą teraz padać!', 'loot');
@@ -394,6 +400,9 @@ const Game = {
             ownedMounts: p.ownedMounts || [],
             mounted: p.mounted || false,
             bankGold: p.bankGold || 0,
+            onStarterIsland: p.onStarterIsland || false,
+            starterIslandQuests: this.starterIslandQuests || {},
+            bestiary: this.bestiary || {},
         };
         localStorage.setItem('pq_save_v8', JSON.stringify(data));
         this.log('Gra zapisana!', 'info');
@@ -453,6 +462,9 @@ const Game = {
             if (d.ownedMounts) p.ownedMounts = d.ownedMounts;
             if (d.mounted) p.mounted = d.mounted;
             if (!p.combatSkills.distance) p.combatSkills.distance = { level: 10, tries: 0, triesNeeded: 45 };
+            p.onStarterIsland = d.onStarterIsland || false;
+            this.starterIslandQuests = d.starterIslandQuests || {};
+            this.bestiary = d.bestiary || {};
             if (d.ownedHouses) p.ownedHouses = d.ownedHouses;
             if (p.ownedHouses) {
                 p.ownedHouses.forEach(key => {
@@ -512,6 +524,10 @@ const Game = {
         if (this.lastVillageWell) {
             p.x = this.lastVillageWell.x;
             p.y = this.lastVillageWell.y;
+        } else if (p.onStarterIsland) {
+            const islandX = STARTER_ISLAND.cx * World.CHUNK_SIZE + Math.floor(World.CHUNK_SIZE / 2);
+            const islandY = STARTER_ISLAND.cy * World.CHUNK_SIZE + Math.floor(World.CHUNK_SIZE / 2);
+            p.x = islandX; p.y = islandY;
         } else {
             p.x = 0; p.y = 0;
         }
@@ -525,6 +541,55 @@ const Game = {
         this.activeOverlay = null;
         GameUI.hideAllOverlays();
         this.log('Odrodzono w wiosce.', 'info');
+    },
+
+    // ========== CLASS CHANGE (from novice) ==========
+    changeClass(newClassId) {
+        const p = this.player;
+        if (!p || p.classId === newClassId) return;
+        const newCls = CLASSES[newClassId];
+        if (!newCls) return;
+
+        p.classId = newClassId;
+        p.onStarterIsland = false;
+        // Reset skill tree and skills for new class
+        p.treeProgress = {};
+        p.unlockedSkills = [];
+        p.skillLevels = {};
+        p.activeSkills = [null, null, null];
+        // Recalculate attribute base from new class
+        const oldAttr = { ...p.attributes };
+        const noviceCls = CLASSES.novice;
+        // Keep invested points, swap base attributes
+        for (const attr of BASE_ATTRIBUTES) {
+            const invested = (oldAttr[attr] || 0) - (noviceCls.baseAttributes[attr] || 0);
+            p.attributes[attr] = (newCls.baseAttributes[attr] || 0) + Math.max(0, invested);
+        }
+        // Remove novice-only equipment
+        for (const slot in p.equipment) {
+            const item = p.equipment[slot];
+            if (item && item.classes && item.classes.includes('novice') && !item.classes.includes(newClassId)) {
+                p.equipment[slot] = null;
+            }
+        }
+        // Generate starting weapon for new class
+        const startWeapon = generateItemForClass(newClassId, p.level, 'weapon');
+        if (startWeapon) {
+            startWeapon.tier = 'normal';
+            p.inventory.push(startWeapon);
+            if (!p.equipment.weapon) p.equipment.weapon = startWeapon;
+        }
+        this.refreshStats();
+        // Teleport to capital
+        World.getChunk(0, 0);
+        const wellX = Math.floor(World.CHUNK_SIZE / 2);
+        const wellY = Math.floor(World.CHUNK_SIZE / 2);
+        p.x = wellX; p.y = wellY;
+        p.visualX = wellX; p.visualY = wellY;
+        this.lastVillageWell = { x: wellX, y: wellY };
+        this.usedWells.add('0,0');
+        this.log(`Wybrano klasę: ${newCls.name}!`, 'loot');
+        this.log('Witaj na kontynencie! Oto Stolica - centrum świata.', 'info');
     },
 
     // ========== MAIN QUEST ==========
