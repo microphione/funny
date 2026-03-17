@@ -26,7 +26,7 @@ const Game = {
     ctx: null,
     TILE: 64,
     VIEW_W: 17,
-    VIEW_H: 11,
+    VIEW_H: 13,
 
     // Camera & smooth movement
     cameraX: 0,

@@ -149,10 +149,15 @@ const GameRender = {
                     else if (biome === 3) groundSprite = 'mountain_' + v;
                     else if (biome === 4) groundSprite = 'desert_' + v;
                     else if (biome === 5) groundSprite = 'snow_' + v;
-                    // Village tiles get stone floor
+                    // Village/town tiles get stone floor
                     const cx = Math.floor(wx / World.CHUNK_SIZE);
                     const cy = Math.floor(wy / World.CHUNK_SIZE);
                     if (World.villages[`${cx},${cy}`]) groundSprite = 'stone_floor';
+                    // Town zone on starter island
+                    if (Game.player.onStarterIsland) {
+                        const zone = World.getIslandZone(wx, wy);
+                        if (zone === 'town') groundSprite = 'stone_floor';
+                    }
                     Sprites.draw(ctx, groundSprite, sx, sy);
                 }
 
@@ -400,6 +405,13 @@ const GameRender = {
             for (const hk in World.houses) {
                 const house = World.houses[hk];
                 if (!house.roofTiles) continue;
+
+                // Viewport culling: skip houses entirely outside view
+                if (house.bx !== undefined) {
+                    if (house.bx + (house.w || 10) < startX || house.bx > endX ||
+                        house.by + (house.h || 10) < startY || house.by > endY) continue;
+                }
+
                 const isPlayerInside = (hk === playerHouseKey);
                 // Near house (within 2 tiles of door) = semi-transparent roof
                 const [doorX, doorY] = hk.split(',').map(Number);

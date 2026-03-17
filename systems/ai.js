@@ -115,7 +115,7 @@ GameCombat.monsterAttackPlayer = function(m) {
         return;
     }
 
-    let dmg = Math.max(1, m.atk - stats.armor * 0.1 + Math.floor(Math.random() * 2));
+    let dmg = Math.floor(Math.max(1, m.atk - stats.armor * 0.1 + Math.floor(Math.random() * 2)));
 
     // Iron skin buff
     const ironSkin = p.buffs.find(b => b.id === 'iron_skin');
@@ -156,22 +156,22 @@ GameCombat.monsterAttackPlayer = function(m) {
 GameCombat.cityNpcAI = function(dt) {
     const p = Game.player;
     if (!p || World.activeDungeon) return;
-    // Only process if player is near capital
-    if (Math.abs(p.x) > 30 || Math.abs(p.y) > 30) return;
 
+    // Process all city NPCs within reasonable distance of player
     for (const key in World.cityNpcs) {
         const npc = World.cityNpcs[key];
+        // Skip NPCs far from player (optimization)
+        if (Math.abs(npc.x - p.x) > 40 || Math.abs(npc.y - p.y) > 40) continue;
+
         npc.moveTimer += dt;
         if (npc.moveTimer >= npc.moveSpeed) {
             npc.moveTimer = 0;
-            // Wander randomly, stay near home
             const dirs = [{dx:0,dy:-1},{dx:0,dy:1},{dx:-1,dy:0},{dx:1,dy:0}];
             const d = dirs[Math.floor(Math.random() * 4)];
             const nx = npc.x + d.dx;
             const ny = npc.y + d.dy;
-            // Don't wander too far from home
             const distFromHome = Math.abs(nx - npc.homeX) + Math.abs(ny - npc.homeY);
-            if (distFromHome <= 8 && !(nx === p.x && ny === p.y)) {
+            if (distFromHome <= (npc.wanderRange || 8) && !(nx === p.x && ny === p.y)) {
                 World.moveCityNpc(npc, nx, ny);
             }
         }

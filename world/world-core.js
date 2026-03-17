@@ -296,8 +296,9 @@ const World = {
 
     moveCityNpc(npc, nx, ny) {
         if (!npc) return;
-        // Stay within capital bounds (-20..19, -20..19)
-        if (nx < -19 || nx > 19 || ny < -19 || ny > 19) return;
+        // Stay within bounds (home position ± wanderRange)
+        const wr = npc.wanderRange || 20;
+        if (Math.abs(nx - npc.homeX) > wr || Math.abs(ny - npc.homeY) > wr) return;
         const oldKey = `${npc.x},${npc.y}`;
         const newKey = `${nx},${ny}`;
         if (this.cityNpcs[newKey]) return;

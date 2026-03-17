@@ -71,7 +71,7 @@
             Game.canvas.height = container.clientHeight;
             Game.ctx.imageSmoothingEnabled = false;
             Game.VIEW_W = 17;
-            Game.VIEW_H = Math.ceil(Game.canvas.height / Game.TILE);
+            Game.VIEW_H = 13;
         }
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
@@ -101,17 +101,18 @@
             Game.state = 'playing';
             Game.startTime = Date.now();
             World.init();
-            // Spawn on starter island center (near town stairs)
+            // Spawn in town center (near the well)
             const ic = World.getIslandCenter();
             World.getChunk(STARTER_ISLAND.cx, STARTER_ISLAND.cy);
+            World.spawnTownWanderingNpcs();
             Game.player.x = ic.x;
-            Game.player.y = ic.y + 2; // Spawn just south of stairs
+            Game.player.y = ic.y + 2; // Spawn just south of well
             Game.player.visualX = Game.player.x;
             Game.player.visualY = Game.player.y;
             Game.starterIslandQuests = {};
             Music.updateBiome(0, false, false);
-            Game.log('Budzisz się na Wyspie Szmaragdowej...', 'info');
-            Game.log('Wejdź po schodach do miasta (SPACJA) po questy i sklepy!', 'info');
+            Game.log('Budzisz się w Mieście Szmaragdowym...', 'info');
+            Game.log('Rozmawiaj z NPC (SPACJA) po questy i sklepy!', 'info');
             Game.log('Eksploruj wyspę, walcz i osiągnij Lv.20 aby opuścić!', 'info');
             Game.log('WASD = ruch, SPACJA = interakcja, E = atak, I = ekwipunek', 'info');
         });

@@ -25,7 +25,7 @@
             user-select: none;
         }
 
-        /* ===== TIBIA-STYLE LAYOUT ===== */
+        /* ===== MAIN LAYOUT: [LOG] [GAME] [SIDE] ===== */
         #game-wrapper {
             display: flex;
             flex-direction: column;
@@ -36,84 +36,48 @@
             padding: 4px;
         }
 
-        #top-bar {
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            width: 100%;
-            background: #12122a;
-            border: 2px solid #1a1a4a;
-            border-radius: 4px;
-            padding: 4px 8px;
-            font-size: 8px;
-            gap: 4px;
-            flex-shrink: 0;
-        }
-
-        #top-bar .stat {
-            display: flex;
-            align-items: center;
-            gap: 3px;
-        }
-
-        .bar-container {
-            width: 60px;
-            height: 8px;
-            background: #222;
-            border: 1px solid #444;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .hp-fill { height: 100%; background: linear-gradient(#e74c3c, #c0392b); transition: width 0.3s; }
-        .mp-fill { height: 100%; background: linear-gradient(#9b59b6, #8e44ad); transition: width 0.3s; }
-        .xp-fill { height: 100%; background: linear-gradient(#3498db, #2980b9); transition: width 0.3s; }
-
-        #game-toolbar {
-            display: flex;
-            width: 100%;
-            background: #0d0d22;
-            border: 1px solid #1a1a4a;
-            border-radius: 0 0 4px 4px;
-            padding: 2px 4px;
-            gap: 2px;
-            flex-shrink: 0;
-        }
-        .tb-btn {
-            background: #1a1a3a;
-            border: 1px solid #333;
-            border-radius: 3px;
-            color: #ccc;
-            font-size: 12px;
-            width: 28px;
-            height: 24px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.15s;
-        }
-        .tb-btn:hover { background: #2a2a5a; border-color: #e67e22; }
-
-        .panel-minimize {
-            cursor: pointer;
-            color: #888;
-            font-size: 10px;
-            float: right;
-            margin-left: 4px;
-        }
-        .panel-minimize:hover { color: #fff; }
-
-        /* Main content area: game + side panel */
         #main-area {
             display: flex;
             flex: 1;
             width: 100%;
             gap: 4px;
-            margin-top: 4px;
             min-height: 0;
         }
 
+        /* ===== LEFT: MESSAGE LOG (vertical) ===== */
+        #log-panel {
+            width: 200px;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            background: #0d0d1f;
+            border: 2px solid #1a1a4a;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        #log-panel .log-header {
+            background: #12122a;
+            font-size: 7px;
+            color: #e67e22;
+            padding: 4px 6px;
+            text-align: center;
+            border-bottom: 1px solid #1a1a4a;
+        }
+        #message-log {
+            flex: 1;
+            padding: 4px 6px;
+            font-size: 7px;
+            line-height: 1.7;
+            overflow-y: auto;
+            color: #777;
+        }
+        .msg-combat { color: #e74c3c; }
+        .msg-loot { color: #f1c40f; }
+        .msg-info { color: #3498db; }
+        .msg-heal { color: #2ecc71; }
+        .msg-shop { color: #e67e22; }
+
+        /* ===== CENTER: GAME CANVAS ===== */
         #game-container {
             position: relative;
             flex: 1;
@@ -124,77 +88,109 @@
             image-rendering: pixelated;
             background: #0a0a1a;
         }
-
         canvas#game-canvas {
             width: 100%;
             height: 100%;
             image-rendering: pixelated;
             display: block;
         }
+        #location-label {
+            position: absolute;
+            top: 6px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
+            z-index: 5;
+            pointer-events: none;
+        }
 
-        /* ===== SIDE PANEL (Equipment + Backpack) ===== */
+        /* ===== RIGHT: SIDE PANEL ===== */
         #side-panel {
             width: 220px;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
             flex-shrink: 0;
-            overflow-y: hidden;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .panel-box {
             background: #12122a;
             border: 2px solid #1a1a4a;
             border-radius: 4px;
-            padding: 6px;
-            transition: box-shadow 0.15s;
-        }
-        .panel-box.dragging {
-            position: fixed;
-            z-index: 1000;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.6);
-            opacity: 0.92;
-            pointer-events: auto;
+            padding: 5px;
         }
         .panel-box.panel-closed { display: none; }
 
         .panel-title {
-            font-size: 8px;
+            font-size: 7px;
             color: #e67e22;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
             text-align: center;
             border-bottom: 1px solid #1a1a4a;
-            padding-bottom: 3px;
-            cursor: grab;
-            user-select: none;
+            padding-bottom: 2px;
         }
-        .panel-title:active { cursor: grabbing; }
-
         .panel-close {
             cursor: pointer;
             color: #888;
-            font-size: 10px;
+            font-size: 9px;
             float: right;
-            margin-left: 4px;
+            margin-left: 3px;
         }
         .panel-close:hover { color: #e74c3c; }
-
-        /* Equipment panel */
-        #eq-panel .eq-slot {
-            display: flex;
-            align-items: center;
-            padding: 2px 4px;
-            margin: 1px 0;
-            font-size: 7px;
-            background: #0a0a1a;
-            border-radius: 3px;
-            border: 1px solid #1a1a4a;
+        .panel-minimize {
             cursor: pointer;
+            color: #888;
+            font-size: 9px;
+            float: right;
+            margin-left: 3px;
         }
-        #eq-panel .eq-slot:hover { border-color: #333; }
-        #eq-panel .eq-slot .slot-label { color: #666; width: 42px; font-size: 6px; flex-shrink: 0; }
-        #eq-panel .eq-slot .slot-item { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        #eq-panel .eq-slot .slot-empty { color: #333; }
+        .panel-minimize:hover { color: #fff; }
+
+        /* Minimap */
+        #minimap-panel canvas {
+            width: 100%;
+            image-rendering: pixelated;
+            display: block;
+        }
+        #minimap {
+            border: 1px solid #1a1a4a;
+            border-radius: 3px;
+            image-rendering: pixelated;
+            background: #111;
+        }
+
+        /* HP/Mana panel */
+        #vitals-panel .vital-bar {
+            position: relative;
+            height: 14px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 3px;
+            margin: 2px 0;
+            overflow: hidden;
+        }
+        #vitals-panel .vital-bar .bar-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        #vitals-panel .vital-bar .bar-text {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            text-align: center;
+            font-size: 6px;
+            line-height: 14px;
+            color: #fff;
+            text-shadow: 1px 1px 1px #000;
+        }
+        .hp-fill { background: linear-gradient(#e74c3c, #c0392b); }
+        .mp-fill { background: linear-gradient(#9b59b6, #8e44ad); }
+        .xp-fill { background: linear-gradient(#3498db, #2980b9); }
+
+        /* Character stats panel */
+        #char-stats { font-size: 7px; line-height: 1.8; }
 
         /* Backpack panel */
         #bp-panel .bp-grid {
@@ -208,98 +204,62 @@
             border: 1px solid #1a1a4a;
             border-radius: 3px;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 6px;
+            font-size: 5px;
             cursor: pointer;
             overflow: hidden;
             position: relative;
             padding: 1px;
             text-align: center;
-            line-height: 1.2;
+            line-height: 1.1;
         }
         #bp-panel .bp-slot:hover { border-color: #444; }
         #bp-panel .bp-slot.has-item { border-color: #333; }
+        #bp-panel .bp-slot .bp-icon {
+            font-size: 14px;
+            line-height: 1;
+            margin-bottom: 1px;
+        }
         #bp-panel .bp-slot .bp-count {
             position: absolute; bottom: 0; right: 1px;
-            font-size: 6px; color: #f1c40f;
+            font-size: 5px; color: #f1c40f;
         }
 
-        /* Skill bar */
-        #skill-bar {
-            display: flex;
-            gap: 3px;
-        }
-        #skill-bar .skill-slot {
-            flex: 1;
-            background: #0a0a1a;
-            border: 1px solid #1a1a4a;
-            border-radius: 3px;
+        /* Side panel buttons */
+        #side-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2px;
             padding: 3px;
-            font-size: 6px;
-            text-align: center;
-            cursor: pointer;
-            line-height: 1.3;
         }
-        #skill-bar .skill-slot:hover { border-color: #9b59b6; }
-        #skill-bar .skill-slot .sk-key { color: #f1c40f; }
-
-        /* Minimap in side panel */
-        #minimap-panel canvas {
-            width: 100%;
-            image-rendering: pixelated;
-            display: block;
-        }
-
-        #minimap {
-            border: 1px solid #1a1a4a;
+        .side-btn {
+            background: #1a1a3a;
+            border: 1px solid #333;
             border-radius: 3px;
-            image-rendering: pixelated;
-            background: #111;
+            color: #ccc;
+            font-size: 7px;
+            padding: 5px 2px;
+            cursor: pointer;
+            text-align: center;
+            line-height: 1.3;
+            font-family: 'Press Start 2P', monospace;
         }
+        .side-btn:hover { background: #2a2a5a; border-color: #e67e22; color: #e67e22; }
+        .side-btn .btn-icon { font-size: 12px; display: block; margin-bottom: 2px; }
 
-        #location-label {
-            position: absolute;
-            top: 6px; left: 50%;
-            transform: translateX(-50%);
-            font-size: 9px;
-            color: #fff;
-            text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
-            z-index: 5;
-            pointer-events: none;
-        }
-
-        /* Bottom bar: message log + controls */
+        /* ===== BOTTOM BAR (simplified) ===== */
         #bottom-bar {
             width: 100%;
             flex-shrink: 0;
-            margin-top: 4px;
+            margin-top: 3px;
         }
-
-        #message-log {
-            width: 100%;
-            height: 50px;
-            background: #12122a;
-            border: 2px solid #1a1a4a;
-            border-radius: 4px;
-            padding: 4px 6px;
-            font-size: 7px;
-            line-height: 1.7;
-            overflow-y: auto;
-            color: #777;
-        }
-
-        .msg-combat { color: #e74c3c; }
-        .msg-loot { color: #f1c40f; }
-        .msg-info { color: #3498db; }
-        .msg-heal { color: #2ecc71; }
-        .msg-shop { color: #e67e22; }
-
         #controls-hint {
             font-size: 6px;
-            color: #444;
+            color: #333;
             text-align: center;
-            margin-top: 2px;
+            padding: 2px;
         }
 
         /* ===== OVERLAYS ===== */
@@ -321,17 +281,15 @@
             border-radius: 6px;
             padding: 16px;
             max-width: 90%;
-            width: 480px;
+            width: 600px;
             max-height: 90%;
             overflow-y: auto;
         }
-
         .overlay-box h2 {
             font-size: 12px;
             margin-bottom: 12px;
             text-align: center;
         }
-
         .close-btn {
             display: block;
             margin: 12px auto 0;
@@ -344,7 +302,7 @@
             cursor: pointer;
         }
 
-        /* Shop */
+        /* Shop dialog */
         #dialog-overlay .overlay-box { border-color: #e67e22; }
         #dialog-overlay h2 { color: #e67e22; }
         #dialog-overlay .close-btn { background: #e67e22; }
@@ -371,18 +329,79 @@
         .shop-item .stat-up { color: #2ecc71; }
         .shop-item .stat-down { color: #e74c3c; }
 
-        /* Inventory overlay (still used for detailed view) */
+        /* Inventory overlay - equipment modal */
+        #inventory-overlay .overlay-box { border-color: #3498db; width: 650px; }
+        #inventory-overlay h2 { color: #3498db; }
+        #inventory-overlay .close-btn { background: #3498db; }
+
+        .inv-layout {
+            display: flex;
+            gap: 12px;
+        }
+        .inv-eq-side {
+            flex: 0 0 200px;
+        }
+        .inv-bp-side {
+            flex: 1;
+        }
+        /* Equipment visual (character doll) */
+        .eq-doll {
+            position: relative;
+            width: 180px;
+            height: 240px;
+            margin: 0 auto;
+            background: #0a0a1a;
+            border: 2px solid #1a1a4a;
+            border-radius: 6px;
+        }
+        .eq-doll .eq-char {
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 64px;
+            opacity: 0.3;
+        }
+        .eq-doll .eq-slot-pos {
+            position: absolute;
+            width: 36px; height: 36px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: border-color 0.15s;
+        }
+        .eq-doll .eq-slot-pos:hover { border-color: #e67e22; }
+        .eq-doll .eq-slot-pos.has-item { border-color: #f1c40f; }
+        .eq-doll .eq-slot-pos .eq-label {
+            position: absolute;
+            bottom: -10px;
+            font-size: 5px;
+            color: #555;
+            white-space: nowrap;
+        }
+        /* Slot positions on the doll */
+        .eq-doll .slot-head    { left: 72px; top: 8px; }
+        .eq-doll .slot-chest   { left: 72px; top: 60px; }
+        .eq-doll .slot-legs    { left: 72px; top: 112px; }
+        .eq-doll .slot-feet    { left: 72px; top: 164px; }
+        .eq-doll .slot-weapon  { left: 16px; top: 60px; }
+        .eq-doll .slot-offhand { left: 128px; top: 60px; }
+
         .inv-item {
             display: flex; justify-content: space-between; align-items: center;
             padding: 5px 8px; margin: 2px 0;
-            background: #0a0a1a; border-radius: 4px; font-size: 8px;
+            background: #0a0a1a; border-radius: 4px; font-size: 7px;
         }
         .inv-item.equipped { border: 1px solid #f1c40f; }
         .inv-item .use-btn {
-            padding: 4px 10px; background: #3498db; color: #fff;
+            padding: 4px 8px; background: #3498db; color: #fff;
             border: none; border-radius: 3px;
-            font-family: 'Press Start 2P', monospace; font-size: 7px; cursor: pointer;
-            margin-left: 4px;
+            font-family: 'Press Start 2P', monospace; font-size: 6px; cursor: pointer;
+            margin-left: 3px;
         }
 
         /* ===== TITLE ===== */
@@ -471,14 +490,12 @@
             pointer-events: none;
             z-index: 30;
         }
-
         #mobile-dpad {
             position: absolute;
             left: 20px; bottom: 20px;
             width: 130px; height: 130px;
             pointer-events: auto;
         }
-
         .dpad-btn {
             position: absolute;
             width: 42px; height: 42px;
@@ -501,7 +518,6 @@
             border-color: rgba(255,255,255,0.1);
             font-size: 10px;
         }
-
         #mobile-actions {
             position: absolute;
             right: 20px; bottom: 20px;
@@ -509,9 +525,7 @@
             gap: 8px; align-items: flex-end;
             pointer-events: auto;
         }
-
         .mobile-action-row { display: flex; gap: 8px; }
-
         .mobile-btn {
             width: 52px; height: 52px;
             background: rgba(255,255,255,0.12);
@@ -544,60 +558,30 @@
         #fullscreen-btn.is-fullscreen { border-color: rgba(46,204,113,0.5); background: rgba(46,204,113,0.15); }
 
         /* ===== RESPONSIVE ===== */
-        @media (max-width: 800px) {
+        @media (max-width: 900px) {
+            #log-panel { width: 160px; }
             #side-panel { width: 180px; }
-            .bar-container { width: 40px; }
         }
-        @media (max-width: 660px) {
+        @media (max-width: 700px) {
             #main-area { flex-direction: column; }
+            #log-panel { width: 100%; height: 60px; flex-direction: row; }
             #side-panel { width: 100%; flex-direction: row; flex-wrap: wrap; overflow-y: visible; }
             #side-panel .panel-box { flex: 1; min-width: 150px; }
             #game-container { height: 50vh; }
-            #top-bar { font-size: 6px; }
-            .bar-container { width: 30px; }
-            #message-log { height: 50px; font-size: 6px; }
             #controls-hint { display: none; }
         }
     </style>
 </head>
 <body>
     <div id="game-wrapper">
-        <div id="top-bar">
-            <div class="stat"><span id="stat-class" style="color:#e67e22"></span></div>
-            <div class="stat">LVL <span id="stat-level">1</span></div>
-            <div class="stat">
-                HP
-                <div class="bar-container" style="width:80px"><div class="hp-fill" id="hp-bar" style="width:100%"></div></div>
-                <span id="stat-hp" style="font-size:7px">50/50</span>
-            </div>
-            <div class="stat">
-                MP
-                <div class="bar-container" style="width:60px"><div class="mp-fill" id="mp-bar" style="width:100%"></div></div>
-                <span id="stat-mp" style="font-size:7px">20/20</span>
-            </div>
-            <div class="stat">
-                XP
-                <div class="bar-container"><div class="xp-fill" id="xp-bar" style="width:0%"></div></div>
-                <span id="stat-xp-pct" style="font-size:6px;color:#3498db"></span>
-            </div>
-            <div class="stat" style="color:#e67e22">DMG <span id="stat-atk">5</span></div>
-            <div class="stat" style="color:#3498db">PNC <span id="stat-def">2</span></div>
-            <div class="stat" style="color:#2ecc71">UNK <span id="stat-agi">3</span></div>
-            <div class="stat" style="color:#888;font-size:7px"><span id="stat-time">0:00</span></div>
-        </div>
-        <!-- Toolbar buttons -->
-        <div id="game-toolbar">
-            <button class="tb-btn" onclick="GameUI.openInventory()" title="Ekwipunek [I]">&#128188;</button>
-            <button class="tb-btn" onclick="GameUI.openSkillTree()" title="Drzewko [K]">&#127795;</button>
-            <button class="tb-btn" onclick="GameUI.openStatAllocation()" title="Atrybuty [T]">&#9733;</button>
-            <button class="tb-btn" onclick="GameUI.openQuests()" title="Questy [J]">&#128220;</button>
-            <button class="tb-btn" onclick="GameUI.openBestiary()" title="Bestiariusz [B]">&#128058;</button>
-            <button class="tb-btn" onclick="GameUI.openWorldMap()" title="Mapa [N]">&#127758;</button>
-            <button class="tb-btn" onclick="Game.save()" title="Zapisz [P]">&#128190;</button>
-            <button class="tb-btn" onclick="GameUI.reopenAllPanels()" title="Pokaż panele">&#128196;</button>
-        </div>
-
         <div id="main-area">
+            <!-- LEFT: Message Log -->
+            <div id="log-panel">
+                <div class="log-header">Dziennik</div>
+                <div id="message-log"></div>
+            </div>
+
+            <!-- CENTER: Game Canvas -->
             <div id="game-container">
                 <canvas id="game-canvas"></canvas>
                 <div id="location-label"></div>
@@ -628,8 +612,8 @@
                 </div>
 
                 <div id="inventory-overlay" class="overlay">
-                    <div class="overlay-box">
-                        <h2>Ekwipunek</h2>
+                    <div class="overlay-box" style="border-color:#3498db;width:650px">
+                        <h2 style="color:#3498db">Ekwipunek</h2>
                         <div id="inventory-content"></div>
                         <button class="close-btn" onclick="Game.closeAllOverlays()" style="background:#3498db">Zamknij [ESC]</button>
                     </div>
@@ -647,7 +631,7 @@
                 </div>
             </div>
 
-            <!-- SIDE PANEL (Tibia-style) -->
+            <!-- RIGHT: Side Panel -->
             <div id="side-panel">
                 <!-- Minimap -->
                 <div class="panel-box" id="minimap-panel">
@@ -655,39 +639,49 @@
                     <div class="panel-content"><canvas id="minimap" width="210" height="120"></canvas></div>
                 </div>
 
+                <!-- HP / Mana / XP -->
+                <div class="panel-box" id="vitals-panel">
+                    <div class="panel-title"><span class="panel-close" onclick="GameUI.closePanel('vitals-panel')">[x]</span>Zdrowie <span class="panel-minimize" onclick="GameUI.togglePanel('vitals-panel')">[-]</span></div>
+                    <div class="panel-content">
+                        <div class="vital-bar"><div class="bar-fill hp-fill" id="hp-bar" style="width:100%"></div><div class="bar-text" id="hp-text">50/50</div></div>
+                        <div class="vital-bar"><div class="bar-fill mp-fill" id="mp-bar" style="width:100%"></div><div class="bar-text" id="mp-text">20/20</div></div>
+                        <div class="vital-bar" style="height:10px"><div class="bar-fill xp-fill" id="xp-bar" style="width:0%"></div><div class="bar-text" id="xp-text" style="font-size:5px;line-height:10px">0%</div></div>
+                    </div>
+                </div>
+
                 <!-- Character Stats -->
                 <div class="panel-box" id="char-panel">
                     <div class="panel-title"><span class="panel-close" onclick="GameUI.closePanel('char-panel')">[x]</span>Postać <span class="panel-minimize" onclick="GameUI.togglePanel('char-panel')">[-]</span></div>
-                    <div class="panel-content" id="char-stats" style="font-size:7px;line-height:1.8"></div>
-                </div>
-
-                <!-- Equipment -->
-                <div class="panel-box" id="eq-panel">
-                    <div class="panel-title"><span class="panel-close" onclick="GameUI.closePanel('eq-panel')">[x]</span>Wyposażenie <span class="panel-minimize" onclick="GameUI.togglePanel('eq-panel')">[-]</span></div>
-                    <div class="panel-content"><div id="eq-slots"></div></div>
-                </div>
-
-                <!-- Skills bar -->
-                <div class="panel-box" id="skillbar-panel">
-                    <div class="panel-title"><span class="panel-close" onclick="GameUI.closePanel('skillbar-panel')">[x]</span>Umiejętności [1-3] <span class="panel-minimize" onclick="GameUI.togglePanel('skillbar-panel')">[-]</span></div>
-                    <div class="panel-content"><div id="skill-bar"></div></div>
+                    <div class="panel-content" id="char-stats"></div>
                 </div>
 
                 <!-- Backpack -->
                 <div class="panel-box" id="bp-panel">
                     <div class="panel-title"><span class="panel-close" onclick="GameUI.closePanel('bp-panel')">[x]</span>Plecak <span id="bp-count">0/20</span> <span class="panel-minimize" onclick="GameUI.togglePanel('bp-panel')">[-]</span></div>
                     <div class="panel-content">
-                        <div id="bp-gold" style="font-size:7px;color:#f1c40f;padding:2px 0;text-align:center"></div>
                         <div class="bp-grid" id="bp-grid"></div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="panel-box" id="buttons-panel">
+                    <div id="side-buttons">
+                        <button class="side-btn" onclick="GameUI.openInventory()" title="Ekwipunek [I]"><span class="btn-icon">&#9876;</span>EQ</button>
+                        <button class="side-btn" onclick="GameUI.openSkillTree()" title="Drzewko [K]"><span class="btn-icon">&#127795;</span>Skille</button>
+                        <button class="side-btn" onclick="GameUI.openStatAllocation()" title="Atrybuty [T]"><span class="btn-icon">&#9733;</span>Atrb</button>
+                        <button class="side-btn" onclick="GameUI.openQuests()" title="Questy [J]"><span class="btn-icon">&#128220;</span>Questy</button>
+                        <button class="side-btn" onclick="GameUI.openBestiary()" title="Bestiariusz [B]"><span class="btn-icon">&#128058;</span>Besti</button>
+                        <button class="side-btn" onclick="GameUI.openWorldMap()" title="Mapa [N]"><span class="btn-icon">&#127758;</span>Mapa</button>
+                        <button class="side-btn" onclick="Game.save()" title="Zapisz [P]"><span class="btn-icon">&#128190;</span>Zapis</button>
+                        <button class="side-btn" onclick="GameUI.toggleAllPanels()" title="Pokaż/Ukryj panele"><span class="btn-icon">&#128196;</span>Panele</button>
                     </div>
                 </div>
             </div>
         </div>
 
         <div id="bottom-bar">
-            <div id="message-log"></div>
             <div id="controls-hint">
-                [WASD] Ruch &nbsp; [SPACJA] Cel/Drzwi/Podnieś &nbsp; [E] Interakcja &nbsp; [1-3] Skille &nbsp; [F1/F2] Mikstury &nbsp; [I] Inwentarz &nbsp; [K] Drzewko &nbsp; [T] Atrybuty &nbsp; [J] Questy &nbsp; [B] Bestiariusz &nbsp; [N] Mapa &nbsp; [R] Wierzchowiec &nbsp; [P] Zapis &nbsp; [PPM] Menu
+                [WASD] Ruch &nbsp; [SPACJA] Cel/Interakcja &nbsp; [E] Drzwi &nbsp; [1-3] Skille &nbsp; [F1/F2] Mikstury &nbsp; [I] EQ &nbsp; [K] Drzewko &nbsp; [T] Atrybuty &nbsp; [R] Wierzchowiec
             </div>
         </div>
     </div>

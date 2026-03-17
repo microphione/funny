@@ -11,12 +11,13 @@ GameInput.targetNearestMonster = function() {
 
     const cls = CLASSES[p.classId];
     const range = cls.attackRange || 1;
+    const searchRange = Math.max(8, range);
 
-    // Find nearest monster within attack range
-    const nearby = World.getMonstersNear(p.x, p.y, range);
+    // Find nearest monster within wide view range (targeting only, damage checks range separately)
+    const nearby = World.getMonstersNear(p.x, p.y, searchRange);
     if (nearby.length === 0) {
         // Try slightly larger search radius for feedback
-        const wider = World.getMonstersNear(p.x, p.y, range + 2);
+        const wider = World.getMonstersNear(p.x, p.y, searchRange + 4);
         if (wider.length > 0) {
             Game.log('Potwór poza zasięgiem ataku.', 'info');
         } else {
@@ -37,8 +38,9 @@ GameInput.targetNearestMonster = function() {
     Game.autoAttackTarget = target;
     Game.log(`Cel: ${target.name}`, 'combat');
 
-    // Immediate first attack if cooldown ready
-    if (Game.attackCooldown <= 0) {
+    // Immediate first attack if cooldown ready and in actual attack range
+    const dist = Math.abs(target.x - p.x) + Math.abs(target.y - p.y);
+    if (Game.attackCooldown <= 0 && dist <= range) {
         GameCombat.playerAttack(target.x, target.y);
         Game.attackCooldown = Game.getAttackSpeed();
     }
@@ -55,17 +57,13 @@ GameInput.interact = function() {
         if (curTile === World.T.STAIRS_DOWN) { World.goDownFloor(); GameRender.updateHUD(); return; }
     }
 
-    // Check if standing on stairs_up on overworld (e.g. starter island -> town)
+    // Check if standing on stairs_up on overworld
     if (!World.activeBuildingFloor && !World.activeDungeon) {
         const curTile = World.getTile(p.x, p.y);
         if (curTile === World.T.STAIRS_UP) {
-            // Check if this is the starter island town entrance
-            const ic = World.getIslandCenter();
-            if (Math.abs(p.x - ic.x) < 3 && Math.abs(p.y - ic.y) < 3) {
-                World.enterStarterTown();
-                GameRender.updateHUD();
-                return;
-            }
+            // Generic stairs up handling (future use)
+            Game.log('Schody prowadzą w górę.', 'info');
+            return;
         }
     }
 
@@ -240,53 +238,8 @@ GameInput.interact = function() {
         return;
     }
 
-    // Town building door (NPC inside) - check multi-story first
-    if (tile === T.TOWN_BUILDING_DOOR) {
-        const bKey = `${tx},${ty}`;
-        const bldg = World.townBuildings && World.townBuildings[bKey];
-        const npcName = bldg ? bldg.npcName : 'Mieszkaniec';
-
-        // Multi-story building: enter upper floors
-        if (bldg && bldg.multiStory && World.buildingFloors[bKey]) {
-            World.enterBuildingFloor(bKey, 0);
-            GameRender.updateHUD();
-            return;
-        }
-        // Special NPCs
-        if (npcName === 'Bankier') {
-            GameUI.openBank();
-            return;
-        }
-        if (npcName === 'Stajennik') {
-            const mountPrice = 500;
-            if (p.ownedMounts && p.ownedMounts.length > 0) {
-                Game.log(`Stajennik: Twój koń czeka! Naciśnij R by wsiadać/zsiadać.`, 'info');
-            } else {
-                GameUI.confirmAction(`Kupić wierzchowca za ${mountPrice} złota? (+40% szybkości ruchu)`, () => {
-                    if (p.gold >= mountPrice) {
-                        p.gold -= mountPrice;
-                        Game.syncGold();
-                        p.ownedMounts = p.ownedMounts || [];
-                        p.ownedMounts.push('horse');
-                        Game.log(`Kupiono wierzchowca! Naciśnij R by wsiadać/zsiadać.`, 'loot');
-                        GameRender.updateHUD();
-                    } else {
-                        Game.log(`Za mało złota! (potrzeba ${mountPrice})`, 'info');
-                    }
-                });
-            }
-            return;
-        }
-        const dialogues = [
-            `${npcName}: Witaj podróżniku! Czym mogę służyć?`,
-            `${npcName}: Miło cię widzieć w naszym mieście!`,
-            `${npcName}: Powodzenia w twoich przygodach!`,
-            `${npcName}: Uważaj za murami miasta, pełno tam potworów.`,
-            `${npcName}: Wróć kiedy będziesz potrzebować pomocy!`,
-        ];
-        Game.log(dialogues[Math.floor(Math.random() * dialogues.length)], 'info');
-        return;
-    }
+    // Town building door - player walks through physically (door is walkable)
+    // NPC interaction happens when player is inside and faces the NPC tile
 
     // Buyable house door - interact to buy or enter (if owned)
     if (tile === T.HOUSE_DOOR) {

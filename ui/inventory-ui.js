@@ -1,6 +1,16 @@
 // ============================================================
-// GAME UI - Inventory, equipment, consumables, item actions, house, bank
+// GAME UI - Inventory modal: Equipment doll (left) + Backpack (right)
 // ============================================================
+
+// Equipment slot icons for the doll
+const EQ_SLOT_ICONS = {
+    head: '&#9937;',
+    chest: '&#129509;',
+    legs: '&#128085;',
+    feet: '&#128095;',
+    weapon: '&#9876;',
+    offhand: '&#128737;',
+};
 
 GameUI.openInventory = function() {
     this.renderInventory();
@@ -13,43 +23,96 @@ GameUI.renderInventory = function() {
     content.innerHTML = '';
     const p = Game.player;
 
-    // Equipment slots
-    const eqDiv = document.createElement('div');
-    eqDiv.style.cssText = 'margin-bottom:12px;border-bottom:1px solid #333;padding-bottom:8px';
-    eqDiv.innerHTML = '<div style="font-size:9px;color:#f1c40f;margin-bottom:6px">Wyposażenie</div>';
-    for (const [slot, label] of Object.entries(EQUIP_SLOTS)) {
-        const item = p.equipment[slot];
-        const row = document.createElement('div');
-        row.className = 'inv-item' + (item ? ' equipped' : '');
-        const tierCol = item?.tier ? (TIERS[item.tier]?.color || '#aaa') : '#555';
-        row.innerHTML = `<span style="color:#888;width:60px">${label}:</span>
-            <span style="color:${tierCol};flex:1">${item ? item.name : '(pusto)'}</span>`;
-        if (item) {
-            const btn = document.createElement('button');
-            btn.className = 'use-btn';
-            btn.textContent = 'Zdejmij';
-            btn.onclick = () => { p.equipment[slot] = null; Game.refreshStats(); this.renderInventory(); this.updateSidePanel(); GameRender.updateHUD(); };
-            row.appendChild(btn);
-        }
-        eqDiv.appendChild(row);
-    }
-    content.appendChild(eqDiv);
+    // Main layout: equipment left, backpack right
+    const layout = document.createElement('div');
+    layout.className = 'inv-layout';
 
-    // Backpack items
-    const invDiv = document.createElement('div');
-    invDiv.innerHTML = '<div style="font-size:9px;color:#3498db;margin-bottom:6px">Plecak</div>';
+    // ===== LEFT SIDE: Equipment Doll =====
+    const eqSide = document.createElement('div');
+    eqSide.className = 'inv-eq-side';
+    eqSide.innerHTML = '<div style="font-size:8px;color:#f1c40f;margin-bottom:6px;text-align:center">Wyposażenie</div>';
+
+    const doll = document.createElement('div');
+    doll.className = 'eq-doll';
+    // Character silhouette
+    doll.innerHTML = '<div class="eq-char">&#129489;</div>';
+
+    // Equipment slots on the doll
+    const slotPositions = {
+        head:    'slot-head',
+        chest:   'slot-chest',
+        legs:    'slot-legs',
+        feet:    'slot-feet',
+        weapon:  'slot-weapon',
+        offhand: 'slot-offhand',
+    };
+
+    for (const [slot, posClass] of Object.entries(slotPositions)) {
+        const item = p.equipment[slot];
+        const slotDiv = document.createElement('div');
+        slotDiv.className = `eq-slot-pos ${posClass} ${item ? 'has-item' : ''}`;
+
+        if (item) {
+            const tierCol = item.tier ? (TIERS[item.tier]?.color || '#aaa') : '#aaa';
+            slotDiv.innerHTML = `<span style="color:${tierCol}">${getItemIcon(item)}</span>`;
+            slotDiv.title = `${item.name}\n${item.desc || ''}`;
+            slotDiv.onclick = () => {
+                // Unequip to backpack
+                const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
+                const backpackCount = p.inventory.filter(i => !equippedIds.has(i.id) || i.type === 'consumable').length;
+                if (backpackCount < 20) {
+                    p.equipment[slot] = null;
+                    Game.refreshStats();
+                    this.renderInventory();
+                    this.updateSidePanel();
+                    GameRender.updateHUD();
+                } else {
+                    Game.log('Plecak pełny!', 'info');
+                }
+            };
+        } else {
+            slotDiv.innerHTML = `<span style="color:#333">${EQ_SLOT_ICONS[slot] || '?'}</span>`;
+        }
+        // Label under slot
+        const label = document.createElement('span');
+        label.className = 'eq-label';
+        label.textContent = EQUIP_SLOTS[slot] || slot;
+        slotDiv.appendChild(label);
+
+        doll.appendChild(slotDiv);
+    }
+
+    eqSide.appendChild(doll);
+
+    // Gold display below doll
+    const goldDiv = document.createElement('div');
+    goldDiv.style.cssText = 'text-align:center;font-size:7px;color:#f1c40f;margin-top:8px';
+    goldDiv.innerHTML = `&#128176; ${formatCurrency(p.gold)}`;
+    eqSide.appendChild(goldDiv);
+
+    layout.appendChild(eqSide);
+
+    // ===== RIGHT SIDE: Backpack Items =====
+    const bpSide = document.createElement('div');
+    bpSide.className = 'inv-bp-side';
+    bpSide.innerHTML = '<div style="font-size:8px;color:#3498db;margin-bottom:6px">Plecak</div>';
+
     const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
     const backpackItems = p.inventory.map((item, idx) => ({item, idx})).filter(({item}) => !equippedIds.has(item.id) || item.type === 'consumable');
+
     if (backpackItems.length === 0) {
-        invDiv.innerHTML += '<div style="font-size:7px;color:#555">Pusty</div>';
+        bpSide.innerHTML += '<div style="font-size:7px;color:#555;padding:8px">Pusty plecak</div>';
     }
+
     backpackItems.forEach(({item, idx}) => {
         const row = document.createElement('div');
         row.className = 'inv-item';
         const tierCol = item.tier ? (TIERS[item.tier]?.color || '#aaa') : '#aaa';
         const count = item.count > 1 ? ` x${item.count}` : '';
-        row.innerHTML = `<span style="color:${tierCol};flex:1">${item.name}${count}</span>
-            <span style="font-size:7px;color:#888;margin:0 6px">${item.desc || ''}</span>`;
+        const icon = getItemIcon(item);
+
+        row.innerHTML = `<span style="font-size:14px;margin-right:4px">${icon}</span>
+            <span style="color:${tierCol};flex:1;font-size:7px">${item.name}${count}</span>`;
 
         // Stat comparison for equipment
         if (item.type === 'equipment') {
@@ -61,8 +124,8 @@ GameUI.renderInventory = function() {
                 const nw = item.stats ? (item.stats[stat] || 0) : (item[stat] || 0);
                 const diff = nw - cur;
                 const name = (ITEM_STAT_POOL.find(s => s.id === stat) || {}).name || stat;
-                if (diff > 0) compareHtml += `<span style="color:#2ecc71;font-size:7px;margin-left:4px">+${diff} ${name}</span>`;
-                else if (diff < 0) compareHtml += `<span style="color:#e74c3c;font-size:7px;margin-left:4px">${diff} ${name}</span>`;
+                if (diff > 0) compareHtml += `<span style="color:#2ecc71;font-size:6px;margin-left:2px">+${diff}</span>`;
+                else if (diff < 0) compareHtml += `<span style="color:#e74c3c;font-size:6px;margin-left:2px">${diff}</span>`;
             }
             if (compareHtml) {
                 const cmp = document.createElement('span');
@@ -73,6 +136,7 @@ GameUI.renderInventory = function() {
             if (canEquip(item, p.classId, p.level)) {
                 const btn = document.createElement('button');
                 btn.className = 'use-btn';
+                btn.style.background = '#2ecc71';
                 btn.textContent = 'Za\u0142\u00f3\u017c';
                 btn.onclick = () => {
                     p.equipment[item.slot] = item;
@@ -82,8 +146,6 @@ GameUI.renderInventory = function() {
                     GameRender.updateHUD();
                 };
                 row.appendChild(btn);
-            } else {
-                row.innerHTML += '<span style="font-size:7px;color:#e74c3c">Nie mo\u017cna</span>';
             }
         } else if (item.type === 'consumable') {
             const btn = document.createElement('button');
@@ -93,7 +155,7 @@ GameUI.renderInventory = function() {
             row.appendChild(btn);
         }
 
-        // Drop button (drop item on ground)
+        // Drop button
         const dropBtn = document.createElement('button');
         dropBtn.className = 'use-btn';
         dropBtn.style.background = '#e74c3c';
@@ -114,16 +176,11 @@ GameUI.renderInventory = function() {
         };
         row.appendChild(dropBtn);
 
-        invDiv.appendChild(row);
+        bpSide.appendChild(row);
     });
 
-    // Hint about selling
-    const hint = document.createElement('div');
-    hint.style.cssText = 'font-size:7px;color:#555;text-align:center;margin-top:8px';
-    hint.textContent = 'Sprzedawaj przedmioty u NPC w sklepach.';
-    invDiv.appendChild(hint);
-
-    content.appendChild(invDiv);
+    layout.appendChild(bpSide);
+    content.appendChild(layout);
 };
 
 GameUI.useConsumable = function(idx) {
@@ -132,13 +189,13 @@ GameUI.useConsumable = function(idx) {
     if (!item || item.type !== 'consumable') return;
 
     if (item.subtype === 'hp') {
-        const oldHp = p.hp;
-        p.hp = Math.min(p.maxHp, p.hp + item.heal);
-        Game.log(`U\u017cyto ${item.name}. +${p.hp - oldHp} HP`, 'heal');
+        const oldHp = Math.floor(p.hp);
+        p.hp = Math.min(p.maxHp, Math.floor(p.hp + item.heal));
+        Game.log(`U\u017cyto ${item.name}. +${Math.floor(p.hp) - oldHp} HP`, 'heal');
     } else if (item.subtype === 'mp') {
-        const oldMp = p.mp;
-        p.mp = Math.min(p.maxMp, p.mp + item.mana);
-        Game.log(`U\u017cyto ${item.name}. +${p.mp - oldMp} MP`, 'heal');
+        const oldMp = Math.floor(p.mp);
+        p.mp = Math.min(p.maxMp, Math.floor(p.mp + item.mana));
+        Game.log(`U\u017cyto ${item.name}. +${Math.floor(p.mp) - oldMp} MP`, 'heal');
     }
 
     item.count = (item.count || 1) - 1;
@@ -149,7 +206,6 @@ GameUI.useConsumable = function(idx) {
 
 // ========== ITEM ACTION MENU (right-click context menu) ==========
 GameUI.showItemActionMenu = function(item, idx, x, y) {
-    // Remove existing menu
     const existing = document.getElementById('item-action-menu');
     if (existing) existing.remove();
 
@@ -212,7 +268,6 @@ GameUI.showItemActionMenu = function(item, idx, x, y) {
     });
 
     document.body.appendChild(menu);
-    // Close on click outside
     const closeMenu = (e) => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', closeMenu); } };
     setTimeout(() => document.addEventListener('click', closeMenu), 10);
 };
@@ -228,11 +283,10 @@ GameUI.showHouseBuyDialog = function(houseKey, house) {
     content.innerHTML = '';
 
     const info = document.createElement('div');
-    info.style.cssText = 'text-align:center;font-size:8px;line-height:2.5;color:#aaa;margin-bottom:12px';
+    info.style.cssText = 'text-align:center;font-size:8px;color:#aaa;line-height:2.5;margin-bottom:12px';
     info.innerHTML = `<div style="color:#f1c40f;font-size:10px;margin-bottom:8px">Na sprzeda\u017c!</div>
         <div>Cena: <span style="color:#f1c40f">${house.price} z\u0142ota</span></div>
-        <div>Twoje z\u0142oto: <span style="color:${p.gold >= house.price ? '#2ecc71' : '#e74c3c'}">${p.gold}</span></div>
-        <div style="font-size:7px;color:#888;margin-top:8px">Kupuj\u0105c dom mo\u017cesz przechowywa\u0107 w nim przedmioty.</div>`;
+        <div>Twoje z\u0142oto: <span style="color:${p.gold >= house.price ? '#2ecc71' : '#e74c3c'}">${p.gold}</span></div>`;
     content.appendChild(info);
 
     if (p.gold >= house.price) {
@@ -252,11 +306,6 @@ GameUI.showHouseBuyDialog = function(houseKey, house) {
             this.updateSidePanel();
         };
         content.appendChild(buyBtn);
-    } else {
-        const noGold = document.createElement('div');
-        noGold.style.cssText = 'text-align:center;font-size:8px;color:#e74c3c;margin-top:8px';
-        noGold.textContent = 'Za ma\u0142o z\u0142ota!';
-        content.appendChild(noGold);
     }
 
     this.showOverlay('dialog-overlay');
@@ -274,11 +323,10 @@ GameUI.openBank = function() {
 
     const info = document.createElement('div');
     info.style.cssText = 'text-align:center;font-size:8px;color:#aaa;line-height:2.5;margin-bottom:10px';
-    info.innerHTML = `<div>Z\u0142oto w portfelu: <span style="color:#f1c40f">${formatCurrency(p.gold)}</span></div>
-        <div>Z\u0142oto w banku: <span style="color:#2ecc71">${formatCurrency(p.bankGold || 0)}</span></div>`;
+    info.innerHTML = `<div>Portfel: <span style="color:#f1c40f">${formatCurrency(p.gold)}</span></div>
+        <div>Bank: <span style="color:#2ecc71">${formatCurrency(p.bankGold || 0)}</span></div>`;
     content.appendChild(info);
 
-    // Deposit buttons
     const amounts = [10, 100, 1000, 'all'];
     const depositDiv = document.createElement('div');
     depositDiv.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-bottom:8px';
@@ -287,8 +335,7 @@ GameUI.openBank = function() {
         const btn = document.createElement('button');
         btn.className = 'use-btn';
         btn.style.background = '#2ecc71';
-        const label = amt === 'all' ? 'Wszystko' : formatCurrency(amt);
-        btn.textContent = label;
+        btn.textContent = amt === 'all' ? 'Wszystko' : formatCurrency(amt);
         btn.onclick = () => {
             const real = amt === 'all' ? p.gold : Math.min(amt, p.gold);
             if (real <= 0) return;
@@ -303,7 +350,6 @@ GameUI.openBank = function() {
     });
     content.appendChild(depositDiv);
 
-    // Withdraw buttons
     const withdrawDiv = document.createElement('div');
     withdrawDiv.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;justify-content:center';
     withdrawDiv.innerHTML = '<div style="width:100%;text-align:center;font-size:7px;color:#f1c40f;margin-bottom:4px">Wyp\u0142a\u0107</div>';
@@ -312,8 +358,7 @@ GameUI.openBank = function() {
         btn.className = 'use-btn';
         btn.style.background = '#f1c40f';
         btn.style.color = '#000';
-        const label = amt === 'all' ? 'Wszystko' : formatCurrency(amt);
-        btn.textContent = label;
+        btn.textContent = amt === 'all' ? 'Wszystko' : formatCurrency(amt);
         btn.onclick = () => {
             const bank = p.bankGold || 0;
             const real = amt === 'all' ? bank : Math.min(amt, bank);

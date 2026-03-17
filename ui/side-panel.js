@@ -1,12 +1,53 @@
 // ============================================================
-// GAME UI - Side panel rendering (stats, equipment, backpack, skills)
+// GAME UI - Side panel rendering (stats, backpack)
+// No equipment panel or skill bar in side UI anymore
 // ============================================================
+
+// Item icons for backpack display
+const ITEM_ICONS = {
+    // Weapons
+    'sword': '&#9876;', 'axe': '&#9876;', 'mace': '&#9876;', 'dagger': '&#128481;',
+    'staff': '&#128302;', 'wand': '&#128302;', 'bow': '&#127993;', 'crossbow': '&#127993;',
+    // Armor
+    'helmet': '&#9937;', 'head': '&#9937;', 'chest': '&#129509;', 'legs': '&#128085;',
+    'feet': '&#128095;', 'boots': '&#128095;', 'shield': '&#128737;', 'offhand': '&#128737;',
+    // Consumables
+    'hp': '&#10084;', 'mp': '&#128156;', 'food': '&#127830;',
+    // Currency
+    'currency': '&#128176;',
+    // Default
+    'default': '&#128188;',
+};
+
+function getItemIcon(item) {
+    if (!item) return '';
+    if (item.type === 'currency') return ITEM_ICONS.currency;
+    if (item.type === 'consumable') {
+        if (item.subtype === 'hp') return ITEM_ICONS.hp;
+        if (item.subtype === 'mp') return ITEM_ICONS.mp;
+        if (item.subtype === 'food') return ITEM_ICONS.food;
+        return ITEM_ICONS.hp;
+    }
+    if (item.type === 'equipment') {
+        if (item.slot === 'weapon') {
+            if (item.name && item.name.includes('Łuk')) return ITEM_ICONS.bow;
+            if (item.name && item.name.includes('Laska')) return ITEM_ICONS.staff;
+            if (item.name && item.name.includes('Różdżk')) return ITEM_ICONS.wand;
+            if (item.name && item.name.includes('Sztylet')) return ITEM_ICONS.dagger;
+            return ITEM_ICONS.sword;
+        }
+        if (item.slot === 'head') return ITEM_ICONS.helmet;
+        if (item.slot === 'chest') return ITEM_ICONS.chest;
+        if (item.slot === 'legs') return ITEM_ICONS.legs;
+        if (item.slot === 'feet') return ITEM_ICONS.boots;
+        if (item.slot === 'offhand') return ITEM_ICONS.shield;
+    }
+    return ITEM_ICONS.default;
+}
 
 GameUI.updateSidePanel = function() {
     this.updateCharStats();
-    this.updateEqPanel();
     this.updateBpPanel();
-    this.updateSkillBar();
 };
 
 GameUI.updateCharStats = function() {
@@ -17,58 +58,24 @@ GameUI.updateCharStats = function() {
     const cls = CLASSES[p.classId];
     const xpPct = p.xpToNext > 0 ? Math.floor(p.xp / p.xpToNext * 100) : 0;
     el.innerHTML = `
-        <div style="color:${cls.color}">${cls.name} Lv.${p.level}</div>
-        <div>XP: ${xpPct}% do Lv.${p.level + 1}</div>
-        <div style="color:#f1c40f">Złoto: ${formatCurrency(p.gold)}</div>
-        <div>DMG:${stats.damage} PNC:${stats.armor} CEL:${stats.accuracy}</div>
-        <div>KRIT:${stats.critChance}% UNIK:${stats.dodge}</div>
-        <div>Pkt stat: ${p.statPoints || 0} | Pkt skill: ${p.skillPoints || 0}</div>
+        <div style="color:${cls.color};font-size:7px">${cls.name} Lv.${p.level}</div>
+        <div style="font-size:6px;color:#888">XP: ${xpPct}% | ${Game.getPlayTime()}</div>
+        <div style="font-size:6px;color:#f1c40f">Złoto: ${formatCurrency(p.gold)}</div>
+        <div style="font-size:6px">DMG:${stats.damage} PNC:${stats.armor} CEL:${stats.accuracy}</div>
+        <div style="font-size:6px">KRIT:${stats.critChance}% UNIK:${stats.dodge}</div>
+        <div style="font-size:6px;color:#e67e22">${(p.statPoints || 0) > 0 ? 'Pkt stat: ' + p.statPoints : ''} ${(p.skillPoints || 0) > 0 ? 'Pkt skill: ' + p.skillPoints : ''}</div>
     `;
-};
-
-GameUI.updateEqPanel = function() {
-    const el = document.getElementById('eq-slots');
-    if (!el || !Game.player) return;
-    const p = Game.player;
-    el.innerHTML = '';
-    for (const [slot, label] of Object.entries(EQUIP_SLOTS)) {
-        const item = p.equipment[slot];
-        const div = document.createElement('div');
-        div.className = 'eq-slot';
-        const tierCol = item?.tier ? (TIERS[item.tier]?.color || '#aaa') : '#333';
-        div.innerHTML = `<span class="slot-label">${label}</span>
-            <span class="slot-item ${item ? '' : 'slot-empty'}" style="color:${tierCol}">${item ? item.name : '-'}</span>`;
-        if (item) {
-            div.title = `${item.name}\n${item.desc || ''}`;
-            div.onclick = () => {
-                // Unequip to backpack
-                const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
-                const backpackCount = p.inventory.filter(i => !equippedIds.has(i.id) || i.type === 'consumable').length;
-                if (backpackCount < 20) {
-                    p.equipment[slot] = null;
-                    Game.refreshStats();
-                    this.updateSidePanel();
-                    GameRender.updateHUD();
-                } else {
-                    Game.log('Plecak pełny!', 'info');
-                }
-            };
-        }
-        el.appendChild(div);
-    }
 };
 
 GameUI.updateBpPanel = function() {
     const grid = document.getElementById('bp-grid');
     const countEl = document.getElementById('bp-count');
-    const goldEl = document.getElementById('bp-gold');
     if (!grid || !Game.player) return;
     const p = Game.player;
     const equippedIds = new Set(Object.values(p.equipment).filter(e => e).map(e => e.id));
     const backpackItems = p.inventory.filter(item => !equippedIds.has(item.id) || item.type === 'consumable');
 
     if (countEl) countEl.textContent = `${backpackItems.length}/20`;
-    if (goldEl) goldEl.textContent = `\u{1F4B0} ${formatCurrency(p.gold)}`;
     grid.innerHTML = '';
 
     for (let i = 0; i < 20; i++) {
@@ -78,10 +85,27 @@ GameUI.updateBpPanel = function() {
         if (item) {
             slot.classList.add('has-item');
             const tierCol = item.tier ? (TIERS[item.tier]?.color || '#aaa') : '#aaa';
-            const shortName = item.name.length > 8 ? item.name.slice(0, 7) + '..' : item.name;
-            slot.innerHTML = `<span style="color:${tierCol}">${shortName}</span>`;
+            const icon = getItemIcon(item);
+            const shortName = item.name.length > 6 ? item.name.slice(0, 5) + '..' : item.name;
+            slot.innerHTML = `<span class="bp-icon">${icon}</span><span style="color:${tierCol}">${shortName}</span>`;
             if (item.count > 1) slot.innerHTML += `<span class="bp-count">x${item.count}</span>`;
             slot.title = `${item.name}\n${item.desc || ''}`;
+
+            // Stat comparison tooltip for equipment
+            if (item.type === 'equipment') {
+                const equipped = p.equipment[item.slot];
+                const compareStats = ['damage','armor','maxHp','maxMp','accuracy','dodge','critChance'];
+                let cmpText = '';
+                for (const stat of compareStats) {
+                    const cur = equipped ? (equipped.stats ? equipped.stats[stat] || 0 : equipped[stat] || 0) : 0;
+                    const nw = item.stats ? (item.stats[stat] || 0) : (item[stat] || 0);
+                    const diff = nw - cur;
+                    if (diff > 0) cmpText += ` +${diff}${stat.slice(0,3)}`;
+                    else if (diff < 0) cmpText += ` ${diff}${stat.slice(0,3)}`;
+                }
+                if (cmpText) slot.title += '\n' + cmpText.trim();
+            }
+
             slot.onclick = (e) => {
                 if (item.type === 'consumable') {
                     this.useConsumable(p.inventory.indexOf(item));
@@ -93,7 +117,6 @@ GameUI.updateBpPanel = function() {
                     GameRender.updateHUD();
                 }
             };
-            // Right-click for action menu
             slot.oncontextmenu = (e) => {
                 e.preventDefault();
                 const idx = p.inventory.indexOf(item);
@@ -105,64 +128,33 @@ GameUI.updateBpPanel = function() {
     }
 };
 
-GameUI.updateSkillBar = function() {
-    const bar = document.getElementById('skill-bar');
-    if (!bar || !Game.player) return;
-    const p = Game.player;
-    const cls = CLASSES[p.classId];
-    bar.innerHTML = '';
-    for (let i = 0; i < 3; i++) {
-        const sid = p.activeSkills[i];
-        const sk = sid ? cls.skills.find(s => s.id === sid) : null;
-        const lv = sid ? (p.skillLevels[sid] || 1) : 0;
-        const slot = document.createElement('div');
-        slot.className = 'skill-slot';
-        if (sk) {
-            const canUse = p.mp >= sk.cost;
-            const onCd = Game.skillCooldowns[sid] > 0;
-            const cdText = onCd ? ` (${Math.ceil(Game.skillCooldowns[sid])}s)` : '';
-            const color = onCd ? '#555' : (canUse ? '#9b59b6' : '#555');
-            slot.innerHTML = `<div class="sk-key">[${i+1}]</div><div style="color:${color}">${sk.name}${cdText}</div><div style="color:#888">Lv${lv}</div>`;
-        } else {
-            slot.innerHTML = `<div class="sk-key">[${i+1}]</div><div style="color:#333">-</div>`;
-        }
-        bar.appendChild(slot);
+// Toggle all panels visibility
+GameUI.toggleAllPanels = function() {
+    const panels = ['minimap-panel', 'vitals-panel', 'char-panel', 'bp-panel'];
+    const anyClosed = panels.some(id => this.closedPanels.has(id));
+    if (anyClosed) {
+        panels.forEach(id => this.reopenPanel(id));
+    } else {
+        // Minimize all
+        panels.forEach(id => this.closePanel(id));
     }
 };
 
-// ========== COMBAT SKILLS PANEL ==========
+// ========== COMBAT SKILLS PANEL (still used in char stats) ==========
 GameUI.updateCombatSkills = function() {
-    const el = document.getElementById('combat-skills');
-    if (!el || !Game.player) return;
-    const p = Game.player;
-    if (!p.combatSkills) return;
-    const skills = p.combatSkills;
-    const names = { melee: 'Walka', shielding: 'Obrona', magic: 'Magia', distance: 'Dystans' };
-    el.innerHTML = '';
-    for (const [key, sk] of Object.entries(skills)) {
-        const needed = Game.getTriesNeeded(key, sk.level);
-        const pct = Math.min(100, (sk.tries / needed) * 100);
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:center;gap:3px;margin:1px 0;font-size:6px';
-        row.innerHTML = `<span style="color:#888;width:36px">${names[key] || key}</span>
-            <span style="color:#e67e22;width:16px">${sk.level}</span>
-            <div style="flex:1;height:4px;background:#222;border:1px solid #333;border-radius:1px;overflow:hidden">
-                <div style="width:${pct}%;height:100%;background:#e67e22"></div>
-            </div>`;
-        el.appendChild(row);
-    }
+    // No longer rendered in side UI - data available in character panel
 };
 
 // ========== GROUND LOOT TOOLTIP ==========
 GameUI.showLootTooltip = function(items) {
     const el = document.getElementById('loot-tooltip');
     if (!el) return;
-    let html = '<div style="color:#f1c40f;margin-bottom:3px">Przedmioty na ziemi:</div>';
+    let html = '<div style="color:#f1c40f;margin-bottom:3px">Na ziemi:</div>';
     items.forEach(item => {
         const tierCol = item.tier ? (TIERS[item.tier]?.color || '#aaa') : '#aaa';
         html += `<div style="color:${tierCol}">${item.name}</div>`;
     });
-    html += '<div style="color:#888;margin-top:3px">[SPACJA] Podnie\u015B (po jednym)</div>';
+    html += '<div style="color:#888;margin-top:3px">[SPACJA] Podnie\u015B</div>';
     el.innerHTML = html;
     el.style.display = 'block';
     el.style.bottom = '10px';

@@ -134,7 +134,7 @@ GameInput.checkZoneVisit = function(wx, wy) {
     if (!siq) return;
 
     const zone = World.getIslandZone(wx, wy);
-    if (!zone || zone === 'plains' || zone === 'town_stairs') return;
+    if (!zone || zone === 'plains' || zone === 'town') return;
 
     // Check all active starter island quests
     for (const q of STARTER_ISLAND.quests) {

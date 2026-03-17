@@ -5,7 +5,7 @@
 
 const Sprites = {
     cache: {},
-    SPRITE_SIZE: 32,
+    SPRITE_SIZE: 128,
 
     create(key, drawFn) {
         if (this.cache[key]) return this.cache[key];
@@ -14,7 +14,12 @@ const Sprites = {
         c.height = this.SPRITE_SIZE;
         const ctx = c.getContext('2d');
         ctx.imageSmoothingEnabled = false;
-        drawFn(ctx, this.SPRITE_SIZE);
+        // Scale context so existing 32px drawing code works at 128px
+        const scaleFactor = this.SPRITE_SIZE / 32;
+        ctx.save();
+        ctx.scale(scaleFactor, scaleFactor);
+        drawFn(ctx, 32); // Always pass 32 as the "logical size"
+        ctx.restore();
         this.cache[key] = c;
         return c;
     },

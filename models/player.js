@@ -249,6 +249,8 @@ Game.refreshStats = function() {
     const s = this.getStats();
     p.maxHp = s.maxHp;
     p.maxMp = s.maxMp;
+    p.hp = Math.floor(p.hp);
+    p.mp = Math.floor(p.mp);
     if (p.hp > p.maxHp) p.hp = p.maxHp;
     if (p.mp > p.maxMp) p.mp = p.maxMp;
     this.syncGold();
